@@ -153,7 +153,7 @@ function groupMatches(matches) {
 /**
  * 由连线形状推导特殊元素（第 5.3 节）。
  *
- *   L 形 / T 形（横纵同时出现）→ 炸弹，落在交叉点
+ *   交叉形（L 形 / T 形，五格起）→ 炸弹，落在交叉点
  *   直线五连 → 彩虹
  *   直线四连 → 条纹，方向由连线方向决定
  *
@@ -171,8 +171,18 @@ export function planSpecials(board, matches, preferred = []) {
     else if (group.maxLen === 4) special = group.longest.dir === 'row' ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
     if (!special) continue;
 
+    /*
+     * 落点必须是"还没有特殊元素"的普通格。
+     * 因为落点会被排除在本次消除之外（它要原地变成新的特殊元素），
+     * 如果落在已有的条纹 / 彩虹 / 炸弹上，那颗特殊元素既不会被消除，
+     * 也不会触发自己的效果——表现出来就是"消掉条纹后它没炸，图案还留在原地"。
+     */
     const cells = [...group.cells.values()];
-    let target = cells.find((cell) => preferredKeys.has(key(cell.r, cell.c)));
+    const plain = cells.filter((cell) => board.specialAt(cell.r, cell.c) === null);
+    if (!plain.length) continue; // 整组都是特殊元素：让它们全部触发，不再生成新的
+    const isPlain = (p) => plain.some((cell) => cell.r === p.r && cell.c === p.c);
+
+    let target = plain.find((cell) => preferredKeys.has(key(cell.r, cell.c)));
 
     if (!target && special === SPECIAL.BOMB) {
       // 交叉点：同时出现在横线与竖线中的格子
@@ -184,14 +194,16 @@ export function planSpecials(board, matches, preferred = []) {
           hitCount.set(k, (hitCount.get(k) || 0) + 1);
         }
       }
-      const cross = [...hitCount.entries()].filter(([, n]) => n > 1);
-      if (cross.length) target = parseKey(cross[0][0]);
+      const cross = [...hitCount.entries()].filter(([, n]) => n > 1).map(([k]) => parseKey(k));
+      const crossPlain = cross.find(isPlain);
+      if (crossPlain) target = crossPlain;
     }
     if (!target) {
       const m = group.longest;
-      target = m.cells[Math.floor(m.cells.length / 2)];
+      const plainInLongest = m.cells.filter(isPlain);
+      target = plainInLongest[Math.floor(plainInLongest.length / 2)] || plain[0];
     }
-    plans.push({ r: target.r, c: target.c, special });
+    plans.push({ r: target.r, c: target.c, special, type: group.longest.type });
   }
 
   return plans;
@@ -232,6 +244,16 @@ export function planSpecialSwap(board, a, b, rng) {
     if (targetType < 0) return { cells: seeds, combo: 'rainbow' };
     seeds.push({ r: otherCell.r, c: otherCell.c });
 
+    // 彩虹 + 炸弹：炸弹没有颜色，改为以炸弹为中心清 5×5
+    if (otherSpecial === SPECIAL.BOMB) {
+      for (let rr = otherCell.r - 2; rr <= otherCell.r + 2; rr += 1) {
+        for (let cc = otherCell.c - 2; cc <= otherCell.c + 2; cc += 1) {
+          if (board.inside(rr, cc) && !board.isBlocked(rr, cc)) seeds.push({ r: rr, c: cc });
+        }
+      }
+      return { cells: seeds, combo: 'rainbow+bomb' };
+    }
+
     const sameType = [];
     board.eachCell((r, c) => {
       if (c === otherCell.c && r === otherCell.r) return;
@@ -256,6 +278,14 @@ export function planSpecialSwap(board, a, b, rng) {
     return { cells: [{ r: a.r, c: a.c }, { r: b.r, c: b.c }], combo: `${sa}+${sb}` };
   }
 
+  /*
+   * 炸弹没有颜色，无法通过"凑三连"触发，因此与任意相邻元素交换即引爆。
+   * 这也是它和条纹、彩虹的区别：后两者仍然靠颜色参与匹配。
+   */
+  if (sa === SPECIAL.BOMB || sb === SPECIAL.BOMB) {
+    return { cells: [{ r: a.r, c: a.c }, { r: b.r, c: b.c }], combo: 'bomb' };
+  }
+
   return null;
 }
 
@@ -273,10 +303,12 @@ export function blastCells(board, r, c, special) {
       for (let rr = 0; rr < board.rows; rr += 1) if (rr !== r) push(rr, c);
       break;
     case SPECIAL.BOMB:
-      for (let rr = r - 1; rr <= r + 1; rr += 1) {
-        for (let cc = c - 1; cc <= c + 1; cc += 1) {
-          if (rr === r && cc === c) continue;
-          push(rr, cc);
+      // 曼哈顿距离 ≤ 2 的菱形范围：以自身为中心共 13 格（横纵坐标之和不超过 2）
+      for (let dr = -2; dr <= 2; dr += 1) {
+        const span = 2 - Math.abs(dr);
+        for (let dc = -span; dc <= span; dc += 1) {
+          if (dr === 0 && dc === 0) continue;
+          push(r + dr, c + dc);
         }
       }
       break;

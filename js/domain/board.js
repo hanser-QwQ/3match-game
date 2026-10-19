@@ -43,11 +43,13 @@ export class Board {
     return this.blocked[i] === 0 && this.ice[i] === 0;
   }
 
-  /** 是否可以被匹配：必须有元素，且彩虹元素不参与颜色匹配 */
+  /** 是否可以被匹配：必须有元素；彩虹与炸弹没有颜色，不参与颜色匹配 */
   isMatchable(r, c) {
     if (!this.isFree(r, c)) return false;
     const i = this.idx(r, c);
-    return this.types[i] >= 0 && this.specials[i] !== 'rainbow';
+    if (this.types[i] < 0) return false;
+    const sp = this.specials[i];
+    return sp !== 'rainbow' && sp !== 'bomb';
   }
 
   typeAt(r, c) {

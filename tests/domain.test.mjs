@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Board } from '../js/domain/board.js';
-import { findMatches, isValidSwap, planSpecials, hasMatchAt } from '../js/domain/matchEngine.js';
+import { findMatches, isValidSwap, planSpecials, hasMatchAt, blastCells } from '../js/domain/matchEngine.js';
 import { resolveCascade } from '../js/domain/cascadeResolver.js';
 import { hasValidMove, findAnyValidMove, reshuffle } from '../js/domain/deadlockDetector.js';
 import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../js/domain/scorer.js';
@@ -79,7 +79,7 @@ test('匹配引擎：可行交换与不可行交换判定', () => {
   assert.equal(board4.typeAt(1, 2), MAP.A);
 });
 
-test('特殊元素：四连生成条纹、五连生成彩虹、L 形生成炸弹', () => {
+test('特殊元素：四连条纹、五连彩虹、L 形/T 形炸弹', () => {
   const four = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
   const p4 = planSpecials(four, findMatches(four), []);
   assert.equal(p4.length, 1);
@@ -90,17 +90,56 @@ test('特殊元素：四连生成条纹、五连生成彩虹、L 形生成炸弹
   assert.equal(p5.length, 1);
   assert.equal(p5[0].special, 'rainbow');
 
-  const lShape = makeBoard([
-    'AAAB',
-    'ABCD',
-    'ACDE',
-    'CDEF',
-  ]);
+  // 五格拐角（三连 + 三连）：炸弹，落在交叉点
+  const lShape = makeBoard(['AAAB', 'ABCD', 'ACDE', 'CDEF']);
   const pl = planSpecials(lShape, findMatches(lShape), []);
   assert.equal(pl.length, 1);
   assert.equal(pl[0].special, 'bomb');
   assert.equal(pl[0].r, 0);
   assert.equal(pl[0].c, 0, '炸弹应落在横线与竖线的交叉点');
+
+  // 四连 + 三连的六格拐角同样是炸弹
+  const bigL = makeBoard(['AAAAB', 'ABCDE', 'ACDEF', 'CDEFG']);
+  const pb = planSpecials(bigL, findMatches(bigL), []);
+  assert.equal(pb.length, 1);
+  assert.equal(pb[0].special, 'bomb');
+});
+
+test('炸弹范围：曼哈顿距离不超过 2 的菱形，共 12 个邻格', () => {
+  const board = new Board(8, 8, 6);
+  const cells = blastCells(board, 4, 4, 'bomb');
+  const has = (r, c) => cells.some((x) => x.r === r && x.c === c);
+  assert.equal(cells.length, 12, '中心 1 格 + 外围 12 格');
+  assert.ok(has(2, 4) && has(6, 4) && has(4, 2) && has(4, 6), '正方向距离 2 在内');
+  assert.ok(has(3, 3) && has(5, 5), '相邻斜角在内');
+  assert.ok(!has(2, 2) && !has(3, 2), '曼哈顿距离 4 与 3 的格子不在范围内');
+});
+
+test('炸弹没有颜色，不参与匹配，只能靠交换或波及引爆', () => {
+  const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
+  board.setType(0, 2, 0, 'bomb');
+  // 炸弹所在格不参与连线判定
+  assert.equal(board.isMatchable(0, 2), false, '炸弹不可匹配');
+  // 三连被炸弹打断：(0,0)(0,1) 只剩两颗，不算消除
+  assert.equal(findMatches(board).length, 0);
+});
+
+test('特殊元素落点不会被放在已有特殊元素上（否则它不触发也不消失）', () => {
+  // 四连中间那颗已经是条纹：落点必须避开它，让它正常被消除并引爆
+  const board = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
+  board.setType(0, 1, 0, 'stripe_h');
+  const plans = planSpecials(board, findMatches(board), [{ r: 0, c: 1 }]);
+  assert.equal(plans.length, 1);
+  assert.notEqual(`${plans[0].r},${plans[0].c}`, '0,1', '落点不能是已有条纹的格子');
+});
+
+test('整组都是特殊元素时不再生成新的特殊元素', () => {
+  const board = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
+  board.setType(0, 0, 0, 'stripe_h');
+  board.setType(0, 1, 0, 'stripe_v');
+  board.setType(0, 2, 0, 'bomb');
+  const plans = planSpecials(board, findMatches(board), []);
+  assert.equal(plans.length, 0, '全部是特殊元素时应全部触发，而不是新增一个');
 });
 
 test('特殊元素：条纹元素优先落在玩家交换的位置', () => {

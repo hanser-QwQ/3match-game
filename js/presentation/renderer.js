@@ -104,6 +104,9 @@ export class Renderer {
     this.fx = new Map();
     this.tweens = [];
     this.particles = [];
+    this.waves = [];
+    this.flashes = [];
+    this.shake = null;
     this.settings = {
       reducedMotion: false,
       showGrid: true,
@@ -314,6 +317,18 @@ export class Renderer {
   /** 播放一段结算：消除淡出 → 落位 → 补充 */
   async playStep(step) {
     const cleared = step.cleared;
+
+    // 炸弹引爆：冲击波 + 碎片 + 轻微震屏（减弱动效时只保留配色提示）
+    const bombs = cleared.filter((cell) => cell.special === SPECIAL.BOMB);
+    for (const b of bombs) {
+      this._shockwave(b.c, b.r);
+      this._burst(b.c, b.r, '#ffcf7a', 16);
+      if (!this.settings.reducedMotion) {
+        this.shake = { t0: performance.now(), dur: 340, amp: Math.min(4.5, this.cell * 0.1) };
+      }
+    }
+    const bombKeys = new Set(bombs.map((b) => `${b.r},${b.c}`));
+
     if (cleared.length) {
       for (const cell of cleared) {
         if (!this.settings.reducedMotion && this.quality !== 'low' && Math.random() < 0.5) {
@@ -336,18 +351,24 @@ export class Renderer {
     const fallMap = this._buildFallMap(step.boardAfterClear, step.boardAfter);
     this.view = step.boardAfter.clone();
 
+    // 新生成的特殊元素弹一下，避免玩家没注意到它出现了
+    const specialKeys = new Set((step.specials || []).map((p) => `${p.r},${p.c}`));
+    for (const p of step.specials || []) this._burst(p.c, p.r, '#ffe9a8', 8);
+
     await this._animate(190, (t) => {
       const e = easeOutCubic(t);
       for (const [, info] of fallMap) {
         const f = this._fx(info.toRow, info.c);
         f.dy = (info.fromRow - info.toRow) * this.cell * (1 - e);
         if (info.isNew && this.settings.reducedMotion) f.alpha = 0.6 + 0.4 * t;
+        if (specialKeys.has(`${info.toRow},${info.c}`)) f.scale = 1 + 0.32 * (1 - e);
       }
     });
     this._resetFx();
 
     if (step.triggered?.length) {
       for (const k of step.triggered) {
+        if (bombKeys.has(k)) continue; // 炸弹已经在引爆瞬间放过碎片
         const [r, c] = k.split(',').map(Number);
         this._burst(c, r, '#ffe9a8', 10);
       }
@@ -442,6 +463,16 @@ export class Renderer {
     this._spawnParticles(col, row, color, count);
   }
 
+  /** 炸弹冲击波：两圈向外扩散的菱形（与爆炸范围同形状）+ 中心闪光 */
+  _shockwave(col, row) {
+    const cx = this._x(col) + this.cell / 2;
+    const cy = this._y(row) + this.cell / 2;
+    const now = performance.now();
+    this.waves.push({ cx, cy, r0: this.cell * 0.3, r1: this.cell * 2.6, t0: now, dur: 460, color: '#ff9f2e', alpha: 0.95, width: 6 });
+    this.waves.push({ cx, cy, r0: this.cell * 0.15, r1: this.cell * 1.9, t0: now + 60, dur: 420, color: '#ffe0a8', alpha: 0.8, width: 3 });
+    this.flashes.push({ cx, cy, r: this.cell * 1.5, t0: now, dur: 260 });
+  }
+
   _updateParticles(now) {
     if (!this.particles.length) return;
     const dt = 1 / 60;
@@ -468,6 +499,18 @@ export class Renderer {
     const size = this.cssSize || this.canvas.width;
     ctx.clearRect(0, 0, size, size);
     if (!this.view) return;
+
+    ctx.save();
+    // 炸弹震屏：整体位移几像素后恢复，减弱动效时不做
+    if (this.shake) {
+      const t = (now - this.shake.t0) / this.shake.dur;
+      if (t >= 1) {
+        this.shake = null;
+      } else {
+        const amp = this.shake.amp * (1 - t);
+        ctx.translate(Math.sin(now / 17) * amp, Math.cos(now / 14) * amp);
+      }
+    }
 
     // 棋盘底板
     const bg = ctx.createLinearGradient(0, 0, size, size);
@@ -531,9 +574,53 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
 
+    // 炸弹中心闪光
+    if (this.flashes.length) {
+      for (const f of this.flashes) {
+        const t = (now - f.t0) / f.dur;
+        if (t < 0 || t > 1) continue;
+        const g = ctx.createRadialGradient(f.cx, f.cy, 0, f.cx, f.cy, f.r);
+        g.addColorStop(0, `rgba(255, 244, 214, ${0.85 * (1 - t)})`);
+        g.addColorStop(0.45, `rgba(255, 186, 92, ${0.45 * (1 - t)})`);
+        g.addColorStop(1, 'rgba(255, 150, 40, 0)');
+        ctx.save();
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(f.cx, f.cy, f.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+      this.flashes = this.flashes.filter((f) => now - f.t0 < f.dur);
+    }
+
+    // 炸弹冲击波：菱形，与爆炸范围同形状
+    if (this.waves.length) {
+      for (const w of this.waves) {
+        const t = (now - w.t0) / w.dur;
+        if (t < 0 || t > 1) continue;
+        const e = 1 - Math.pow(1 - t, 3);
+        const radius = w.r0 + (w.r1 - w.r0) * e;
+        ctx.save();
+        ctx.globalAlpha = w.alpha * (1 - t);
+        ctx.strokeStyle = w.color;
+        ctx.lineWidth = w.width * (1 - t) + 1;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(w.cx, w.cy - radius);
+        ctx.lineTo(w.cx + radius, w.cy);
+        ctx.lineTo(w.cx, w.cy + radius);
+        ctx.lineTo(w.cx - radius, w.cy);
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+      this.waves = this.waves.filter((w) => now - w.t0 < w.dur);
+    }
+
     // 选中框与键盘光标
     if (this.selected) this._drawRing(this.selected, 'rgba(255,255,255,0.95)', 4);
     if (this.settings.showCursor && this.cursor && this.cursorVisible) this._drawCursor(this.cursor, now);
+    ctx.restore();
   }
 
   _drawBlocked(r, c) {
@@ -594,21 +681,29 @@ export class Renderer {
       ctx.arc(cx, cy, s * 0.13, 0, Math.PI * 2);
       ctx.fill();
     } else if (special === SPECIAL.BOMB) {
+      // 炸弹没有颜色，靠暗色体 + 橙色脉冲光晕标识，避免混在普通方块里被忽略
+      const pulse = 0.5 + 0.5 * Math.sin(now / 320);
+      ctx.save();
+      ctx.shadowColor = `rgba(240, 166, 60, ${0.35 + pulse * 0.45})`;
+      ctx.shadowBlur = s * (0.16 + pulse * 0.24);
       const g = ctx.createLinearGradient(x, y, x + s, y + s);
       g.addColorStop(0, '#4a4652');
       g.addColorStop(1, '#25222c');
       ctx.fillStyle = g;
       roundRect(ctx, x, y, s, s, radius);
       ctx.fill();
+      ctx.restore();
+
       ctx.strokeStyle = '#15131a';
       ctx.lineWidth = Math.max(1.5, s * 0.04);
+      roundRect(ctx, x, y, s, s, radius);
       ctx.stroke();
-      ctx.strokeStyle = '#f0a63c';
+
+      ctx.strokeStyle = `rgba(240, 166, 60, ${0.55 + pulse * 0.45})`;
       ctx.lineWidth = Math.max(2, s * 0.055);
       ctx.beginPath();
-      ctx.arc(cx, cy, s * 0.26, 0, Math.PI * 2);
+      ctx.arc(cx, cy, s * (0.26 + pulse * 0.02), 0, Math.PI * 2);
       ctx.stroke();
-      ctx.fillStyle = '#f6c463';
       drawShape(ctx, 'star', cx, cy, s * 0.36, '#f6c463');
       ctx.strokeStyle = '#ffd98a';
       ctx.lineWidth = 2;
@@ -637,20 +732,24 @@ export class Renderer {
       // （条纹元素仍然按颜色参与匹配，这一点必须可读）。
       if (special === SPECIAL.STRIPE_H || special === SPECIAL.STRIPE_V) {
         ctx.save();
-        ctx.globalAlpha = 0.58;
+        ctx.globalAlpha = 0.75;
         ctx.strokeStyle = '#fffdf5';
-        ctx.lineWidth = Math.max(1.8, s * 0.06);
+        ctx.lineWidth = Math.max(2, s * 0.07);
         ctx.lineCap = 'round';
         const n = 3;
         for (let i = 1; i <= n; i += 1) {
-          const p = x + (s * i) / (n + 1);
+          // 竖条纹沿 y 方向铺，位置取 x；横条纹沿 x 方向铺，位置取 y。
+          // 两者不能共用同一个变量，否则横条纹会被画到别的行上去。
+          const t = (s * i) / (n + 1);
           ctx.beginPath();
           if (special === SPECIAL.STRIPE_V) {
-            ctx.moveTo(p, y + s * 0.14);
-            ctx.lineTo(p, y + s * 0.86);
+            const px = x + t;
+            ctx.moveTo(px, y + s * 0.08);
+            ctx.lineTo(px, y + s * 0.92);
           } else {
-            ctx.moveTo(x + s * 0.14, p);
-            ctx.lineTo(x + s * 0.86, p);
+            const py = y + t;
+            ctx.moveTo(x + s * 0.08, py);
+            ctx.lineTo(x + s * 0.92, py);
           }
           ctx.stroke();
         }
