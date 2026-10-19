@@ -448,6 +448,43 @@ body {
   padding: 10px 4px 0;
 }
 
+/* 达成目标后：允许继续冲分，也可以立即结算并拿走剩余步数奖励 */
+.settle-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 8px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eaf5ee, #dcece4);
+  border: 1px solid #b9d6c8;
+  box-shadow: var(--shadow-sm);
+  animation: popIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.settle-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.settle-info b { font-size: 13px; color: var(--accent-ink); letter-spacing: 0.02em; }
+.settle-info span { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.settle-btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fdfbf5;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+  transition: transform 0.12s ease;
+}
+
+.settle-btn:active { transform: scale(0.95); }
+.settle-btn:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+
 .booster {
   appearance: none;
   position: relative;
@@ -513,6 +550,8 @@ body {
 .result-card {
   width: 100%;
   max-width: 380px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
   background: var(--card);
   border-radius: 24px;
   box-shadow: var(--shadow-lg);
@@ -572,8 +611,8 @@ body {
 
 .result-actions { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
 .result-actions .btn { width: 100%; }
-.result-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.result-row.single { grid-template-columns: 1fr; }
+.result-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.result-row.single { grid-template-columns: repeat(2, 1fr); }
 .result-row .btn { font-size: 13px; padding: 11px 6px; }
 
 /* ------------------------------------------------------------------ 设置 */

@@ -50,6 +50,8 @@ export class SceneManager {
       score: $('score-value'),
       goalTasks: $('goal-tasks'),
       boosterBar: $('booster-bar'),
+      settleBar: $('settle-bar'),
+      settleBonus: $('settle-bonus'),
       saveNote: $('save-note'),
       badge: $('board-badge'),
       resultKicker: $('result-kicker'),
@@ -62,6 +64,7 @@ export class SceneManager {
       resultRetry: $('result-retry'),
       resultShare: $('result-share'),
       resultLevels: $('result-levels'),
+      resultHome: $('result-home'),
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
@@ -150,6 +153,11 @@ export class SceneManager {
       c.armBooster(btn.dataset.booster);
     });
 
+    document.getElementById('btn-settle')?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.dispatch({ type: 'SETTLE' });
+    });
+
     this.el.resultNext.addEventListener('click', () => {
       this.audio.play('button');
       const r = this.lastResult;
@@ -173,6 +181,11 @@ export class SceneManager {
     this.el.resultLevels.addEventListener('click', () => {
       this.audio.play('button');
       this.goto(SCENE.LEVELS);
+    });
+
+    this.el.resultHome.addEventListener('click', () => {
+      this.audio.play('button');
+      c.goHome();
     });
 
     this.el.resultShare.addEventListener('click', () => {
@@ -392,6 +405,14 @@ export class SceneManager {
     }
 
     this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
+
+    // 达标后不强制结算：给出"继续冲分"与"立即结算并拿走剩余步数奖励"两条路
+    const canSettle = Boolean(vm.goalDone) && vm.movesLeft > 0 && vm.state === 'in_progress';
+    this.el.settleBar?.classList.toggle('hidden', !canSettle);
+    if (canSettle && this.el.settleBonus) {
+      this.el.settleBonus.textContent = `+${vm.potentialBonus}`;
+    }
+
     this.a11y?.announce(`剩余 ${vm.movesLeft} 步，得分 ${vm.score}`);
   }
 

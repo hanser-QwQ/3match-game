@@ -96,6 +96,14 @@
       <div class="board-badge hidden" id="board-badge"></div>
     </div>
 
+    <div class="settle-bar hidden" id="settle-bar">
+      <div class="settle-info">
+        <b>目标已达成</b>
+        <span>继续消除可以提高分数，或现在结算</span>
+      </div>
+      <button class="settle-btn" id="btn-settle">结算 <span id="settle-bonus">+0</span></button>
+    </div>
+
     <div class="booster-bar" id="booster-bar"></div>
     <p class="save-note hidden" id="save-note">进度可能不会被保存（本地存储不可用）</p>
   </section>
@@ -118,6 +126,7 @@
           <button class="btn btn-ghost" id="result-retry">再玩一次</button>
           <button class="btn btn-ghost" id="result-share">成绩卡片</button>
           <button class="btn btn-ghost" id="result-levels">关卡</button>
+          <button class="btn btn-ghost" id="result-home">返回首页</button>
         </div>
       </div>
     </div>
@@ -202,7 +211,7 @@
         <div class="rank-total" id="rank-total">0</div>
       </div>
       <div class="rank-list" id="rank-list"></div>
-      <p class="fine-print">以上为本机记录的单机成绩，不是全服排名。</p>
+      <p class="fine-print">记录保存在浏览器本地，更换设备后不会同步。</p>
     </div>
   </section>
 
@@ -224,7 +233,7 @@
     <div class="overlay-card share-card">
       <h2>成绩卡片</h2>
       <div class="share-preview"><canvas id="share-canvas" width="1080" height="1440"></canvas></div>
-      <p class="fine-print">单机成绩，非全服排名。图片在本机生成，不会上传。</p>
+      <p class="fine-print">图片可直接保存到本地。</p>
       <div class="overlay-row">
         <button class="btn btn-primary" id="btn-share-download">保存图片</button>
         <button class="btn btn-ghost" id="btn-share-close">关闭</button>

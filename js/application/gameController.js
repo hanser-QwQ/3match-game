@@ -10,7 +10,7 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { BOOSTERS, SESSION_STATE, SCENE } from '../core/constants.js';
+import { BOOSTERS, SESSION_STATE, SCENE, SCORE } from '../core/constants.js';
 import { Board } from '../domain/board.js';
 import { createBoard } from '../domain/boardFactory.js';
 import { isAdjacent, isValidSwap, planSpecialSwap } from '../domain/matchEngine.js';
@@ -102,12 +102,17 @@ export class GameController {
   }
 
   startLevel(levelId, { resume = false } = {}) {
+    // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
+    if (this.busy) return false;
     const level = this.levels.get(levelId);
     if (!level || !level.valid) {
       this.toast('该关卡数据异常，暂时无法进入', 'warn');
       this.navigate(SCENE.LEVELS);
       return false;
     }
+
+    // 换关时先收起上一个会话的引导，避免气泡跨关卡残留
+    this.tutorial?.stop();
 
     const snap = this.save.interruptedSession;
     let board = null;
@@ -189,6 +194,8 @@ export class GameController {
         return this.useBooster(action.boosterId, action.target || null);
       case 'ARM_BOOSTER':
         return this.armBooster(action.boosterId);
+      case 'SETTLE':
+        return this.settle();
       case 'CONFIRM_RESULT':
         return { ok: true };
       default:
@@ -199,9 +206,22 @@ export class GameController {
   setBusy(value) {
     this.busy = value;
     this.renderer?.setInputLocked(value);
-    if (!value && this.pendingPause) {
-      this.pendingPause = false;
-      this.pause();
+    if (value) {
+      // 看门狗：动画异常时也不能让棋盘永久锁死
+      clearTimeout(this._busyTimer);
+      this._busyTimer = setTimeout(() => {
+        if (!this.busy) return;
+        console.warn('[controller] 操作超时，强制解锁输入');
+        this.busy = false;
+        this.renderer?.setInputLocked(false);
+        this.emitSession();
+      }, 12000);
+    } else {
+      clearTimeout(this._busyTimer);
+      if (this.pendingPause) {
+        this.pendingPause = false;
+        this.pause();
+      }
     }
   }
 
@@ -226,19 +246,21 @@ export class GameController {
         this.emitSession();
         await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
       } else {
-        const valid = isValidSwap(s.board, from, to);
-        if (!valid) {
-          // 无效交换回弹：不消耗步数、不改变得分（AC-02）
-          this.audio.play('invalid');
-          await this.renderer.playInvalidSwap(from, to);
-          return { ok: false, error: 'NO_MATCH' };
-        }
+        /*
+         * 任何相邻交换都会真正执行并消耗一步，不再预先判定"能否形成三连"。
+         * 交换后若没有连线，就只是这一步没有收益——把选择权留给玩家，
+         * 不做"这一步不划算所以不让你走"的拦截。
+         */
         s.board.swap(from, to);
         this.audio.play('swap');
         await this.renderer.playSwap(from, to, s.board);
         s.spendMove();
         this.emitSession();
-        await this.runCascade({ preferred: [from, to] });
+        const result = await this.runCascade({ preferred: [from, to] });
+        if (!result.sequence.length) {
+          // 没有连锁产生：给一个轻微的低音提示，画面保持交换后的状态
+          this.audio.play('dud');
+        }
       }
       await this.afterMove();
       return { ok: true };
@@ -270,14 +292,20 @@ export class GameController {
   async afterMove() {
     const s = this.session;
     if (!s) return;
-    if (s.goalDone) {
-      await this.finish(true);
-      return;
-    }
+
+    // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
+    // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
     if (s.movesLeft <= 0) {
-      await this.finish(false);
+      await this.finish(s.goalDone);
       return;
     }
+
+    if (s.goalDone && !s.goalAnnounced) {
+      s.goalAnnounced = true;
+      this.audio.play('special');
+      this.toast('目标已达成，可继续消除冲分，也可直接结算', 'good');
+    }
+
     // 死局检测与自动重排（FR-02）：不消耗步数、不改变得分
     if (!hasValidMove(s.board)) {
       this.toast('没有可消除的组合，自动重排', 'warn');
@@ -287,6 +315,18 @@ export class GameController {
     }
     this.saveSession();
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
+  }
+
+  /** 达成目标后主动结算，保留剩余步数奖励 */
+  async settle() {
+    const s = this.session;
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
+    if (!s.goalDone) {
+      this.toast('目标尚未完成', 'warn');
+      return { ok: false };
+    }
+    await this.finish(true);
+    return { ok: true };
   }
 
   async finish(cleared) {
@@ -457,6 +497,20 @@ export class GameController {
     return { ok: true };
   }
 
+  /** 直接回到标题（首页），用于结算后不想继续/不想跳下一关的场景 */
+  goHome() {
+    const s = this.session;
+    if (s && s.state === SESSION_STATE.IN_PROGRESS) {
+      this.save.interruptedSession = s.snapshot();
+      this.storage.write(this.save);
+    }
+    this.tutorial?.stop();
+    this.session = null;
+    this.renderer?.setBoard(null);
+    this.navigate(SCENE.HOME);
+    return { ok: true };
+  }
+
   // ---------------------------------------------------------------- 道具
 
   armBooster(id) {
@@ -588,6 +642,8 @@ export class GameController {
       score: s.counters.score,
       counters: s.counters,
       goals: s.goalTasks,
+      goalDone: s.goalDone,
+      potentialBonus: s.movesLeft * SCORE.CLEAR_BONUS_PER_MOVE,
       boosters,
       boosterArmed: this.boosterArmed,
       settings,

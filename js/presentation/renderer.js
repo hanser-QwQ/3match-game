@@ -223,27 +223,42 @@ export class Renderer {
 
   _loop(now) {
     if (!this._running) return;
-    // 推进补间
-    if (this.tweens.length) {
-      const remain = [];
-      for (const tw of this.tweens) {
-        const t = Math.min(1, (now - tw.t0) / tw.duration);
-        tw.onUpdate(t);
-        if (t < 1) remain.push(tw);
-        else tw.resolve();
+    try {
+      // 推进补间
+      if (this.tweens.length) {
+        const remain = [];
+        for (const tw of this.tweens) {
+          const t = Math.min(1, (now - tw.t0) / tw.duration);
+          tw.onUpdate(t);
+          if (t < 1) remain.push(tw);
+          else tw.resolve();
+        }
+        this.tweens = remain;
       }
-      this.tweens = remain;
+      // 帧率采样（每 30 帧一次）
+      this._fpsSamples.push(now);
+      if (this._fpsSamples.length > 30) this._fpsSamples.shift();
+      if (this._fpsSamples.length === 30) {
+        const span = this._fpsSamples[29] - this._fpsSamples[0];
+        const fps = span > 0 ? (29 * 1000) / span : 60;
+        this._evaluateFps(fps);
+      }
+      this._updateParticles(now);
+      this._draw(now);
+    } catch (err) {
+      // 单帧异常不能打断渲染循环：一旦循环停掉，等待中的补间永远不会 resolve，
+      // 输入层就会一直处于锁定状态。
+      this._errorCount = (this._errorCount || 0) + 1;
+      if (this._errorCount <= 3) console.error('[renderer] 帧渲染异常', err);
+      for (const tw of this.tweens) {
+        try {
+          tw.resolve();
+        } catch {
+          /* ignore */
+        }
+      }
+      this.tweens = [];
     }
-    // 帧率采样（每 30 帧一次）
-    this._fpsSamples.push(now);
-    if (this._fpsSamples.length > 30) this._fpsSamples.shift();
-    if (this._fpsSamples.length === 30) {
-      const span = this._fpsSamples[29] - this._fpsSamples[0];
-      const fps = span > 0 ? (29 * 1000) / span : 60;
-      this._evaluateFps(fps);
-    }
-    this._updateParticles(now);
-    this._draw(now);
     requestAnimationFrame(this._loop);
   }
 
@@ -277,27 +292,6 @@ export class Renderer {
       const fb = this._fx(b.r, b.c);
       fb.dx = -dc * dist * (1 - e);
       fb.dy = -dr * dist * (1 - e);
-    });
-    this._resetFx();
-  }
-
-  async playInvalidSwap(a, b) {
-    const dc = b.c - a.c;
-    const dr = b.r - a.r;
-    const dist = this.cell * 0.34;
-    await this._animate(260, (t) => {
-      this._resetFx();
-      const k = Math.sin(t * Math.PI);
-      const fa = this._fx(a.r, a.c);
-      fa.dx = dc * dist * k;
-      fa.dy = dr * dist * k;
-      const fb = this._fx(b.r, b.c);
-      fb.dx = -dc * dist * k;
-      fb.dy = -dr * dist * k;
-      if (t > 0.45 && t < 0.55) {
-        fa.scale = 0.94;
-        fb.scale = 0.94;
-      }
     });
     this._resetFx();
   }

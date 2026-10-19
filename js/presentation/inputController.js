@@ -49,11 +49,24 @@ export class InputController {
   }
 
   _onPointerDown(event) {
-    if (this.locked) return;
     const cell = this.renderer.cellFromPoint(event.clientX, event.clientY);
     if (!cell) return;
     event.preventDefault();
     this.canvas.focus({ preventScroll: true });
+
+    const session = this.controller.session;
+    if (!session || session.state !== 'in_progress') return;
+
+    /*
+     * 连锁结算动画期间只更新选中格，不消费这次点击。
+     * 之前在这里直接 return，玩家的下一次点击会被静默丢弃，
+     * 看起来就像"棋盘不动了"。
+     */
+    if (this.controller.busy) {
+      this.selected = cell;
+      this.renderer.setSelected(cell);
+      return;
+    }
 
     // 锤子待选目标：点哪里敲哪里
     if (this.controller.boosterArmed === 'hammer') {

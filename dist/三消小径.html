@@ -458,6 +458,43 @@ body {
   padding: 10px 4px 0;
 }
 
+/* 达成目标后：允许继续冲分，也可以立即结算并拿走剩余步数奖励 */
+.settle-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 4px 8px;
+  padding: 8px 10px 8px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eaf5ee, #dcece4);
+  border: 1px solid #b9d6c8;
+  box-shadow: var(--shadow-sm);
+  animation: popIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+.settle-info { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.settle-info b { font-size: 13px; color: var(--accent-ink); letter-spacing: 0.02em; }
+.settle-info span { font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.settle-btn {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fdfbf5;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex: none;
+  transition: transform 0.12s ease;
+}
+
+.settle-btn:active { transform: scale(0.95); }
+.settle-btn:focus-visible { outline: 3px solid var(--accent-ink); outline-offset: 2px; }
+
 .booster {
   appearance: none;
   position: relative;
@@ -523,6 +560,8 @@ body {
 .result-card {
   width: 100%;
   max-width: 380px;
+  max-height: calc(100dvh - 36px);
+  overflow-y: auto;
   background: var(--card);
   border-radius: 24px;
   box-shadow: var(--shadow-lg);
@@ -582,8 +621,8 @@ body {
 
 .result-actions { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
 .result-actions .btn { width: 100%; }
-.result-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.result-row.single { grid-template-columns: 1fr; }
+.result-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.result-row.single { grid-template-columns: repeat(2, 1fr); }
 .result-row .btn { font-size: 13px; padding: 11px 6px; }
 
 /* ------------------------------------------------------------------ 设置 */
@@ -1041,6 +1080,14 @@ body {
       <div class="board-badge hidden" id="board-badge"></div>
     </div>
 
+    <div class="settle-bar hidden" id="settle-bar">
+      <div class="settle-info">
+        <b>目标已达成</b>
+        <span>继续消除可以提高分数，或现在结算</span>
+      </div>
+      <button class="settle-btn" id="btn-settle">结算 <span id="settle-bonus">+0</span></button>
+    </div>
+
     <div class="booster-bar" id="booster-bar"></div>
     <p class="save-note hidden" id="save-note">进度可能不会被保存（本地存储不可用）</p>
   </section>
@@ -1063,6 +1110,7 @@ body {
           <button class="btn btn-ghost" id="result-retry">再玩一次</button>
           <button class="btn btn-ghost" id="result-share">成绩卡片</button>
           <button class="btn btn-ghost" id="result-levels">关卡</button>
+          <button class="btn btn-ghost" id="result-home">返回首页</button>
         </div>
       </div>
     </div>
@@ -1147,7 +1195,7 @@ body {
         <div class="rank-total" id="rank-total">0</div>
       </div>
       <div class="rank-list" id="rank-list"></div>
-      <p class="fine-print">以上为本机记录的单机成绩，不是全服排名。</p>
+      <p class="fine-print">记录保存在浏览器本地，更换设备后不会同步。</p>
     </div>
   </section>
 
@@ -1169,7 +1217,7 @@ body {
     <div class="overlay-card share-card">
       <h2>成绩卡片</h2>
       <div class="share-preview"><canvas id="share-canvas" width="1080" height="1440"></canvas></div>
-      <p class="fine-print">单机成绩，非全服排名。图片在本机生成，不会上传。</p>
+      <p class="fine-print">图片可直接保存到本地。</p>
       <div class="overlay-row">
         <button class="btn btn-primary" id="btn-share-download">保存图片</button>
         <button class="btn btn-ghost" id="btn-share-close">关闭</button>
@@ -1987,6 +2035,10 @@ class AudioService {
           break;
         case 'invalid':
           this._tone({ freq: 180, to: 120, type: 'square', dur: 0.12, gain: 0.10 });
+          break;
+        case 'dud':
+          // 交换成立但没有形成消除：轻而短的低音，不打断节奏也不带惩罚意味
+          this._tone({ freq: 210, to: 170, type: 'sine', dur: 0.1, gain: 0.07 });
           break;
         case 'clear': {
           const idx = Math.min(options.chainIndex || 1, 6);
@@ -3269,6 +3321,7 @@ class GameSession {
     this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
+    this.goalAnnounced = false;
     this.startedAt = Date.now();
     this.finishedAt = null;
     this.result = null;
@@ -3391,7 +3444,7 @@ __modules["js/application/gameController.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { BOOSTERS, SESSION_STATE, SCENE } = __req("js/core/constants.js");
+const { BOOSTERS, SESSION_STATE, SCENE, SCORE } = __req("js/core/constants.js");
 const { Board } = __req("js/domain/board.js");
 const { createBoard } = __req("js/domain/boardFactory.js");
 const { isAdjacent, isValidSwap, planSpecialSwap } = __req("js/domain/matchEngine.js");
@@ -3483,12 +3536,17 @@ class GameController {
   }
 
   startLevel(levelId, { resume = false } = {}) {
+    // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
+    if (this.busy) return false;
     const level = this.levels.get(levelId);
     if (!level || !level.valid) {
       this.toast('该关卡数据异常，暂时无法进入', 'warn');
       this.navigate(SCENE.LEVELS);
       return false;
     }
+
+    // 换关时先收起上一个会话的引导，避免气泡跨关卡残留
+    this.tutorial?.stop();
 
     const snap = this.save.interruptedSession;
     let board = null;
@@ -3570,6 +3628,8 @@ class GameController {
         return this.useBooster(action.boosterId, action.target || null);
       case 'ARM_BOOSTER':
         return this.armBooster(action.boosterId);
+      case 'SETTLE':
+        return this.settle();
       case 'CONFIRM_RESULT':
         return { ok: true };
       default:
@@ -3580,9 +3640,22 @@ class GameController {
   setBusy(value) {
     this.busy = value;
     this.renderer?.setInputLocked(value);
-    if (!value && this.pendingPause) {
-      this.pendingPause = false;
-      this.pause();
+    if (value) {
+      // 看门狗：动画异常时也不能让棋盘永久锁死
+      clearTimeout(this._busyTimer);
+      this._busyTimer = setTimeout(() => {
+        if (!this.busy) return;
+        console.warn('[controller] 操作超时，强制解锁输入');
+        this.busy = false;
+        this.renderer?.setInputLocked(false);
+        this.emitSession();
+      }, 12000);
+    } else {
+      clearTimeout(this._busyTimer);
+      if (this.pendingPause) {
+        this.pendingPause = false;
+        this.pause();
+      }
     }
   }
 
@@ -3607,19 +3680,21 @@ class GameController {
         this.emitSession();
         await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
       } else {
-        const valid = isValidSwap(s.board, from, to);
-        if (!valid) {
-          // 无效交换回弹：不消耗步数、不改变得分（AC-02）
-          this.audio.play('invalid');
-          await this.renderer.playInvalidSwap(from, to);
-          return { ok: false, error: 'NO_MATCH' };
-        }
+        /*
+         * 任何相邻交换都会真正执行并消耗一步，不再预先判定"能否形成三连"。
+         * 交换后若没有连线，就只是这一步没有收益——把选择权留给玩家，
+         * 不做"这一步不划算所以不让你走"的拦截。
+         */
         s.board.swap(from, to);
         this.audio.play('swap');
         await this.renderer.playSwap(from, to, s.board);
         s.spendMove();
         this.emitSession();
-        await this.runCascade({ preferred: [from, to] });
+        const result = await this.runCascade({ preferred: [from, to] });
+        if (!result.sequence.length) {
+          // 没有连锁产生：给一个轻微的低音提示，画面保持交换后的状态
+          this.audio.play('dud');
+        }
       }
       await this.afterMove();
       return { ok: true };
@@ -3651,14 +3726,20 @@ class GameController {
   async afterMove() {
     const s = this.session;
     if (!s) return;
-    if (s.goalDone) {
-      await this.finish(true);
-      return;
-    }
+
+    // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
+    // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
     if (s.movesLeft <= 0) {
-      await this.finish(false);
+      await this.finish(s.goalDone);
       return;
     }
+
+    if (s.goalDone && !s.goalAnnounced) {
+      s.goalAnnounced = true;
+      this.audio.play('special');
+      this.toast('目标已达成，可继续消除冲分，也可直接结算', 'good');
+    }
+
     // 死局检测与自动重排（FR-02）：不消耗步数、不改变得分
     if (!hasValidMove(s.board)) {
       this.toast('没有可消除的组合，自动重排', 'warn');
@@ -3668,6 +3749,18 @@ class GameController {
     }
     this.saveSession();
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
+  }
+
+  /** 达成目标后主动结算，保留剩余步数奖励 */
+  async settle() {
+    const s = this.session;
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
+    if (!s.goalDone) {
+      this.toast('目标尚未完成', 'warn');
+      return { ok: false };
+    }
+    await this.finish(true);
+    return { ok: true };
   }
 
   async finish(cleared) {
@@ -3838,6 +3931,20 @@ class GameController {
     return { ok: true };
   }
 
+  /** 直接回到标题（首页），用于结算后不想继续/不想跳下一关的场景 */
+  goHome() {
+    const s = this.session;
+    if (s && s.state === SESSION_STATE.IN_PROGRESS) {
+      this.save.interruptedSession = s.snapshot();
+      this.storage.write(this.save);
+    }
+    this.tutorial?.stop();
+    this.session = null;
+    this.renderer?.setBoard(null);
+    this.navigate(SCENE.HOME);
+    return { ok: true };
+  }
+
   // ---------------------------------------------------------------- 道具
 
   armBooster(id) {
@@ -3969,6 +4076,8 @@ class GameController {
       score: s.counters.score,
       counters: s.counters,
       goals: s.goalTasks,
+      goalDone: s.goalDone,
+      potentialBonus: s.movesLeft * SCORE.CLEAR_BONUS_PER_MOVE,
       boosters,
       boosterArmed: this.boosterArmed,
       settings,
@@ -4373,27 +4482,42 @@ class Renderer {
 
   _loop(now) {
     if (!this._running) return;
-    // 推进补间
-    if (this.tweens.length) {
-      const remain = [];
-      for (const tw of this.tweens) {
-        const t = Math.min(1, (now - tw.t0) / tw.duration);
-        tw.onUpdate(t);
-        if (t < 1) remain.push(tw);
-        else tw.resolve();
+    try {
+      // 推进补间
+      if (this.tweens.length) {
+        const remain = [];
+        for (const tw of this.tweens) {
+          const t = Math.min(1, (now - tw.t0) / tw.duration);
+          tw.onUpdate(t);
+          if (t < 1) remain.push(tw);
+          else tw.resolve();
+        }
+        this.tweens = remain;
       }
-      this.tweens = remain;
+      // 帧率采样（每 30 帧一次）
+      this._fpsSamples.push(now);
+      if (this._fpsSamples.length > 30) this._fpsSamples.shift();
+      if (this._fpsSamples.length === 30) {
+        const span = this._fpsSamples[29] - this._fpsSamples[0];
+        const fps = span > 0 ? (29 * 1000) / span : 60;
+        this._evaluateFps(fps);
+      }
+      this._updateParticles(now);
+      this._draw(now);
+    } catch (err) {
+      // 单帧异常不能打断渲染循环：一旦循环停掉，等待中的补间永远不会 resolve，
+      // 输入层就会一直处于锁定状态。
+      this._errorCount = (this._errorCount || 0) + 1;
+      if (this._errorCount <= 3) console.error('[renderer] 帧渲染异常', err);
+      for (const tw of this.tweens) {
+        try {
+          tw.resolve();
+        } catch {
+          /* ignore */
+        }
+      }
+      this.tweens = [];
     }
-    // 帧率采样（每 30 帧一次）
-    this._fpsSamples.push(now);
-    if (this._fpsSamples.length > 30) this._fpsSamples.shift();
-    if (this._fpsSamples.length === 30) {
-      const span = this._fpsSamples[29] - this._fpsSamples[0];
-      const fps = span > 0 ? (29 * 1000) / span : 60;
-      this._evaluateFps(fps);
-    }
-    this._updateParticles(now);
-    this._draw(now);
     requestAnimationFrame(this._loop);
   }
 
@@ -4427,27 +4551,6 @@ class Renderer {
       const fb = this._fx(b.r, b.c);
       fb.dx = -dc * dist * (1 - e);
       fb.dy = -dr * dist * (1 - e);
-    });
-    this._resetFx();
-  }
-
-  async playInvalidSwap(a, b) {
-    const dc = b.c - a.c;
-    const dr = b.r - a.r;
-    const dist = this.cell * 0.34;
-    await this._animate(260, (t) => {
-      this._resetFx();
-      const k = Math.sin(t * Math.PI);
-      const fa = this._fx(a.r, a.c);
-      fa.dx = dc * dist * k;
-      fa.dy = dr * dist * k;
-      const fb = this._fx(b.r, b.c);
-      fb.dx = -dc * dist * k;
-      fb.dy = -dr * dist * k;
-      if (t > 0.45 && t < 0.55) {
-        fa.scale = 0.94;
-        fb.scale = 0.94;
-      }
     });
     this._resetFx();
   }
@@ -4974,11 +5077,24 @@ class InputController {
   }
 
   _onPointerDown(event) {
-    if (this.locked) return;
     const cell = this.renderer.cellFromPoint(event.clientX, event.clientY);
     if (!cell) return;
     event.preventDefault();
     this.canvas.focus({ preventScroll: true });
+
+    const session = this.controller.session;
+    if (!session || session.state !== 'in_progress') return;
+
+    /*
+     * 连锁结算动画期间只更新选中格，不消费这次点击。
+     * 之前在这里直接 return，玩家的下一次点击会被静默丢弃，
+     * 看起来就像"棋盘不动了"。
+     */
+    if (this.controller.busy) {
+      this.selected = cell;
+      this.renderer.setSelected(cell);
+      return;
+    }
 
     // 锤子待选目标：点哪里敲哪里
     if (this.controller.boosterArmed === 'hammer') {
@@ -5140,7 +5256,7 @@ __modules["js/presentation/shareCard.js"] = function (exports, __req) {
  * 成绩卡片（第 7.5 节 / FR-18）
  *
  * 单张 1080 × 1440 PNG，浏览器 Canvas 离屏绘制后导出，不依赖服务端、不上传数据。
- * 卡片内必须标注"单机成绩，非全服排名"；昵称默认不写入。
+ * 昵称默认不写入。
  * 不支持位图导出时降级为可复制的纯文本摘要（由调用方处理）。
  */
 
@@ -5182,7 +5298,7 @@ function formatDate(iso) {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())}`;
 }
 
-function drawShareCard(canvas, result, { nickname = null } = {}) {
+function drawShareCard(canvas, result) {
   const ctx = canvas.getContext('2d');
   canvas.width = W;
   canvas.height = H;
@@ -5200,7 +5316,7 @@ function drawShareCard(canvas, result, { nickname = null } = {}) {
   ctx.fill();
   ctx.fillStyle = 'rgba(47, 111, 94, 0.10)';
   ctx.beginPath();
-  ctx.arc(W - 60, H - 120, 230, 0, Math.PI * 2);
+  ctx.arc(W - 60, H - 110, 230, 0, Math.PI * 2);
   ctx.fill();
 
   // 头部
@@ -5220,7 +5336,7 @@ function drawShareCard(canvas, result, { nickname = null } = {}) {
   ctx.shadowBlur = 50;
   ctx.shadowOffsetY = 18;
   ctx.fillStyle = '#fffdf8';
-  roundRect(ctx, 80, 250, W - 160, 830, 48);
+  roundRect(ctx, 80, 250, W - 160, 990, 48);
   ctx.fill();
   ctx.restore();
 
@@ -5228,34 +5344,34 @@ function drawShareCard(canvas, result, { nickname = null } = {}) {
   ctx.textAlign = 'center';
   ctx.fillStyle = '#8d8377';
   ctx.font = '500 28px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText(`第 ${String(result.levelId).padStart(2, '0')} 关`, W / 2, 340);
+  ctx.fillText(`第 ${String(result.levelId).padStart(2, '0')} 关`, W / 2, 360);
   ctx.fillStyle = '#2a2620';
   ctx.font = '800 56px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText(result.levelName || '', W / 2, 412);
+  ctx.fillText(result.levelName || '', W / 2, 440);
 
   // 星级
-  const starY = 510;
+  const starY = 572;
   for (let i = 0; i < 3; i += 1) {
-    const cx = W / 2 + (i - 1) * 128;
-    drawStar(ctx, cx, starY, 52, i < result.stars ? '#e0a020' : '#e3d9c7');
+    const cx = W / 2 + (i - 1) * 136;
+    drawStar(ctx, cx, starY, 56, i < result.stars ? '#e0a020' : '#e3d9c7');
   }
 
   // 分数
   ctx.fillStyle = '#2a2620';
-  ctx.font = '800 150px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText(String(result.finalScore), W / 2, 730);
+  ctx.font = '800 164px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+  ctx.fillText(String(result.finalScore), W / 2, 836);
   ctx.fillStyle = '#8d8377';
   ctx.font = '400 30px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText('分', W / 2, 778);
+  ctx.fillText('分', W / 2, 892);
 
   // 对比最高分
   ctx.font = '400 26px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
   if (result.isNewBest) {
     ctx.fillStyle = '#2f6f5e';
-    ctx.fillText('刷新本关最高分', W / 2, 832);
+    ctx.fillText('刷新本关最高分', W / 2, 952);
   } else {
     ctx.fillStyle = '#8d8377';
-    ctx.fillText(`历史最高 ${result.previousBest} 分`, W / 2, 832);
+    ctx.fillText(`历史最高 ${result.previousBest} 分`, W / 2, 952);
   }
 
   // 明细
@@ -5265,7 +5381,7 @@ function drawShareCard(canvas, result, { nickname = null } = {}) {
     ['最高连锁', `${result.chainBest} 连`],
     ['达成日期', formatDate(result.at)],
   ];
-  let ry = 906;
+  let ry = 1030;
   ctx.font = '400 28px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
   for (const [label, value] of rows) {
     ctx.textAlign = 'left';
@@ -5274,25 +5390,8 @@ function drawShareCard(canvas, result, { nickname = null } = {}) {
     ctx.textAlign = 'right';
     ctx.fillStyle = '#2a2620';
     ctx.fillText(value, W - 160, ry);
-    ry += 46;
+    ry += 50;
   }
-
-  // 昵称（默认不写入，仅玩家主动开启时显示）
-  if (nickname) {
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#8d8377';
-    ctx.font = '400 26px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    ctx.fillText(`玩家 ${nickname}`, W / 2, 1160);
-  }
-
-  // 必含标注
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#a1937f';
-  ctx.font = '400 24px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText('单机成绩，非全服排名', W / 2, 1270);
-  ctx.fillStyle = '#b8ab97';
-  ctx.font = '400 20px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  ctx.fillText('本图在本机生成，未上传任何数据', W / 2, 1310);
 }
 
 function shareFileName(result) {
@@ -5332,7 +5431,6 @@ function shareText(result) {
     `三消小径 · 第 ${result.levelId} 关 ${result.levelName}`,
     `得分 ${result.finalScore}（${'★'.repeat(result.stars)}）`,
     `剩余 ${result.movesLeft} 步，最高 ${result.chainBest} 连`,
-    '单机成绩，非全服排名',
   ].join('\n');
 }
 
@@ -5395,6 +5493,8 @@ class SceneManager {
       score: $('score-value'),
       goalTasks: $('goal-tasks'),
       boosterBar: $('booster-bar'),
+      settleBar: $('settle-bar'),
+      settleBonus: $('settle-bonus'),
       saveNote: $('save-note'),
       badge: $('board-badge'),
       resultKicker: $('result-kicker'),
@@ -5407,6 +5507,7 @@ class SceneManager {
       resultRetry: $('result-retry'),
       resultShare: $('result-share'),
       resultLevels: $('result-levels'),
+      resultHome: $('result-home'),
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
@@ -5495,6 +5596,11 @@ class SceneManager {
       c.armBooster(btn.dataset.booster);
     });
 
+    document.getElementById('btn-settle')?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.dispatch({ type: 'SETTLE' });
+    });
+
     this.el.resultNext.addEventListener('click', () => {
       this.audio.play('button');
       const r = this.lastResult;
@@ -5518,6 +5624,11 @@ class SceneManager {
     this.el.resultLevels.addEventListener('click', () => {
       this.audio.play('button');
       this.goto(SCENE.LEVELS);
+    });
+
+    this.el.resultHome.addEventListener('click', () => {
+      this.audio.play('button');
+      c.goHome();
     });
 
     this.el.resultShare.addEventListener('click', () => {
@@ -5737,6 +5848,14 @@ class SceneManager {
     }
 
     this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
+
+    // 达标后不强制结算：给出"继续冲分"与"立即结算并拿走剩余步数奖励"两条路
+    const canSettle = Boolean(vm.goalDone) && vm.movesLeft > 0 && vm.state === 'in_progress';
+    this.el.settleBar?.classList.toggle('hidden', !canSettle);
+    if (canSettle && this.el.settleBonus) {
+      this.el.settleBonus.textContent = `+${vm.potentialBonus}`;
+    }
+
     this.a11y?.announce(`剩余 ${vm.movesLeft} 步，得分 ${vm.score}`);
   }
 

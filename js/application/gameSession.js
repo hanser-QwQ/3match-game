@@ -20,6 +20,7 @@ export class GameSession {
     this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
+    this.goalAnnounced = false;
     this.startedAt = Date.now();
     this.finishedAt = null;
     this.result = null;
