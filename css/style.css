@@ -698,6 +698,8 @@ body {
 
 .btn-danger { color: var(--danger); border-color: #dcc0bc; }
 
+.version-line { text-align: center; margin-top: 20px; opacity: 0.75; letter-spacing: 0.08em; }
+
 /* ------------------------------------------------------------------ 成绩 */
 
 .rank-hero {
