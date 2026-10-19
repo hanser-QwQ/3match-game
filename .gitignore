@@ -1,0 +1,15 @@
+# 依赖与构建产物（本项目无需构建，dist 里的单文件版需要一起发布）
+node_modules/
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 本地工具数据（含对话记录与发布凭据，不应进入仓库）
+.workbuddy/
+.*.genie
+
+# 课程交付文档（含需求/设计对照，不随仓库发布）
+docs/

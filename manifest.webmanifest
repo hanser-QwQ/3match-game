@@ -1,0 +1,20 @@
+{
+  "name": "三消小径 · 轻量消除",
+  "short_name": "三消小径",
+  "description": "无需安装、无需注册的关卡制轻量消除网页游戏，对色觉障碍玩家友好，断网可玩。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f1e7",
+  "theme_color": "#f6f1e7",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

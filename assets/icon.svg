@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="三消小径图标">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#faf5ec"/>
+      <stop offset="1" stop-color="#eee4d3"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="42" fill="url(#bg)"/>
+  <g>
+    <rect x="30" y="30" width="40" height="40" rx="12" fill="#e8557f"/>
+    <circle cx="116" cy="50" r="20" fill="#3f78d0"/>
+    <path d="M156 30 L176 66 L136 66 Z" fill="#2f9e6f"/>
+    <path d="M50 86 L70 106 L50 126 L30 106 Z" fill="#e2a520"/>
+    <path d="M116 82 L120 96 L135 96 L123 105 L128 119 L116 110 L104 119 L109 105 L97 96 L112 96 Z" fill="#8b63d6"/>
+    <path d="M156 86 L173 96 L173 116 L156 126 L139 116 L139 96 Z" fill="#17a3b8"/>
+  </g>
+  <rect x="30" y="146" width="132" height="16" rx="8" fill="#2f6f5e" opacity="0.85"/>
+</svg>
