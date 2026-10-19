@@ -1,0 +1,626 @@
+/**
+ * M16 场景与界面 SceneManager（表现层／应用层之间）
+ *
+ * 六个场景：首页、关卡列表、游戏、结算、设置、成绩。
+ * 只负责把应用层下发的视图模型渲染为 DOM 并转发用户意图，
+ * 不判断规则是否成立，也不直接读写存档。
+ */
+
+import { EVENTS } from '../core/events.js';
+import { SCENE } from '../core/constants.js';
+import { goalSummary } from '../domain/goals.js';
+import { drawShareCard, downloadShareCard, shareText } from './shareCard.js';
+
+const STAR = '★';
+
+export class SceneManager {
+  constructor({ bus, controller, renderer, audio, a11y }) {
+    this.bus = bus;
+    this.controller = controller;
+    this.renderer = renderer;
+    this.audio = audio;
+    this.a11y = a11y;
+    this.current = null;
+    this.lastResult = null;
+    this.lastScore = -1;
+    this.tutorialAnchor = 'board';
+    this.tutorialStep = null;
+    this.el = {};
+  }
+
+  init() {
+    this.cacheElements();
+    this.bindStatic();
+    this.bindBus();
+    this.refreshHome();
+    return this;
+  }
+
+  cacheElements() {
+    const $ = (id) => document.getElementById(id);
+    this.el = {
+      homeProgress: $('home-progress'),
+      btnContinue: $('btn-continue'),
+      levelGrid: $('level-grid'),
+      levelsMeta: $('levels-meta'),
+      levelName: $('game-level-name'),
+      hint: $('game-hint'),
+      movesLeft: $('moves-left'),
+      movesChip: $('moves-chip'),
+      score: $('score-value'),
+      goalTasks: $('goal-tasks'),
+      boosterBar: $('booster-bar'),
+      saveNote: $('save-note'),
+      badge: $('board-badge'),
+      resultKicker: $('result-kicker'),
+      resultTitle: $('result-title'),
+      resultStars: $('result-stars'),
+      resultScore: $('result-score'),
+      resultBest: $('result-best'),
+      resultDetail: $('result-detail'),
+      resultNext: $('result-next'),
+      resultRetry: $('result-retry'),
+      resultShare: $('result-share'),
+      resultLevels: $('result-levels'),
+      resultRow: document.querySelector('.result-row'),
+      resultCard: document.querySelector('.result-card'),
+      pause: $('pause-overlay'),
+      share: $('share-overlay'),
+      shareCanvas: $('share-canvas'),
+      tutorial: $('tutorial-bubble'),
+      tutorialStep: $('tutorial-step'),
+      tutorialText: $('tutorial-text'),
+      toastLayer: $('toast-layer'),
+      updateBar: $('update-bar'),
+      rankName: $('rank-name'),
+      rankTotal: $('rank-total'),
+      rankList: $('rank-list'),
+      setSound: $('set-sound'),
+      setVolume: $('set-volume'),
+      setVolumeOut: $('set-volume-out'),
+      setColorblind: $('set-colorblind'),
+      setMotion: $('set-motion'),
+      setGrid: $('set-grid'),
+      setCursor: $('set-cursor'),
+      setNickname: $('set-nickname'),
+    };
+  }
+
+  bindStatic() {
+    const c = this.controller;
+
+    document.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.audio.play('button');
+        this.goto(btn.dataset.action);
+      });
+    });
+
+    document.querySelectorAll('[data-back]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.audio.play('button');
+        this.goto(btn.dataset.back);
+      });
+    });
+
+    this.el.btnContinue.addEventListener('click', () => {
+      this.audio.play('button');
+      const snap = c.save.interruptedSession;
+      const target = snap?.levelId ?? c.nextLevelId();
+      const resume = Boolean(snap && Number(snap.levelId) === Number(target));
+      c.startLevel(target, { resume });
+    });
+
+    this.el.levelGrid.addEventListener('click', (event) => {
+      const card = event.target.closest('.level-card');
+      if (!card || card.disabled) return;
+      this.audio.play('button');
+      const id = Number(card.dataset.level);
+      const snap = c.save.interruptedSession;
+      c.startLevel(id, { resume: Boolean(snap && Number(snap.levelId) === id) });
+    });
+
+    document.getElementById('btn-pause').addEventListener('click', () => {
+      this.audio.play('button');
+      c.pause();
+    });
+
+    document.getElementById('btn-resume').addEventListener('click', () => {
+      this.audio.play('button');
+      c.resume();
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+      this.audio.play('button');
+      this.hidePause();
+      c.restart();
+    });
+
+    document.getElementById('btn-quit').addEventListener('click', () => {
+      this.audio.play('button');
+      this.hidePause();
+      c.quit();
+      this.goto(SCENE.LEVELS);
+    });
+
+    this.el.boosterBar.addEventListener('click', (event) => {
+      const btn = event.target.closest('.booster');
+      if (!btn || btn.disabled) return;
+      this.audio.play('button');
+      c.armBooster(btn.dataset.booster);
+    });
+
+    this.el.resultNext.addEventListener('click', () => {
+      this.audio.play('button');
+      const r = this.lastResult;
+      if (!r) return;
+      if (!r.cleared) {
+        c.startLevel(r.levelId);
+        return;
+      }
+      if (c.levels.get(r.levelId + 1)) c.startLevel(r.levelId + 1);
+      else {
+        this.goto(SCENE.LEVELS);
+        this.toast('已经通关全部关卡，可以重复挑战刷新记录', 'good');
+      }
+    });
+
+    this.el.resultRetry.addEventListener('click', () => {
+      this.audio.play('button');
+      if (this.lastResult) c.startLevel(this.lastResult.levelId);
+    });
+
+    this.el.resultLevels.addEventListener('click', () => {
+      this.audio.play('button');
+      this.goto(SCENE.LEVELS);
+    });
+
+    this.el.resultShare.addEventListener('click', () => {
+      this.audio.play('button');
+      this.openShare();
+    });
+
+    document.getElementById('btn-share-close').addEventListener('click', () => {
+      this.el.share.classList.add('hidden');
+    });
+
+    document.getElementById('btn-share-download').addEventListener('click', async () => {
+      if (!this.lastResult) return;
+      const res = await downloadShareCard(this.el.shareCanvas, this.lastResult);
+      if (res.ok) this.toast('图片已保存到下载目录', 'good');
+      else {
+        const text = shareText(this.lastResult);
+        try {
+          await navigator.clipboard.writeText(text);
+          this.toast('当前浏览器不支持导出图片，成绩文本已复制', 'warn');
+        } catch {
+          this.toast('当前浏览器不支持导出图片', 'warn');
+        }
+      }
+    });
+
+    // 设置项
+    this.el.setSound.addEventListener('change', (e) => {
+      c.updateSettings({ soundEnabled: e.target.checked });
+    });
+    this.el.setVolume.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      this.el.setVolumeOut.textContent = `${v}%`;
+      c.save.settings.volume = v;
+      c.audio.setVolume(v / 100);
+    });
+    this.el.setVolume.addEventListener('change', (e) => {
+      c.updateSettings({ volume: Number(e.target.value) });
+    });
+    this.el.setColorblind.addEventListener('change', (e) => {
+      c.updateSettings({ colorBlindEnhanced: e.target.checked });
+    });
+    this.el.setMotion.addEventListener('change', (e) => {
+      c.updateSettings({ reducedMotion: e.target.checked });
+    });
+    this.el.setGrid.addEventListener('change', (e) => {
+      c.updateSettings({ showGrid: e.target.checked });
+    });
+    this.el.setCursor.addEventListener('change', (e) => {
+      c.updateSettings({ showCursor: e.target.checked });
+    });
+    this.el.setNickname.addEventListener('change', (e) => {
+      const value = c.setNickname(e.target.value);
+      e.target.value = value;
+      this.toast(`昵称已保存为“${value}”`, 'good');
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      if (!window.confirm('清空全部本地进度？此操作不可撤销。')) return;
+      c.clearAllProgress();
+      this.refreshHome();
+      this.toast('本地进度已清空');
+      this.goto(SCENE.HOME);
+    });
+
+    // 线上重新发布后的版本提示
+    document.getElementById('btn-update')?.addEventListener('click', () => {
+      this.updateDismissed = true;
+      location.reload();
+    });
+    document.getElementById('btn-update-later')?.addEventListener('click', () => {
+      this.updateDismissed = true;
+      this.el.updateBar?.classList.add('hidden');
+    });
+  }
+
+  bindBus() {
+    const b = this.bus;
+    b.on(EVENTS.SESSION_UPDATED, (vm) => this.renderSession(vm));
+    b.on(EVENTS.TOAST, (payload) => this.toast(payload.text, payload.type));
+    b.on(EVENTS.TUTORIAL_STEP, (step) => this.showTutorial(step));
+    b.on(EVENTS.SAVE_FAILED, () => {
+      if (this.el.saveNote) this.el.saveNote.classList.remove('hidden');
+    });
+    b.on('game:paused', () => this.showPause());
+    b.on('game:resumed', () => this.hidePause());
+    b.on('ui:pause-request', () => this.controller.pause());
+    b.on('ui:resume-request', () => this.controller.resume());
+    b.on(EVENTS.LEVEL_CLEARED, () => this.refreshHome());
+    b.on('offline:update', () => {
+      if (this.updateDismissed) return;
+      this.el.updateBar?.classList.remove('hidden');
+    });
+  }
+
+  // ------------------------------------------------------------------ 场景
+
+  goto(scene) {
+    if (!scene) return;
+    const scenes = document.querySelectorAll('.scene');
+    scenes.forEach((s) => {
+      const name = s.dataset.scene;
+      if (name === scene) s.classList.add('active');
+      else if (scene === SCENE.RESULT && name === SCENE.GAME) {
+        /* 结算时保留棋盘作为背景 */
+      } else s.classList.remove('active');
+    });
+    this.current = scene;
+
+    if (scene === SCENE.LEVELS) this.renderLevels();
+    if (scene === SCENE.RANK) this.renderRank();
+    if (scene === SCENE.SETTINGS) this.syncSettings();
+    if (scene === SCENE.HOME) this.refreshHome();
+    if (scene === SCENE.GAME) {
+      this.lastScore = -1;
+      requestAnimationFrame(() => this.renderer._onResize());
+    }
+    if (scene === SCENE.RESULT) this.el.pause.classList.add('hidden');
+    // 引导气泡只在游戏场景内出现，离开时收起，避免遮挡其他界面
+    if (scene !== SCENE.GAME && scene !== SCENE.RESULT) {
+      this.el.tutorial.classList.add('hidden');
+    } else if (this.tutorialStep) {
+      this.showTutorial(this.tutorialStep);
+    }
+  }
+
+  showPause() {
+    this.el.pause.classList.remove('hidden');
+    this.el.tutorial.classList.add('hidden');
+  }
+
+  hidePause() {
+    this.el.pause.classList.add('hidden');
+    if (this.tutorialStep) this.showTutorial(this.tutorialStep);
+  }
+
+  // ------------------------------------------------------------------ 渲染
+
+  refreshHome() {
+    const save = this.controller.save;
+    const cleared = Object.values(save.progress).filter((p) => p.cleared).length;
+    const total = this.controller.levels.count() || 20;
+    const nextId = this.controller.nextLevelId();
+    const nextLevel = this.controller.levels.get(nextId);
+    const label = this.el.btnContinue.querySelector('.btn-continue-label');
+    const sub = this.el.btnContinue.querySelector('.btn-continue-sub');
+    if (cleared === 0) {
+      label.textContent = '开始第 1 关';
+      sub.textContent = '四个元素连成一线';
+    } else {
+      label.textContent = `继续第 ${nextId} 关`;
+      const goal = nextLevel ? goalSummary(nextLevel.goal) : '';
+      sub.textContent = nextLevel ? `${nextLevel.name} · ${goal}` : '全部关卡已通关';
+    }
+    this.el.homeProgress.textContent = cleared
+      ? `已通关 ${cleared} / ${total} · 累计 ${save.player.totalScore} 分`
+      : '尚未开始';
+  }
+
+  renderSession(vm) {
+    if (!vm || !vm.board) return;
+    if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
+
+    this.el.levelName.textContent = `第 ${vm.levelId} 关 · ${vm.levelName}`;
+    this.el.hint.textContent = vm.hint;
+    this.el.movesLeft.textContent = vm.movesLeft;
+    this.el.movesChip.classList.toggle('low', vm.movesLeft <= 3 && vm.state === 'in_progress');
+
+    if (vm.score !== this.lastScore) {
+      this.el.score.textContent = vm.score;
+      if (vm.score > this.lastScore && this.lastScore >= 0) {
+        this.el.score.classList.add('bump');
+        setTimeout(() => this.el.score.classList.remove('bump'), 140);
+      }
+      this.lastScore = vm.score;
+    }
+
+    // 目标进度：始终可见并实时更新（NFR-08）
+    this.el.goalTasks.textContent = '';
+    for (const task of vm.goals) {
+      const chip = document.createElement('div');
+      chip.className = 'goal-chip' + (task.done ? ' done' : '');
+      const label = document.createElement('span');
+      label.className = 'goal-label';
+      label.textContent = task.label;
+      const value = document.createElement('span');
+      value.className = 'goal-value';
+      value.textContent = `${task.cleared} / ${task.total}`;
+      const bar = document.createElement('span');
+      bar.className = 'goal-bar';
+      const fill = document.createElement('i');
+      const pct = task.total > 0 ? Math.min(100, (task.cleared / task.total) * 100) : 0;
+      fill.style.width = `${pct}%`;
+      bar.appendChild(fill);
+      chip.append(label, value, bar);
+      this.el.goalTasks.appendChild(chip);
+    }
+
+    this.el.boosterBar.textContent = '';
+    for (const b of vm.boosters) {
+      const btn = document.createElement('button');
+      btn.className = 'booster' + (b.armed ? ' armed' : '');
+      btn.dataset.booster = b.id;
+      btn.disabled = !b.available && !b.armed;
+      btn.setAttribute('aria-label', `${b.name}，剩余 ${b.count} 个，本关已用 ${b.used} 次`);
+      const count = document.createElement('span');
+      count.className = 'b-count';
+      count.textContent = String(b.count);
+      const name = document.createElement('span');
+      name.className = 'b-name';
+      name.textContent = b.name;
+      const limit = document.createElement('span');
+      limit.className = 'b-limit';
+      limit.textContent = b.disabled ? '本关禁用' : `本关 ${b.used}/${b.limit}`;
+      btn.append(count, name, limit);
+      this.el.boosterBar.appendChild(btn);
+    }
+
+    this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
+    this.a11y?.announce(`剩余 ${vm.movesLeft} 步，得分 ${vm.score}`);
+  }
+
+  renderLevels() {
+    const list = this.controller.levelList();
+    const cleared = list.filter((l) => l.cleared).length;
+    this.el.levelsMeta.textContent = `${cleared} / ${list.length}`;
+    this.el.levelGrid.textContent = '';
+    const currentId = this.controller.nextLevelId();
+
+    for (const lv of list) {
+      const btn = document.createElement('button');
+      btn.className = 'level-card';
+      btn.dataset.level = String(lv.levelId);
+      if (!lv.valid) {
+        btn.classList.add('invalid');
+        btn.disabled = true;
+      } else if (!lv.unlocked) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+      }
+      if (lv.cleared) btn.classList.add('cleared');
+      if (lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
+
+      const no = document.createElement('span');
+      no.className = 'level-no';
+      no.textContent = lv.valid ? String(lv.levelId) : '异常';
+
+      const stars = document.createElement('span');
+      stars.className = 'level-stars';
+      if (lv.valid && lv.unlocked) {
+        stars.textContent = STAR.repeat(lv.stars) + STAR.repeat(Math.max(0, 3 - lv.stars));
+        // 已获得的星用高亮色，未获得的用浅色
+        stars.textContent = '';
+        for (let i = 0; i < 3; i += 1) {
+          const s = document.createElement('span');
+          s.textContent = STAR;
+          if (i < lv.stars) s.className = 'on';
+          stars.appendChild(s);
+        }
+      } else if (!lv.valid) {
+        stars.textContent = '数据异常';
+      } else {
+        stars.textContent = '未解锁';
+      }
+
+      btn.append(no, stars);
+      if (lv.valid && lv.unlocked) {
+        btn.title = `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
+      }
+      this.el.levelGrid.appendChild(btn);
+    }
+  }
+
+  renderResult(result) {
+    this.lastResult = result;
+    this.el.resultKicker.textContent = `第 ${String(result.levelId).padStart(2, '0')} 关 · ${result.levelName}`;
+    this.el.resultTitle.textContent = result.cleared ? (result.stars === 3 ? '完美通关' : '通关') : '未达成目标';
+    this.el.resultCard.classList.toggle('failed', !result.cleared);
+
+    this.el.resultStars.textContent = '';
+    for (let i = 0; i < 3; i += 1) {
+      const s = document.createElement('span');
+      s.className = 'star' + (i < result.stars ? ' on' : '');
+      s.textContent = STAR;
+      s.style.animationDelay = `${120 + i * 130}ms`;
+      this.el.resultStars.appendChild(s);
+    }
+
+    this.el.resultScore.textContent = result.finalScore;
+
+    if (!result.cleared) {
+      this.el.resultBest.textContent = '步数用尽，目标未完成';
+    } else if (result.isNewBest) {
+      this.el.resultBest.innerHTML = '';
+      const up = document.createElement('span');
+      up.className = 'up';
+      up.textContent = `刷新纪录 +${result.finalScore - result.previousBest}`;
+      this.el.resultBest.append(up);
+    } else {
+      this.el.resultBest.textContent = `历史最高 ${result.previousBest} 分`;
+    }
+
+    this.el.resultDetail.textContent = '';
+    const rows = [
+      ['基础分', String(result.baseScore)],
+      ['步数奖励', result.cleared ? `+${result.bonusScore}` : '未通关不计'],
+      ['剩余步数', `${result.movesLeft} / ${result.movesTotal}`],
+      ['最高连锁', `${result.chainBest} 连`],
+      ['消除元素', `${result.tilesCleared} 个`],
+    ];
+    if (!result.cleared) {
+      for (const task of result.goalTasks) {
+        if (!task.done) rows.push([task.label, `${task.cleared} / ${task.total}`]);
+      }
+    }
+    for (const [k, v] of rows) {
+      const dt = document.createElement('dt');
+      dt.textContent = k;
+      const dd = document.createElement('dd');
+      dd.textContent = v;
+      this.el.resultDetail.append(dt, dd);
+    }
+
+    const hasNext = Boolean(this.controller.levels.get(result.levelId + 1));
+    this.el.resultNext.textContent = result.cleared ? (hasNext ? '下一关' : '返回关卡') : '再试一次';
+    // 未通关时隐藏与主按钮重复的"再玩一次"，以及不可用的成绩卡片
+    this.el.resultRetry.classList.toggle('hidden', !result.cleared);
+    this.el.resultShare.classList.toggle('hidden', !result.cleared);
+    this.el.resultRow?.classList.toggle('single', !result.cleared);
+  }
+
+  renderRank() {
+    const view = this.controller.rankView();
+    this.el.rankName.textContent = view.nickname || '玩家';
+    this.el.rankTotal.textContent = String(view.totalScore);
+    this.el.rankList.textContent = '';
+
+    if (!view.rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'empty-state';
+      empty.textContent = '还没有成绩记录。完成任意一关后，这里会按分数从高到低列出你的本地记录。';
+      this.el.rankList.appendChild(empty);
+      return;
+    }
+
+    view.rows.forEach((row, i) => {
+      const item = document.createElement('div');
+      item.className = 'rank-item';
+      const idx = document.createElement('span');
+      idx.className = 'rank-index';
+      idx.textContent = String(i + 1).padStart(2, '0');
+      const mid = document.createElement('div');
+      mid.className = 'rank-level';
+      const name = document.createElement('b');
+      name.textContent = `第 ${row.levelId} 关 · ${row.name}`;
+      const sub = document.createElement('small');
+      sub.textContent = row.clearedAt ? row.clearedAt.slice(0, 10) : '—';
+      mid.append(name, sub);
+      const score = document.createElement('div');
+      score.className = 'rank-score';
+      score.textContent = String(row.score);
+      const st = document.createElement('small');
+      st.textContent = STAR.repeat(row.stars);
+      score.appendChild(st);
+      item.append(idx, mid, score);
+      this.el.rankList.appendChild(item);
+    });
+  }
+
+  syncSettings() {
+    const s = this.controller.save.settings;
+    this.el.setSound.checked = s.soundEnabled;
+    this.el.setVolume.value = String(s.volume);
+    this.el.setVolumeOut.textContent = `${s.volume}%`;
+    this.el.setColorblind.checked = s.colorBlindEnhanced;
+    this.el.setMotion.checked = s.reducedMotion;
+    this.el.setGrid.checked = s.showGrid;
+    this.el.setCursor.checked = s.showCursor;
+    this.el.setNickname.value = this.controller.save.player.nickname;
+  }
+
+  // ------------------------------------------------------------------ 引导
+
+  showTutorial(step) {
+    if (!this.el.tutorial) return;
+    if (step.done) {
+      this.tutorialStep = null;
+      this.el.tutorial.classList.add('hidden');
+      return;
+    }
+    this.tutorialStep = step;
+    this.el.tutorialStep.textContent = `${step.index + 1}/${step.total}`;
+    this.el.tutorialText.textContent = step.text;
+    this.el.tutorial.classList.remove('hidden');
+
+    const anchor = step.anchor;
+    let target = null;
+    if (anchor === 'goal') target = this.el.goalTasks;
+    else if (anchor === 'moves') target = this.el.movesChip;
+    else target = document.getElementById('board');
+
+    requestAnimationFrame(() => {
+      if (!target) return;
+      const r = target.getBoundingClientRect();
+      const bubble = this.el.tutorial;
+      const bw = bubble.offsetWidth;
+      const bh = bubble.offsetHeight;
+      let left = r.left + r.width / 2 - bw / 2;
+      left = Math.max(10, Math.min(window.innerWidth - bw - 10, left));
+      let top = r.top - bh - 14;
+      let below = false;
+      if (top < 12) {
+        top = r.bottom + 14;
+        below = true;
+      }
+      bubble.style.left = `${left}px`;
+      bubble.style.top = `${top}px`;
+      bubble.classList.toggle('below', below);
+    });
+  }
+
+  // ------------------------------------------------------------------ 分享
+
+  openShare() {
+    if (!this.lastResult) return;
+    drawShareCard(this.el.shareCanvas, this.lastResult);
+    this.el.share.classList.remove('hidden');
+  }
+
+  // ------------------------------------------------------------------ 提示
+
+  toast(text, type = 'info') {
+    if (!text) return;
+    const div = document.createElement('div');
+    div.className = `toast ${type}`;
+    div.textContent = text;
+    this.el.toastLayer.appendChild(div);
+    while (this.el.toastLayer.children.length > 3) this.el.toastLayer.firstChild.remove();
+    setTimeout(() => {
+      div.classList.add('leaving');
+      setTimeout(() => div.remove(), 260);
+    }, 1900);
+  }
+
+  showBadge(text) {
+    if (!this.el.badge) return;
+    this.el.badge.textContent = text;
+    this.el.badge.classList.remove('hidden');
+    setTimeout(() => this.el.badge.classList.add('hidden'), 1200);
+  }
+}
