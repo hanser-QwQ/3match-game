@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#f6f1e7" />
+<meta name="description" content="三消小径：无需安装、无需注册的关卡制轻量消除网页游戏，对色觉障碍玩家友好，断网可玩。" />
+<title>三消小径 · 轻量消除</title>
+<!-- file-guard:start -->
+<script>
+/*
+ * 以 file:// 直接双击打开时，浏览器会以 CORS 为由拒绝加载 ES 模块，
+ * 页面会保持空白。工程入口在此自动切换到单文件版；
+ * 单文件版在构建时会把这段守卫连同标记一起删掉，因此不会自我跳转。
+ */
+(function () {
+  if (location.protocol !== 'file:') return;
+  if (window.__M3_STANDALONE__) return;
+  location.replace('dist/' + encodeURIComponent('三消小径.html'));
+})();
+</script>
+<!-- file-guard:end -->
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div id="app" class="app">
+
+  <!-- ============================ 首页 ============================ -->
+  <section id="scene-home" class="scene scene-home" data-scene="home">
+    <div class="home-top">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
+          <span class="dot d4"></span><span class="dot d5"></span><span class="dot d6"></span>
+        </div>
+        <h1>三消小径</h1>
+        <p class="tagline">打开即玩，玩完即走</p>
+      </div>
+      <button id="btn-continue" class="btn btn-primary btn-continue">
+        <span class="btn-continue-label">开始第 1 关</span>
+        <span class="btn-continue-sub">四个元素连成一线</span>
+      </button>
+      <div class="home-grid">
+        <button class="btn btn-ghost" data-action="levels"><span class="ico">▦</span>关卡</button>
+        <button class="btn btn-ghost" data-action="rank"><span class="ico">★</span>成绩</button>
+        <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
+      </div>
+    </div>
+    <div class="home-foot">
+      <span id="home-progress">尚未开始</span>
+      <span class="dot-sep">·</span>
+      <span>本地存档</span>
+      <span class="dot-sep">·</span>
+      <span>断网可玩</span>
+    </div>
+  </section>
+
+  <!-- ============================ 关卡列表 ============================ -->
+  <section id="scene-levels" class="scene" data-scene="levels">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>选择关卡</h2>
+      <span class="topbar-meta" id="levels-meta">0 / 20</span>
+    </header>
+    <div class="scroll-area">
+      <div id="level-grid" class="level-grid"></div>
+      <p class="fine-print">已通关的关卡可重复挑战，记录只保留最高星级与最高分。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 游戏 ============================ -->
+  <section id="scene-game" class="scene scene-game" data-scene="game">
+    <header class="game-head">
+      <button class="icon-btn" id="btn-pause" aria-label="暂停">❙❙</button>
+      <div class="head-main">
+        <h2 id="game-level-name">第 1 关</h2>
+        <p id="game-hint" class="hint-text"></p>
+      </div>
+      <div class="moves-chip" id="moves-chip">
+        <span class="moves-num" id="moves-left">25</span>
+        <span class="moves-label">步</span>
+      </div>
+    </header>
+
+    <div class="status-bar">
+      <div class="score-block">
+        <span class="score-label">得分</span>
+        <span class="score-num" id="score-value">0</span>
+      </div>
+      <div class="goal-block" id="goal-tasks"></div>
+    </div>
+
+    <div class="board-wrap">
+      <canvas id="board" aria-label="消除棋盘，使用方向键移动光标，空格选择并交换" role="application" tabindex="0"></canvas>
+      <div class="board-badge hidden" id="board-badge"></div>
+    </div>
+
+    <div class="booster-bar" id="booster-bar"></div>
+    <p class="save-note hidden" id="save-note">进度可能不会被保存（本地存储不可用）</p>
+  </section>
+
+  <!-- ============================ 结算 ============================ -->
+  <section id="scene-result" class="scene scene-result" data-scene="result">
+    <div class="result-card">
+      <p class="result-kicker" id="result-kicker">第 1 关</p>
+      <h2 class="result-title" id="result-title">通关</h2>
+      <div class="stars" id="result-stars" aria-label="星级"></div>
+      <div class="result-score">
+        <span class="result-score-num" id="result-score">0</span>
+        <span class="result-score-unit">分</span>
+      </div>
+      <p class="result-best" id="result-best"></p>
+      <dl class="result-detail" id="result-detail"></dl>
+      <div class="result-actions">
+        <button class="btn btn-primary" id="result-next">下一关</button>
+        <div class="result-row">
+          <button class="btn btn-ghost" id="result-retry">再玩一次</button>
+          <button class="btn btn-ghost" id="result-share">成绩卡片</button>
+          <button class="btn btn-ghost" id="result-levels">关卡</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 设置 ============================ -->
+  <section id="scene-settings" class="scene" data-scene="settings">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>设置</h2>
+      <span class="topbar-meta"></span>
+    </header>
+    <div class="scroll-area">
+      <div class="panel">
+        <div class="panel-title">声音</div>
+        <label class="row row-switch">
+          <span>音效</span>
+          <input type="checkbox" id="set-sound" class="switch" />
+        </label>
+        <label class="row row-slider">
+          <span>音量</span>
+          <input type="range" id="set-volume" min="0" max="100" step="5" />
+          <output id="set-volume-out">50%</output>
+        </label>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">无障碍</div>
+        <label class="row row-switch">
+          <span>色觉增强<small>加大形状标识并提高对比度</small></span>
+          <input type="checkbox" id="set-colorblind" class="switch" />
+        </label>
+        <label class="row row-switch">
+          <span>减弱动效<small>降低动画幅度，不影响判定</small></span>
+          <input type="checkbox" id="set-motion" class="switch" />
+        </label>
+        <label class="row row-switch">
+          <span>棋盘网格线</span>
+          <input type="checkbox" id="set-grid" class="switch" />
+        </label>
+        <label class="row row-switch">
+          <span>键盘光标</span>
+          <input type="checkbox" id="set-cursor" class="switch" />
+        </label>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">玩家</div>
+        <label class="row row-input">
+          <span>昵称</span>
+          <input type="text" id="set-nickname" maxlength="12" placeholder="玩家" autocomplete="off" />
+        </label>
+        <p class="fine-print">昵称只保存在本机，用于成绩记录，最多 12 个字符。</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">键盘操作</div>
+        <p class="fine-print">方向键移动光标，空格或回车选择并交换，Esc 暂停或继续。</p>
+      </div>
+
+      <div class="panel panel-danger">
+        <div class="panel-title">数据</div>
+        <button class="btn btn-ghost btn-danger" id="btn-reset">清空本地进度</button>
+        <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ 成绩 ============================ -->
+  <section id="scene-rank" class="scene" data-scene="rank">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>成绩</h2>
+      <span class="topbar-meta">本地</span>
+    </header>
+    <div class="scroll-area">
+      <div class="rank-hero">
+        <div>
+          <p class="rank-name" id="rank-name">玩家</p>
+          <p class="rank-sub">本地累计总得分</p>
+        </div>
+        <div class="rank-total" id="rank-total">0</div>
+      </div>
+      <div class="rank-list" id="rank-list"></div>
+      <p class="fine-print">以上为本机记录的单机成绩，不是全服排名。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 暂停遮罩 ============================ -->
+  <div id="pause-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="已暂停">
+    <div class="overlay-card">
+      <h2>已暂停</h2>
+      <p class="overlay-sub">进度已保存在本机</p>
+      <button class="btn btn-primary" id="btn-resume">继续游戏</button>
+      <div class="overlay-row">
+        <button class="btn btn-ghost" id="btn-restart">重开本关</button>
+        <button class="btn btn-ghost" id="btn-quit">返回关卡</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 分享卡片预览 ============================ -->
+  <div id="share-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="成绩卡片">
+    <div class="overlay-card share-card">
+      <h2>成绩卡片</h2>
+      <div class="share-preview"><canvas id="share-canvas" width="1080" height="1440"></canvas></div>
+      <p class="fine-print">单机成绩，非全服排名。图片在本机生成，不会上传。</p>
+      <div class="overlay-row">
+        <button class="btn btn-primary" id="btn-share-download">保存图片</button>
+        <button class="btn btn-ghost" id="btn-share-close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ 引导气泡 ============================ -->
+  <div id="tutorial-bubble" class="tutorial-bubble hidden" role="status">
+    <span class="tutorial-step" id="tutorial-step">1/4</span>
+    <span class="tutorial-text" id="tutorial-text"></span>
+  </div>
+
+  <!-- 线上部署后，重新发布时旧页面会提示刷新 -->
+  <div id="update-bar" class="update-bar hidden" role="status">
+    <span class="update-text">有新版本可用</span>
+    <button id="btn-update" class="update-action">刷新</button>
+    <button id="btn-update-later" class="update-dismiss" aria-label="稍后提醒">×</button>
+  </div>
+
+  <div id="toast-layer" class="toast-layer" aria-live="polite"></div>
+
+  <noscript><p class="noscript">这个游戏需要启用 JavaScript 才能运行。</p></noscript>
+</div>
+
+<!-- entry:start -->
+<script>
+/*
+ * 入口脚本：只在 http/https 下挂载 PWA 清单与 ES 模块入口。
+ * file:// 下由上面的守卫跳转到单文件版，这里直接返回，避免产生
+ * 任何被浏览器拒绝的请求（控制台保持干净）。
+ */
+(function () {
+  if (location.protocol === 'file:') return;
+
+  var manifest = document.createElement('link');
+  manifest.rel = 'manifest';
+  manifest.href = 'manifest.webmanifest';
+  document.head.appendChild(manifest);
+
+  var entry = document.createElement('script');
+  entry.type = 'module';
+  entry.src = 'js/main.js';
+  document.body.appendChild(entry);
+})();
+</script>
+<!-- entry:end -->
+</body>
+</html>
