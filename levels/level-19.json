@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "levelId": 19,
+  "name": "极限边缘",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        7
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        7,
+        7
+      ]
+    ],
+    "blockedCells": [],
+    "iceDurability": 2
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "score",
+      "amount": 2600
+    },
+    "secondary": {
+      "type": "clear_ice",
+      "amount": 12
+    }
+  },
+  "moves": 19,
+  "starThresholds": [
+    1720,
+    2230,
+    2740
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "道具不消耗步数，卡住的时候别硬撑"
+}

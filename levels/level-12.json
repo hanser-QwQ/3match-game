@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "levelId": 12,
+  "name": "霜寒未消",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        6
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "clear_ice",
+    "amount": 10
+  },
+  "moves": 21,
+  "starThresholds": [
+    1840,
+    2410,
+    3010
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "被困住的元素不能交换，先清掉它旁边的位置"
+}

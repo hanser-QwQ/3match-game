@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "levelId": 11,
+  "name": "冰下藏金",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        7
+      ],
+      [
+        1,
+        3
+      ],
+      [
+        1,
+        4
+      ],
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ],
+      [
+        7,
+        0
+      ],
+      [
+        7,
+        7
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "clear_ice",
+      "amount": 8
+    },
+    "secondary": {
+      "type": "collect",
+      "element": 5,
+      "amount": 14
+    }
+  },
+  "moves": 21,
+  "starThresholds": [
+    1840,
+    2410,
+    3010
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
+}

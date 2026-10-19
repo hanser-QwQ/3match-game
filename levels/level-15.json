@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "levelId": 15,
+  "name": "双生目标",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        5
+      ],
+      [
+        6,
+        6
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "score",
+      "amount": 2400
+    },
+    "secondary": {
+      "type": "clear_ice",
+      "amount": 8
+    }
+  },
+  "moves": 20,
+  "starThresholds": [
+    1780,
+    2320,
+    2860
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "步数只有二十步，每一步都要争取形成连锁"
+}

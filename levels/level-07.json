@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "levelId": 7,
+  "name": "星辉点点",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "collect",
+    "element": 4,
+    "amount": 20
+  },
+  "moves": 23,
+  "starThresholds": [
+    1950,
+    2590,
+    3190
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "元素种类变多，找准一处能连带的位置再动手"
+}

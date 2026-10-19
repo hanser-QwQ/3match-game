@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "levelId": 5,
+  "name": "深蓝之约",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "collect",
+    "element": 1,
+    "amount": 20
+  },
+  "moves": 24,
+  "starThresholds": [
+    2000,
+    2680,
+    3280
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "优先消除目标元素，边上留出的空位会带来连锁"
+}

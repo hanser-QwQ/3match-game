@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "levelId": 3,
+  "name": "五彩初章",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 4,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2000
+  },
+  "moves": 25,
+  "starThresholds": [
+    2100,
+    2775,
+    3450
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "剩余的步数会在通关时折算成额外分数"
+}

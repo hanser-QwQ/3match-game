@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "levelId": 13,
+  "name": "冷杉林",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        4
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        2,
+        6
+      ],
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        5
+      ],
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        5
+      ],
+      [
+        7,
+        3
+      ],
+      [
+        7,
+        4
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "clear_ice",
+      "amount": 10
+    },
+    "secondary": {
+      "type": "score",
+      "amount": 2200
+    }
+  },
+  "moves": 22,
+  "starThresholds": [
+    1900,
+    2500,
+    3100
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "分数与破冰都要顾及，连锁能同时推进两者"
+}

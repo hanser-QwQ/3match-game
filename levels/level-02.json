@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "levelId": 2,
+  "name": "三色小径",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 4,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 1800
+  },
+  "moves": 25,
+  "starThresholds": [
+    2100,
+    2775,
+    3450
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "一次消除四个，会得到更强的条纹元素"
+}

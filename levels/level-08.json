@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "levelId": 8,
+  "name": "双色协奏",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "score",
+      "amount": 1800
+    },
+    "secondary": {
+      "type": "collect",
+      "element": 3,
+      "amount": 16
+    }
+  },
+  "moves": 22,
+  "starThresholds": [
+    1900,
+    2500,
+    3100
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "两个目标要同时完成，别只顾着堆分数"
+}

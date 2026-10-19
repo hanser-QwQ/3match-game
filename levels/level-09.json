@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "levelId": 9,
+  "name": "冰封花园",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        6
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "clear_ice",
+    "amount": 6
+  },
+  "moves": 22,
+  "starThresholds": [
+    1900,
+    2500,
+    3100
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"
+}

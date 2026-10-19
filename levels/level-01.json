@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "levelId": 1,
+  "name": "初见",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 4,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 1500
+  },
+  "moves": 25,
+  "starThresholds": [
+    2100,
+    2775,
+    3450
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "交换相邻的两个元素，连成三个即可消除"
+}

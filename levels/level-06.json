@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "levelId": 6,
+  "name": "绿意渐浓",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "collect",
+    "element": 2,
+    "amount": 22
+  },
+  "moves": 23,
+  "starThresholds": [
+    1950,
+    2590,
+    3190
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "连锁的倍率会一路涨到三倍，尽量制造连续消除"
+}

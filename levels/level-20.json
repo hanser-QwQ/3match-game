@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "levelId": 20,
+  "name": "终章·雪境",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        1,
+        1
+      ],
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        2
+      ],
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ],
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        6
+      ]
+    ],
+    "blockedCells": [],
+    "iceDurability": 2
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "clear_ice",
+      "amount": 10
+    },
+    "secondary": {
+      "type": "score",
+      "amount": 2400
+    }
+  },
+  "moves": 18,
+  "starThresholds": [
+    1650,
+    2140,
+    2620
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "最后一步之前，先算清剩余的冰与分数"
+}

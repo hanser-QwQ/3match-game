@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "levelId": 17,
+  "name": "精算之路",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        5
+      ]
+    ],
+    "blockedCells": [],
+    "iceDurability": 2
+  },
+  "goal": {
+    "type": "combo",
+    "primary": {
+      "type": "score",
+      "amount": 2600
+    },
+    "secondary": {
+      "type": "collect",
+      "element": 2,
+      "amount": 16
+    }
+  },
+  "moves": 20,
+  "starThresholds": [
+    1780,
+    2320,
+    2860
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "彩虹元素与条纹交换，可以清掉同色的全部元素"
+}

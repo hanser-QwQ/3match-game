@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "levelId": 10,
+  "name": "碎冰之路",
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        5
+      ],
+      [
+        2,
+        3
+      ],
+      [
+        2,
+        4
+      ],
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        5
+      ]
+    ],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "clear_ice",
+    "amount": 8
+  },
+  "moves": 22,
+  "starThresholds": [
+    1900,
+    2500,
+    3100
+  ],
+  "disabledBoosters": [],
+  "tutorialHint": "条纹元素可以整行或整列清除，用来破冰最有效"
+}
