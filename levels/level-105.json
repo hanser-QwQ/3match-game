@@ -25,5 +25,5 @@
     "moveTimeLimit": 7,
     "specialCycle": true
   },
-  "tutorialHint": "特殊方块生效一次后会进入冷却，等所有特殊方块都生效一轮后才能再次生效"
+  "tutorialHint": "特殊方块生效后会被冻住，无法移动、匹配或再次触发；等所有特殊方块都生效一轮后才会统一解冻"
 }

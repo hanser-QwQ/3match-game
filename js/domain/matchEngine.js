@@ -255,6 +255,8 @@ export function planSpecials(board, matches, preferred = [], rng = null) {
  * @returns {{cells:{r,c}[], combo:string}|null} cells 作为首轮清除的种子
  */
 export function planSpecialSwap(board, a, b, rng) {
+  // EX-5：冰冻中的特殊方块不参与任何特殊交换
+  if (board.isSpecialFrozen(a.r, a.c) || board.isSpecialFrozen(b.r, b.c)) return null;
   const sa = board.specialAt(a.r, a.c);
   const sb = board.specialAt(b.r, b.c);
   if (!sa && !sb) return null;
@@ -348,7 +350,10 @@ function sample(arr, n, rng) {
 export function blastCells(board, r, c, special, rng = null) {
   const out = [];
   const push = (rr, cc) => {
-    if (board.inside(rr, cc) && !board.isBlocked(rr, cc)) out.push({ r: rr, c: cc });
+    if (!board.inside(rr, cc) || board.isBlocked(rr, cc)) return;
+    // EX-5：冰冻特殊方块免疫爆炸波及
+    if (board.isSpecialFrozen(rr, cc)) return;
+    out.push({ r: rr, c: cc });
   };
   const rules = board?.rules || {};
   switch (special) {

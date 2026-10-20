@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Board } from '../js/domain/board.js';
-import { findMatches, isValidSwap, planSpecials, hasMatchAt, blastCells } from '../js/domain/matchEngine.js';
+import { findMatches, isValidSwap, planSpecials, planSpecialSwap, hasMatchAt, blastCells } from '../js/domain/matchEngine.js';
 import { resolveCascade } from '../js/domain/cascadeResolver.js';
 import { hasValidMove, findAnyValidMove, reshuffle } from '../js/domain/deadlockDetector.js';
 import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../js/domain/scorer.js';
@@ -374,6 +374,27 @@ test('EX-5：触发后的特殊方块保留在棋盘上并进入冰冻', () => {
   assert.equal(back.specialAt(0, 0), SPECIAL.BOMB);
 });
 
+test('EX-5：冰冻的特殊方块免疫爆炸，不会被炸掉也不会触发', () => {
+  const board = new Board(6, 6, 4);
+  for (let r = 0; r < 6; r += 1) {
+    for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
+  }
+  // 第 2 行：条纹在左，冰冻炸弹在中间；另放一颗未冰冻的彩虹，避免步末统一解冻
+  board.setType(2, 0, 0, SPECIAL.STRIPE_H);
+  board.setType(2, 3, 1, SPECIAL.BOMB);
+  board.setSpecialFrozen(2, 3, true);
+  board.setType(5, 5, 2, SPECIAL.RAINBOW);
+  board.rules = { specialCycle: true };
+
+  const res = resolveCascade(board, { initialCells: [{ r: 2, c: 0 }], rng: rng(3) });
+  const first = res.sequence[0];
+  assert.ok(first, '条纹应触发');
+  assert.ok(!first.cleared.some((x) => x.r === 2 && x.c === 3), '冰冻炸弹不应出现在消除列表里');
+  assert.ok(!first.triggered.includes('2,3'), '冰冻炸弹不应被触发');
+  assert.equal(board.specialAt(2, 3), SPECIAL.BOMB, '冰冻炸弹应留在棋盘上');
+  assert.ok(board.isSpecialFrozen(2, 3), '冰冻炸弹应保持冰冻');
+});
+
 test('EX-5：冰冻中的特殊方块不能被交换', () => {
   const board = makeBoard(['ABCD', 'CDEF', 'DFCE', 'ECFD']);
   board.setType(0, 0, 0, SPECIAL.BOMB);
@@ -382,6 +403,7 @@ test('EX-5：冰冻中的特殊方块不能被交换', () => {
   // (0,0) 炸弹被冻住，(0,1) 是普通元素，交换应被禁止
   assert.equal(isValidSwap(board, { r: 0, c: 0 }, { r: 0, c: 1 }), false, '冰冻中的炸弹不可移动');
   assert.ok(!board.isFree(0, 0), '冰冻中的特殊方块不是自由格');
+  assert.equal(planSpecialSwap(board, { r: 0, c: 0 }, { r: 0, c: 1 }), null, '冰冻中的特殊方块不能触发特殊交换');
   // 同一规则下，两个普通元素仍可正常判定
   const plain = makeBoard(['AAB', 'CDE', 'FGH']);
   plain.rules = { specialCycle: true };

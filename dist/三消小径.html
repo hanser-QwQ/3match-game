@@ -1303,7 +1303,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.4.3</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.4.4</button>
     </div>
   </section>
 
@@ -2873,6 +2873,8 @@ function planSpecials(board, matches, preferred = [], rng = null) {
  * @returns {{cells:{r,c}[], combo:string}|null} cells 作为首轮清除的种子
  */
 function planSpecialSwap(board, a, b, rng) {
+  // EX-5：冰冻中的特殊方块不参与任何特殊交换
+  if (board.isSpecialFrozen(a.r, a.c) || board.isSpecialFrozen(b.r, b.c)) return null;
   const sa = board.specialAt(a.r, a.c);
   const sb = board.specialAt(b.r, b.c);
   if (!sa && !sb) return null;
@@ -2966,7 +2968,10 @@ function sample(arr, n, rng) {
 function blastCells(board, r, c, special, rng = null) {
   const out = [];
   const push = (rr, cc) => {
-    if (board.inside(rr, cc) && !board.isBlocked(rr, cc)) out.push({ r: rr, c: cc });
+    if (!board.inside(rr, cc) || board.isBlocked(rr, cc)) return;
+    // EX-5：冰冻特殊方块免疫爆炸波及
+    if (board.isSpecialFrozen(rr, cc)) return;
+    out.push({ r: rr, c: cc });
   };
   const rules = board?.rules || {};
   switch (special) {
@@ -3326,6 +3331,8 @@ function resolveCascade(board, options = {}) {
     const addCell = (r, c) => {
       if (!board.inside(r, c) || board.isBlocked(r, c)) return;
       if (board.typeAt(r, c) < 0) return;
+      // EX-5：被冻住的特殊方块免疫消除，爆炸与匹配都不能把它带走
+      if (board.isSpecialFrozen(r, c)) return;
       const k = key(r, c);
       if (exclude.has(k) || clearMap.has(k)) return;
       if (board.iceAt(r, c) > 0) {
@@ -3368,6 +3375,8 @@ function resolveCascade(board, options = {}) {
       }
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
+        // EX-5：冰冻特殊方块不被波及，也不因波及而触发
+        if (board.isSpecialFrozen(target.r, target.c)) continue;
         if (board.iceAt(target.r, target.c) > 0) {
           iceHits.add(tk);
           continue;
@@ -3382,6 +3391,7 @@ function resolveCascade(board, options = {}) {
     // 执行消除并统计
     const cleared = [];
     for (const cell of clearMap.values()) {
+      if (board.isSpecialFrozen(cell.r, cell.c)) continue;
       const type = board.typeAt(cell.r, cell.c);
       if (type < 0) continue;
       cleared.push({ r: cell.r, c: cell.c, type, special: board.specialAt(cell.r, cell.c) });
@@ -3426,6 +3436,8 @@ function resolveCascade(board, options = {}) {
     board.types.set(boardAfter.types);
     board.specials = boardAfter.specials;
     board.specialActive.set(boardAfter.specialActive);
+    // 冰冻状态必须一并同步：否则重填的普通元素会继承旧位置的冰冻标记
+    board.specialFrozen.set(boardAfter.specialFrozen);
     board.ice.set(boardAfter.ice);
 
     // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻
@@ -5521,9 +5533,9 @@ class Renderer {
       ctx.strokeStyle = '#b98a3f';
       ctx.lineWidth = Math.max(1.5, s * 0.045);
       ctx.stroke();
-      // 六色环
+      // 六色环（冰冻时停止转动，表示暂时失效）
       for (let i = 0; i < 6; i += 1) {
-        const a0 = (Math.PI / 3) * i - Math.PI / 2 + now / 2600;
+        const a0 = (Math.PI / 3) * i - Math.PI / 2 + (frozen ? 0 : now / 2600);
         ctx.beginPath();
         ctx.strokeStyle = ELEMENTS[i].color;
         ctx.lineWidth = Math.max(2, s * 0.09);
@@ -5536,7 +5548,8 @@ class Renderer {
       ctx.fill();
     } else if (special === SPECIAL.BOMB) {
       // 炸弹没有颜色，靠暗色体 + 橙色脉冲光晕标识，避免混在普通方块里被忽略
-      const pulse = 0.5 + 0.5 * Math.sin(now / 320);
+      // 冰冻时停止脉冲并压暗，表示暂时失效
+      const pulse = frozen ? 0 : 0.5 + 0.5 * Math.sin(now / 320);
       ctx.save();
       ctx.shadowColor = `rgba(240, 166, 60, ${0.35 + pulse * 0.45})`;
       ctx.shadowBlur = s * (0.16 + pulse * 0.24);
@@ -6168,13 +6181,22 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.4.3';
+const APP_VERSION = '1.4.4';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.4.4',
+    date: '2026-10-20',
+    notes: [
+      '修复 EX-5 冰冻特殊方块仍会被爆炸波及、仍会播放爆炸特效的问题',
+      '冰冻特殊方块现在完全免疫消除与爆炸，并且停止脉冲/转动动画，明确表示暂时失效',
+      '修复下落补充后冰冻状态可能与棋盘错位的问题',
+    ],
+  },
   {
     version: '1.4.3',
     date: '2026-10-20',
@@ -7681,7 +7703,7 @@ const LEVELS = [
       "moveTimeLimit": 7,
       "specialCycle": true
     },
-    "tutorialHint": "特殊方块生效一次后会进入冷却，等所有特殊方块都生效一轮后才能再次生效"
+    "tutorialHint": "特殊方块生效后会被冻住，无法移动、匹配或再次触发；等所有特殊方块都生效一轮后才会统一解冻"
   },
   {
     "schemaVersion": 1,

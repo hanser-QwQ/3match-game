@@ -36,6 +36,8 @@ export function resolveCascade(board, options = {}) {
     const addCell = (r, c) => {
       if (!board.inside(r, c) || board.isBlocked(r, c)) return;
       if (board.typeAt(r, c) < 0) return;
+      // EX-5：被冻住的特殊方块免疫消除，爆炸与匹配都不能把它带走
+      if (board.isSpecialFrozen(r, c)) return;
       const k = key(r, c);
       if (exclude.has(k) || clearMap.has(k)) return;
       if (board.iceAt(r, c) > 0) {
@@ -78,6 +80,8 @@ export function resolveCascade(board, options = {}) {
       }
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
+        // EX-5：冰冻特殊方块不被波及，也不因波及而触发
+        if (board.isSpecialFrozen(target.r, target.c)) continue;
         if (board.iceAt(target.r, target.c) > 0) {
           iceHits.add(tk);
           continue;
@@ -92,6 +96,7 @@ export function resolveCascade(board, options = {}) {
     // 执行消除并统计
     const cleared = [];
     for (const cell of clearMap.values()) {
+      if (board.isSpecialFrozen(cell.r, cell.c)) continue;
       const type = board.typeAt(cell.r, cell.c);
       if (type < 0) continue;
       cleared.push({ r: cell.r, c: cell.c, type, special: board.specialAt(cell.r, cell.c) });
@@ -136,6 +141,8 @@ export function resolveCascade(board, options = {}) {
     board.types.set(boardAfter.types);
     board.specials = boardAfter.specials;
     board.specialActive.set(boardAfter.specialActive);
+    // 冰冻状态必须一并同步：否则重填的普通元素会继承旧位置的冰冻标记
+    board.specialFrozen.set(boardAfter.specialFrozen);
     board.ice.set(boardAfter.ice);
 
     // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻

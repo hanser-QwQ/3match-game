@@ -702,9 +702,9 @@ export class Renderer {
       ctx.strokeStyle = '#b98a3f';
       ctx.lineWidth = Math.max(1.5, s * 0.045);
       ctx.stroke();
-      // 六色环
+      // 六色环（冰冻时停止转动，表示暂时失效）
       for (let i = 0; i < 6; i += 1) {
-        const a0 = (Math.PI / 3) * i - Math.PI / 2 + now / 2600;
+        const a0 = (Math.PI / 3) * i - Math.PI / 2 + (frozen ? 0 : now / 2600);
         ctx.beginPath();
         ctx.strokeStyle = ELEMENTS[i].color;
         ctx.lineWidth = Math.max(2, s * 0.09);
@@ -717,7 +717,8 @@ export class Renderer {
       ctx.fill();
     } else if (special === SPECIAL.BOMB) {
       // 炸弹没有颜色，靠暗色体 + 橙色脉冲光晕标识，避免混在普通方块里被忽略
-      const pulse = 0.5 + 0.5 * Math.sin(now / 320);
+      // 冰冻时停止脉冲并压暗，表示暂时失效
+      const pulse = frozen ? 0 : 0.5 + 0.5 * Math.sin(now / 320);
       ctx.save();
       ctx.shadowColor = `rgba(240, 166, 60, ${0.35 + pulse * 0.45})`;
       ctx.shadowBlur = s * (0.16 + pulse * 0.24);
