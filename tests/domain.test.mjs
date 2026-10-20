@@ -308,22 +308,22 @@ test('棋盘序列化：往返后状态一致', () => {
 
 // ------------------------------------------------------------------ EX 关卡规则
 
-test('EX-1：最低连线长度提高后，三连不再匹配，条纹/彩虹阈值顺次提高', () => {
+test('EX-1：三连可消除，但条纹/彩虹阈值单独提高', () => {
   const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
-  board.rules = { minMatchLength: 4 };
-  assert.equal(findMatches(board).length, 0, '三连不应被识别');
+  board.rules = { stripeThreshold: 5, rainbowThreshold: 6 };
+  assert.equal(findMatches(board).length, 1, '三连仍可匹配');
 
   const four = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
-  four.rules = { minMatchLength: 4 };
-  assert.equal(findMatches(four).length, 1, '四连应被识别');
+  four.rules = { stripeThreshold: 5, rainbowThreshold: 6 };
+  assert.equal(findMatches(four).length, 1, '四连可匹配');
   const p4 = planSpecials(four, findMatches(four), []);
   assert.equal(p4.length, 0, '四连不应生成条纹（阈值已提高到 5）');
 
   const five = makeBoard(['AAAAA', 'CDEFG', 'DFGCE', 'EGCDF']);
-  five.rules = { minMatchLength: 4 };
+  five.rules = { stripeThreshold: 5, rainbowThreshold: 6 };
   const p5 = planSpecials(five, findMatches(five), []);
   assert.equal(p5.length, 1);
-  assert.equal(p5[0].special, 'stripe_h', '五连应生成条纹（彩虹阈值提高到 6）');
+  assert.equal(p5[0].special, 'stripe_h', '五连应生成条纹（彩虹阈值 6）');
 });
 
 test('EX-3：炸弹范围可缩小为周围 4 格，彩虹可随机消除指定数量', () => {

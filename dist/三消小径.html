@@ -1303,7 +1303,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.4.0</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.4.1</button>
     </div>
   </section>
 
@@ -2760,10 +2760,11 @@ function groupMatches(matches) {
  */
 function planSpecials(board, matches, preferred = [], rng = null) {
   if (!matches.length) return [];
+  const rules = board?.rules || {};
   const minLen = minMatchLength(board);
-  const stripeThreshold = minLen + 1;
-  const rainbowThreshold = minLen + 2;
-  const bombBoost = Boolean(board?.rules?.bombChanceBoost) && rng;
+  const stripeThreshold = Number.isInteger(rules.stripeThreshold) ? rules.stripeThreshold : minLen + 1;
+  const rainbowThreshold = Number.isInteger(rules.rainbowThreshold) ? rules.rainbowThreshold : minLen + 2;
+  const bombBoost = Boolean(rules.bombChanceBoost) && rng;
   const preferredKeys = new Set(preferred.map((p) => key(p.r, p.c)));
   const plans = [];
 
@@ -6066,7 +6067,7 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.4.1';
 
 /**
  * 更新公告，按版本从新到旧排列。
@@ -6074,10 +6075,17 @@ const APP_VERSION = '1.4.0';
  */
 const CHANGELOG = [
   {
+    version: '1.4.1',
+    date: '2026-10-20',
+    notes: [
+      'EX-1 难度下调：最低连线长度恢复为 3，但条纹/彩虹阈值仍分别为 5/6',
+    ],
+  },
+  {
     version: '1.4.0',
     date: '2026-10-20',
     notes: [
-      '新增 5 个 EX 关卡：四连、冰封、雷区、坚冰、节律',
+      '新增 5 个 EX 关卡：升阶、冰封、雷区、坚冰、节律',
       'EX 关卡设有 7 秒单步思考时间，超时自动执行一步',
       'EX 关卡默认解锁 EX-1，通关后顺次解锁下一 EX 关',
     ],
@@ -7411,7 +7419,7 @@ const LEVELS = [
   {
     "schemaVersion": 1,
     "levelId": 101,
-    "name": "EX-1 四连",
+    "name": "EX-1 升阶",
     "isEx": true,
     "board": {
       "rows": 8,
@@ -7433,10 +7441,11 @@ const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "minMatchLength": 4,
+      "stripeThreshold": 5,
+      "rainbowThreshold": 6,
       "reduceBombStructures": true
     },
-    "tutorialHint": "本关至少需要 4 个同色连成一线才能消除"
+    "tutorialHint": "三连即可消除，但需要 5 连才能生成条纹，6 连才能生成彩虹"
   },
   {
     "schemaVersion": 1,

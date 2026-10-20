@@ -173,10 +173,11 @@ function groupMatches(matches) {
  */
 export function planSpecials(board, matches, preferred = [], rng = null) {
   if (!matches.length) return [];
+  const rules = board?.rules || {};
   const minLen = minMatchLength(board);
-  const stripeThreshold = minLen + 1;
-  const rainbowThreshold = minLen + 2;
-  const bombBoost = Boolean(board?.rules?.bombChanceBoost) && rng;
+  const stripeThreshold = Number.isInteger(rules.stripeThreshold) ? rules.stripeThreshold : minLen + 1;
+  const rainbowThreshold = Number.isInteger(rules.rainbowThreshold) ? rules.rainbowThreshold : minLen + 2;
+  const bombBoost = Boolean(rules.bombChanceBoost) && rng;
   const preferredKeys = new Set(preferred.map((p) => key(p.r, p.c)));
   const plans = [];
 

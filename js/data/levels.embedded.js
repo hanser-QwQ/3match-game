@@ -318,7 +318,7 @@ export const LEVELS = [
   {
     "schemaVersion": 1,
     "levelId": 101,
-    "name": "EX-1 四连",
+    "name": "EX-1 升阶",
     "isEx": true,
     "board": {
       "rows": 8,
@@ -340,10 +340,11 @@ export const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "minMatchLength": 4,
+      "stripeThreshold": 5,
+      "rainbowThreshold": 6,
       "reduceBombStructures": true
     },
-    "tutorialHint": "本关至少需要 4 个同色连成一线才能消除"
+    "tutorialHint": "三连即可消除，但需要 5 连才能生成条纹，6 连才能生成彩虹"
   },
   {
     "schemaVersion": 1,
