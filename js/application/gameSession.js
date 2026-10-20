@@ -20,6 +20,7 @@ export class GameSession {
     this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
+    this.turnCount = resumed?.turnCount ?? 0;
     this.goalAnnounced = false;
     this.startedAt = Date.now();
     this.finishedAt = null;
@@ -75,6 +76,7 @@ export class GameSession {
       levelId: this.level.levelId,
       board: boardData.board,
       specials: boardData.specials,
+      specialActive: boardData.specialActive,
       ice: boardData.ice,
       movesLeft: this.movesLeft,
       score: this.counters.score,
@@ -84,6 +86,7 @@ export class GameSession {
       initialIce: this.counters.initialIce,
       chainBest: this.chainBest,
       tilesCleared: this.tilesCleared,
+      turnCount: this.turnCount,
     };
   }
 

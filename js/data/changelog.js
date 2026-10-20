@@ -6,13 +6,22 @@
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 export const CHANGELOG = [
+  {
+    version: '1.4.0',
+    date: '2026-10-20',
+    notes: [
+      '新增 5 个 EX 关卡：四连、冰封、雷区、坚冰、节律',
+      'EX 关卡设有 7 秒单步思考时间，超时自动执行一步',
+      'EX 关卡默认解锁 EX-1，通关后顺次解锁下一 EX 关',
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-10-20',

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "levelId": 101,
+  "name": "EX-1 四连",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2000
+  },
+  "moves": 20,
+  "starThresholds": [
+    2500,
+    3500,
+    4500
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "minMatchLength": 4,
+    "reduceBombStructures": true
+  },
+  "tutorialHint": "本关至少需要 4 个同色连成一线才能消除"
+}

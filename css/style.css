@@ -296,9 +296,46 @@ body {
 .level-card.invalid { border-color: #d8b3ae; background: #fbf1ef; color: var(--danger); }
 .level-card.invalid .level-no { font-size: 15px; }
 
+.level-card.ex { background: linear-gradient(180deg, #fffdf8, #f8f0e4); border-color: #e4d2b8; }
+.level-card.ex .level-no { color: var(--warm); }
+
+.level-divider {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+  padding: 8px 0 2px;
+  letter-spacing: 0.1em;
+}
+
 /* ------------------------------------------------------------------ 游戏 */
 
 .scene-game { padding-left: 10px; padding-right: 10px; }
+
+.move-timer {
+  position: relative;
+  height: 6px;
+  background: rgba(60, 50, 38, 0.12);
+  border-radius: 999px;
+  margin: 2px 0 10px;
+  overflow: hidden;
+}
+.move-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--accent, #2f6f5e);
+  border-radius: 999px;
+  transform-origin: left;
+  transition: width 0.1s linear, background 0.2s ease;
+}
+.move-timer-fill.low { background: var(--danger, #a83f38); }
+.move-timer-text {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
 
 .game-head {
   display: flex;

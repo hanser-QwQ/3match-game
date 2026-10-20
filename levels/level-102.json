@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "levelId": 102,
+  "name": "EX-2 冰封",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2500
+  },
+  "moves": 22,
+  "starThresholds": [
+    3000,
+    4200,
+    5500
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "freezeEveryNMoves": 2,
+    "freezeCount": 3
+  },
+  "tutorialHint": "每走 2 步会随机冻住若干元素，抓紧时间"
+}

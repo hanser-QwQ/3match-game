@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "levelId": 103,
+  "name": "EX-3 雷区",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2500
+  },
+  "moves": 20,
+  "starThresholds": [
+    3000,
+    4200,
+    5500
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "bombChanceBoost": true,
+    "bombRange": 4,
+    "rainbowRandomClear": true,
+    "rainbowRandomCount": 8
+  },
+  "tutorialHint": "炸弹更容易生成，但只会炸周围 4 格；彩虹改为随机消除同色方块"
+}

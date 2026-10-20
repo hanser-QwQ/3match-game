@@ -317,6 +317,156 @@ export const LEVELS = [
   },
   {
     "schemaVersion": 1,
+    "levelId": 101,
+    "name": "EX-1 四连",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2000
+    },
+    "moves": 20,
+    "starThresholds": [
+      2500,
+      3500,
+      4500
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "minMatchLength": 4,
+      "reduceBombStructures": true
+    },
+    "tutorialHint": "本关至少需要 4 个同色连成一线才能消除"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 102,
+    "name": "EX-2 冰封",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2500
+    },
+    "moves": 22,
+    "starThresholds": [
+      3000,
+      4200,
+      5500
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "freezeEveryNMoves": 2,
+      "freezeCount": 3
+    },
+    "tutorialHint": "每走 2 步会随机冻住若干元素，抓紧时间"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 103,
+    "name": "EX-3 雷区",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2500
+    },
+    "moves": 20,
+    "starThresholds": [
+      3000,
+      4200,
+      5500
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "bombChanceBoost": true,
+      "bombRange": 4,
+      "rainbowRandomClear": true,
+      "rainbowRandomCount": 8
+    },
+    "tutorialHint": "炸弹更容易生成，但只会炸周围 4 格；彩虹改为随机消除同色方块"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 104,
+    "name": "EX-4 坚冰",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "clear_ice",
+      "amount": 18
+    },
+    "moves": 25,
+    "starThresholds": [
+      3000,
+      4500,
+      6000
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "initialDoubleIce": 18
+    },
+    "tutorialHint": "开局有大量双层冰，需要消除两次相邻才能彻底敲碎"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 105,
+    "name": "EX-5 节律",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 3000
+    },
+    "moves": 22,
+    "starThresholds": [
+      4000,
+      5500,
+      7000
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "specialCycle": true
+    },
+    "tutorialHint": "特殊方块生效一次后会进入冷却，等所有特殊方块都生效一轮后才能再次生效"
+  },
+  {
+    "schemaVersion": 1,
     "levelId": 11,
     "name": "冰下藏金",
     "board": {

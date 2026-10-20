@@ -59,6 +59,20 @@ function applyIce(board, config) {
   }
 }
 
+function applyRuleIce(board, rules, rng) {
+  if (!rules || !Number.isInteger(rules.initialDoubleIce) || rules.initialDoubleIce <= 0) return;
+  const free = [];
+  board.eachCell((r, c) => {
+    if (board.isFree(r, c) && board.typeAt(r, c) >= 0) free.push({ r, c });
+  });
+  const count = Math.min(rules.initialDoubleIce, free.length);
+  for (let i = free.length - 1; i > 0; i -= 1) {
+    const j = rng.int(i + 1);
+    [free[i], free[j]] = [free[j], free[i]];
+  }
+  for (let i = 0; i < count; i += 1) board.setIce(free[i].r, free[i].c, 2);
+}
+
 /**
  * 按关卡配置生成初始棋盘。
  * 保证：无现成连线、至少存在一次可行交换（第 5.1 节与 5.7 节）。
@@ -67,20 +81,25 @@ export function createBoard(config, rng) {
   const rows = config.rows || 8;
   const cols = config.cols || 8;
   const elementTypes = Math.min(6, Math.max(3, config.elementTypes || 6));
+  const rules = config.rules || {};
 
   for (let attempt = 0; attempt < MAX_GENERATE_ATTEMPTS; attempt += 1) {
     const board = new Board(rows, cols, elementTypes);
+    board.rules = rules;
     applyLayout(board, config);
     fillWithoutMatches(board, rng);
     applyIce(board, config);
+    applyRuleIce(board, rules, rng);
     if (hasValidMove(board)) return board;
   }
 
   // 20 次仍未得到有解棋盘时强制构造一对可消除元素
   const board = new Board(rows, cols, elementTypes);
+  board.rules = rules;
   applyLayout(board, config);
   fillWithoutMatches(board, rng);
   applyIce(board, config);
+  applyRuleIce(board, rules, rng);
   forceValidMove(board, rng);
   return board;
 }

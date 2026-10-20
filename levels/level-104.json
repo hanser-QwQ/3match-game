@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "levelId": 104,
+  "name": "EX-4 坚冰",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 5,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "clear_ice",
+    "amount": 18
+  },
+  "moves": 25,
+  "starThresholds": [
+    3000,
+    4500,
+    6000
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "initialDoubleIce": 18
+  },
+  "tutorialHint": "开局有大量双层冰，需要消除两次相邻才能彻底敲碎"
+}

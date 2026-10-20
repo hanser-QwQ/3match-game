@@ -58,6 +58,9 @@ export class SceneManager {
       boosterBar: $('booster-bar'),
       settleBar: $('settle-bar'),
       settleBonus: $('settle-bonus'),
+      moveTimer: $('move-timer'),
+      moveTimerFill: $('move-timer-fill'),
+      moveTimerText: $('move-timer-text'),
       saveNote: $('save-note'),
       badge: $('board-badge'),
       resultKicker: $('result-kicker'),
@@ -484,7 +487,9 @@ export class SceneManager {
     if (!vm || !vm.board) return;
     if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
 
-    this.el.levelName.textContent = `第 ${vm.levelId} 关 · ${vm.levelName}`;
+    this.el.levelName.textContent = vm.levelId >= 100
+      ? vm.levelName
+      : `第 ${vm.levelId} 关 · ${vm.levelName}`;
     this.el.hint.textContent = vm.hint;
     this.el.movesLeft.textContent = vm.movesLeft;
     this.el.movesChip.classList.toggle('low', vm.movesLeft <= 3 && vm.state === 'in_progress');
@@ -541,6 +546,19 @@ export class SceneManager {
 
     this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
 
+    // 单步思考倒计时（EX 关卡）
+    if (this.el.moveTimer) {
+      const hasTimer = Boolean(vm.moveTimer);
+      this.el.moveTimer.classList.toggle('hidden', !hasTimer);
+      if (hasTimer) {
+        const pct = vm.moveTimer.limit > 0 ? (vm.moveTimer.remaining / vm.moveTimer.limit) * 100 : 0;
+        const secs = (vm.moveTimer.remaining / 1000).toFixed(1);
+        this.el.moveTimerFill.style.width = `${Math.max(0, pct)}%`;
+        this.el.moveTimerFill.classList.toggle('low', pct <= 30);
+        this.el.moveTimerText.textContent = `${secs}s`;
+      }
+    }
+
     // 达标后不强制结算：给出"继续冲分"与"立即结算并拿走剩余步数奖励"两条路
     const canSettle = Boolean(vm.goalDone) && vm.movesLeft > 0 && vm.state === 'in_progress';
     this.el.settleBar?.classList.toggle('hidden', !canSettle);
@@ -557,10 +575,19 @@ export class SceneManager {
     this.el.levelsMeta.textContent = `${cleared} / ${list.length}`;
     this.el.levelGrid.textContent = '';
     const currentId = this.controller.nextLevelId();
+    let exHeaderAdded = false;
 
     for (const lv of list) {
+      if (lv.isEx && !exHeaderAdded) {
+        const divider = document.createElement('div');
+        divider.className = 'level-divider';
+        divider.textContent = 'EX 关卡';
+        this.el.levelGrid.appendChild(divider);
+        exHeaderAdded = true;
+      }
       const btn = document.createElement('button');
       btn.className = 'level-card';
+      if (lv.isEx) btn.classList.add('ex');
       btn.dataset.level = String(lv.levelId);
       if (!lv.valid) {
         btn.classList.add('invalid');
@@ -570,11 +597,11 @@ export class SceneManager {
         btn.disabled = true;
       }
       if (lv.cleared) btn.classList.add('cleared');
-      if (lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
+      if (!lv.isEx && lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
 
       const no = document.createElement('span');
       no.className = 'level-no';
-      no.textContent = lv.valid ? String(lv.levelId) : '异常';
+      no.textContent = lv.valid ? (lv.isEx ? `EX-${lv.levelId - 100}` : String(lv.levelId)) : '异常';
 
       const stars = document.createElement('span');
       stars.className = 'level-stars';
@@ -604,7 +631,9 @@ export class SceneManager {
 
   renderResult(result) {
     this.lastResult = result;
-    this.el.resultKicker.textContent = `第 ${String(result.levelId).padStart(2, '0')} 关 · ${result.levelName}`;
+    this.el.resultKicker.textContent = result.levelId >= 100
+      ? result.levelName
+      : `第 ${String(result.levelId).padStart(2, '0')} 关 · ${result.levelName}`;
     this.el.resultTitle.textContent = result.cleared ? (result.stars === 3 ? '完美通关' : '通关') : '未达成目标';
     this.el.resultCard.classList.toggle('failed', !result.cleared);
 

@@ -14,6 +14,7 @@ import { hasValidMove, findAnyValidMove, reshuffle } from '../js/domain/deadlock
 import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../js/domain/scorer.js';
 import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
+import { SPECIAL } from '../js/core/constants.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
 
@@ -303,4 +304,66 @@ test('棋盘序列化：往返后状态一致', () => {
   const back = Board.deserialize(data, { rows: 8, cols: 8, elementTypes: 6, iceCells: [[2, 2]] });
   assert.deepEqual(back.serialize(), data);
   assert.equal(back.specialAt(0, 0), 'stripe_v');
+});
+
+// ------------------------------------------------------------------ EX 关卡规则
+
+test('EX-1：最低连线长度提高后，三连不再匹配，条纹/彩虹阈值顺次提高', () => {
+  const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
+  board.rules = { minMatchLength: 4 };
+  assert.equal(findMatches(board).length, 0, '三连不应被识别');
+
+  const four = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
+  four.rules = { minMatchLength: 4 };
+  assert.equal(findMatches(four).length, 1, '四连应被识别');
+  const p4 = planSpecials(four, findMatches(four), []);
+  assert.equal(p4.length, 0, '四连不应生成条纹（阈值已提高到 5）');
+
+  const five = makeBoard(['AAAAA', 'CDEFG', 'DFGCE', 'EGCDF']);
+  five.rules = { minMatchLength: 4 };
+  const p5 = planSpecials(five, findMatches(five), []);
+  assert.equal(p5.length, 1);
+  assert.equal(p5[0].special, 'stripe_h', '五连应生成条纹（彩虹阈值提高到 6）');
+});
+
+test('EX-3：炸弹范围可缩小为周围 4 格，彩虹可随机消除指定数量', () => {
+  const board = new Board(8, 8, 6);
+  board.rules = { bombRange: 4 };
+  const cells = blastCells(board, 4, 4, SPECIAL.BOMB);
+  assert.equal(cells.length, 4, '小范围炸弹只有正交 4 格');
+
+  const rb = new Board(8, 8, 6);
+  rb.rules = { rainbowRandomClear: true, rainbowRandomCount: 5 };
+  // 在 (0,0)..(3,3) 填入 A，其余 B，让最多颜色是 B
+  for (let r = 0; r < 8; r += 1) {
+    for (let c = 0; c < 8; c += 1) {
+      rb.setType(r, c, r < 4 && c < 4 ? 0 : 1);
+    }
+  }
+  const rainbows = blastCells(rb, 4, 4, SPECIAL.RAINBOW, rng(55));
+  assert.ok(rainbows.length <= 5 && rainbows.length > 0, '随机彩虹应消除 1~5 个');
+});
+
+test('EX-4：双层冰需要两次相邻消除才会消失', () => {
+  const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
+  board.setIce(0, 3, 2);
+  const res = resolveCascade(board, { rng: rng(9) });
+  assert.equal(res.iceCleared, 0, '第一次相邻消除只削减一层冰，不计入清除');
+  assert.equal(board.iceAt(0, 3), 1, '双层冰应还剩一层');
+});
+
+test('EX-5：特殊方块有独立的生效状态，可进入冷却并序列化', () => {
+  const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
+  board.setType(0, 3, 1, SPECIAL.BOMB);
+  assert.ok(board.isSpecialActive(0, 3), '新设置的特殊方块默认可触发');
+  board.setSpecialActive(0, 3, false);
+  assert.ok(!board.isSpecialActive(0, 3), '可手动设为冷却');
+
+  board.rules = { specialCycle: true };
+  const res = resolveCascade(board, { rng: rng(12) });
+  assert.ok(res.sequence.length >= 1, '特殊循环规则下仍可正常结算');
+
+  const data = board.serialize();
+  const back = Board.deserialize(data, { rows: 4, cols: 4, elementTypes: 6 });
+  assert.deepEqual(back.specialActive, board.specialActive, '特殊方块激活状态应被序列化保留');
 });

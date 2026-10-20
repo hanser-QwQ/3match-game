@@ -45,6 +45,8 @@ export function validateLevel(data) {
   if (!data || typeof data !== 'object') return ['关卡数据不是对象'];
   if (!Number.isInteger(data.levelId) || data.levelId <= 0) errors.push('levelId 非法');
   if (typeof data.name !== 'string' || !data.name || data.name.length > 16) errors.push('name 缺失或超过 16 字');
+  if (data.isEx !== undefined && typeof data.isEx !== 'boolean') errors.push('isEx 必须是布尔值');
+  if (data.rules !== undefined && (typeof data.rules !== 'object' || data.rules === null)) errors.push('rules 必须是对象');
 
   const board = data.board || {};
   const rows = board.rows;

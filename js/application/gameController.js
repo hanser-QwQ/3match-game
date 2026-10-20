@@ -44,6 +44,9 @@ export class GameController {
     this.boosterArmed = null;
     this.storageDegraded = false;
     this.sessionCounter = 0;
+    this._moveTimer = null;
+    this._moveRemaining = 0;
+    this._moveLastTick = 0;
   }
 
   async boot() {
@@ -92,9 +95,9 @@ export class GameController {
     return value;
   }
 
-  /** 下一次未完成关卡 */
+  /** 下一次未完成关卡（只考虑普通关卡，EX 关独立解锁） */
   nextLevelId() {
-    const list = this.levels.playable();
+    const list = this.levels.playable().filter((lv) => !lv.isEx);
     for (const lv of list) {
       const p = this.save.progress[String(lv.levelId)];
       if (!p?.cleared) return lv.levelId;
@@ -141,12 +144,14 @@ export class GameController {
     }
 
     if (!board) board = createBoard(level.board, this.rng);
+    board.rules = level.rules || {};
 
     this.session = new GameSession({ level, board, resumed });
     this.sessionCounter += 1;
     this.boosterArmed = null;
     this.renderer?.setBoard(board);
     this.renderer?.setHint(this.suggestMove());
+    this._resetMoveTimer();
     this.navigate(SCENE.GAME);
     this.emitSession();
     return true;
@@ -217,12 +222,102 @@ export class GameController {
         this.renderer?.setInputLocked(false);
         this.emitSession();
       }, 12000);
+      this._stopMoveTimer();
     } else {
       clearTimeout(this._busyTimer);
       if (this.pendingPause) {
         this.pendingPause = false;
         this.pause();
+      } else {
+        this._startMoveTimer();
       }
+    }
+  }
+
+  _moveTimeLimitMs() {
+    const limit = this.session?.level?.rules?.moveTimeLimit;
+    return Number.isFinite(limit) && limit > 0 ? limit * 1000 : 0;
+  }
+
+  _startMoveTimer() {
+    const limit = this._moveTimeLimitMs();
+    if (!limit) return;
+    const s = this.session;
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy || this._pausedTimer) return;
+    this._stopMoveTimer();
+    if (!this._moveRemaining || this._moveRemaining <= 0) this._moveRemaining = limit;
+    this._moveLastTick = performance.now();
+    this._moveTimer = setInterval(() => this._tickMoveTimer(), 100);
+  }
+
+  _stopMoveTimer() {
+    if (this._moveTimer) {
+      clearInterval(this._moveTimer);
+      this._moveTimer = null;
+    }
+  }
+
+  _pauseMoveTimer() {
+    this._pausedTimer = true;
+    this._stopMoveTimer();
+  }
+
+  _resumeMoveTimer() {
+    this._pausedTimer = false;
+    this._startMoveTimer();
+  }
+
+  _resetMoveTimer() {
+    this._stopMoveTimer();
+    const limit = this._moveTimeLimitMs();
+    this._moveRemaining = limit;
+    this._startMoveTimer();
+  }
+
+  _tickMoveTimer() {
+    const s = this.session;
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
+    const now = performance.now();
+    const delta = now - this._moveLastTick;
+    this._moveLastTick = now;
+    this._moveRemaining -= delta;
+    if (this._moveRemaining <= 0) {
+      this._moveRemaining = 0;
+      this._stopMoveTimer();
+      this.autoPlayMove();
+    } else {
+      this.emitSession();
+    }
+  }
+
+  async autoPlayMove() {
+    const s = this.session;
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
+    this._stopMoveTimer();
+    const move = this.suggestMove();
+    if (move) {
+      this.toast('思考时间到，自动执行一步', 'warn');
+      await this.handleSwap(move.a, move.b);
+      return;
+    }
+    // 没有可行交换时，随机交换两个相邻空格并消耗一步
+    const freePairs = [];
+    for (let r = 0; r < s.board.rows; r += 1) {
+      for (let c = 0; c < s.board.cols; c += 1) {
+        if (!s.board.isFree(r, c)) continue;
+        if (c + 1 < s.board.cols && s.board.isFree(r, c + 1)) freePairs.push([{ r, c }, { r, c: c + 1 }]);
+        if (r + 1 < s.board.rows && s.board.isFree(r + 1, c)) freePairs.push([{ r, c }, { r: r + 1, c }]);
+      }
+    }
+    if (freePairs.length) {
+      const [a, b] = freePairs[this.rng.int(freePairs.length)];
+      this.toast('思考时间到，自动交换', 'warn');
+      await this.handleSwap(a, b);
+    } else {
+      // 没有任何可交换的相邻空格，让 afterMove 自动重排
+      s.spendMove();
+      s.pendingFreeze = true;
+      await this.afterMove();
     }
   }
 
@@ -231,6 +326,7 @@ export class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false, error: 'STATE_MISMATCH' };
     if (!from || !to || !isAdjacent(from, to)) return { ok: false, error: 'INVALID_COORD' };
+    this._stopMoveTimer();
 
     if (!s.board.isFree(from.r, from.c) || !s.board.isFree(to.r, to.c)) {
       this.toast('冰块覆盖的元素不能交换', 'warn');
@@ -256,6 +352,7 @@ export class GameController {
         this.audio.play('swap');
         await this.renderer.playSwap(from, to, s.board);
         s.spendMove();
+        s.pendingFreeze = true;
         this.emitSession();
         const result = await this.runCascade({ preferred: [from, to] });
         if (!result.sequence.length) {
@@ -294,6 +391,13 @@ export class GameController {
     const s = this.session;
     if (!s) return;
 
+    // 处理 EX-2 的“每 N 步随机冰冻”
+    if (s.pendingFreeze) {
+      s.pendingFreeze = false;
+      s.turnCount += 1;
+      await this.applyFreezeRule();
+    }
+
     // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
     // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
     if (s.movesLeft <= 0) {
@@ -316,6 +420,34 @@ export class GameController {
     }
     this.saveSession();
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
+    this._resetMoveTimer();
+  }
+
+  /** EX-2：每走 N 步后随机冰冻若干空格 */
+  async applyFreezeRule() {
+    const s = this.session;
+    const rules = s.level.rules || {};
+    const n = rules.freezeEveryNMoves;
+    const count = rules.freezeCount || 3;
+    if (!n || s.turnCount % n !== 0) return;
+
+    const free = [];
+    s.board.eachCell((r, c) => {
+      if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0) free.push({ r, c });
+    });
+    if (!free.length) return;
+
+    // 随机抽取
+    for (let i = free.length - 1; i > 0; i -= 1) {
+      const j = this.rng.int(i + 1);
+      [free[i], free[j]] = [free[j], free[i]];
+    }
+    const pick = Math.min(count, free.length);
+    for (let i = 0; i < pick; i += 1) s.board.setIce(free[i].r, free[i].c, 1);
+    this.audio?.play('freeze');
+    this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
+    this.emitSession();
+    await this.renderer?.playFreeze?.(free.slice(0, pick));
   }
 
   /** 达成目标后主动结算，保留剩余步数奖励 */
@@ -365,6 +497,7 @@ export class GameController {
 
     if (cleared) this.applyProgress(s.result);
     this.save.interruptedSession = null;
+    this._stopMoveTimer();
     const wr = this.storage.write(this.save);
     if (!wr.ok) this.storageDegraded = true;
     this.audio.play(cleared ? 'win' : 'lose');
@@ -455,6 +588,7 @@ export class GameController {
       this.pendingPause = true;
       return { ok: true, deferred: true };
     }
+    this._pauseMoveTimer();
     s.pause();
     this.tutorial?.pause();
     this.save.interruptedSession = s.snapshot();
@@ -471,6 +605,7 @@ export class GameController {
     this.tutorial?.resume();
     this.bus.emit('game:resumed', {});
     this.emitSession();
+    this._resumeMoveTimer();
     return { ok: true };
   }
 
@@ -491,6 +626,7 @@ export class GameController {
       this.save.interruptedSession = s.snapshot();
       this.storage.write(this.save);
     }
+    this._stopMoveTimer();
     this.tutorial?.stop();
     this.session = null;
     this.renderer?.setBoard(null);
@@ -505,6 +641,7 @@ export class GameController {
       this.save.interruptedSession = s.snapshot();
       this.storage.write(this.save);
     }
+    this._stopMoveTimer();
     this.tutorial?.stop();
     this.session = null;
     this.renderer?.setBoard(null);
@@ -652,6 +789,9 @@ export class GameController {
       busy: this.busy,
       save: this.save,
       chainBest: s.chainBest,
+      moveTimer: this._moveTimeLimitMs()
+        ? { limit: this._moveTimeLimitMs(), remaining: Math.max(0, Math.round(this._moveRemaining)) }
+        : null,
     };
   }
 
@@ -663,12 +803,19 @@ export class GameController {
   levelList() {
     return this.levels.list().map((lv) => {
       const p = this.save.progress[String(lv.levelId)];
+      let unlocked;
+      if (lv.isEx) {
+        unlocked = lv.levelId === 101 || Boolean(this.save.progress[String(lv.levelId - 1)]?.cleared);
+      } else {
+        unlocked = Boolean(p?.unlocked) || lv.levelId === 1;
+      }
       return {
         levelId: lv.levelId,
         name: lv.name,
+        isEx: lv.isEx,
         valid: lv.valid,
         errors: lv.errors,
-        unlocked: Boolean(p?.unlocked) || lv.levelId === 1,
+        unlocked,
         cleared: Boolean(p?.cleared),
         stars: p?.stars || 0,
         highScore: p?.highScore || 0,

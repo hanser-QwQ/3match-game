@@ -20,8 +20,11 @@ export class Board {
     const n = rows * cols;
     this.types = new Int8Array(n).fill(-1);
     this.specials = new Array(n).fill(SPECIAL_NONE);
+    // 特殊方块“生效轮次”状态：1 表示可触发，0 表示本轮已触发（EX-5 节律）
+    this.specialActive = new Uint8Array(n).fill(0);
     this.ice = new Uint8Array(n);
     this.blocked = new Uint8Array(n);
+    this.rules = {};
   }
 
   idx(r, c) {
@@ -74,6 +77,17 @@ export class Board {
     const i = this.idx(r, c);
     this.types[i] = type;
     this.specials[i] = type < 0 ? SPECIAL_NONE : special;
+    this.specialActive[i] = special ? 1 : 0;
+  }
+
+  setSpecialActive(r, c, active) {
+    if (!this.inside(r, c)) return;
+    this.specialActive[this.idx(r, c)] = active ? 1 : 0;
+  }
+
+  isSpecialActive(r, c) {
+    if (!this.inside(r, c)) return false;
+    return this.specialActive[this.idx(r, c)] === 1;
   }
 
   /** 清空一个格子（消除），返回被清除的元素类型，供收集目标统计 */
@@ -83,6 +97,7 @@ export class Board {
     const type = this.types[i];
     this.types[i] = -1;
     this.specials[i] = SPECIAL_NONE;
+    this.specialActive[i] = 0;
     return type;
   }
 
@@ -92,6 +107,7 @@ export class Board {
     const j = this.idx(b.r, b.c);
     [this.types[i], this.types[j]] = [this.types[j], this.types[i]];
     [this.specials[i], this.specials[j]] = [this.specials[j], this.specials[i]];
+    [this.specialActive[i], this.specialActive[j]] = [this.specialActive[j], this.specialActive[i]];
   }
 
   countIce() {
@@ -110,8 +126,10 @@ export class Board {
     const copy = new Board(this.rows, this.cols, this.elementTypes);
     copy.types.set(this.types);
     copy.specials = this.specials.slice();
+    copy.specialActive.set(this.specialActive);
     copy.ice.set(this.ice);
     copy.blocked.set(this.blocked);
+    copy.rules = this.rules;
     return copy;
   }
 
@@ -141,17 +159,18 @@ export class Board {
         let top = r;
         while (top - 1 >= 0 && this.isFree(top - 1, c)) top -= 1;
 
-        // 自下而上收集本段内仍存在的元素
+        // 自下而上收集本段内仍存在的元素（连同特殊方块的激活状态）
         const stack = [];
         for (let rr = bottom; rr >= top; rr -= 1) {
           const i = this.idx(rr, c);
-          if (this.types[i] >= 0) stack.push({ type: this.types[i], special: this.specials[i] });
+          if (this.types[i] >= 0) stack.push({ type: this.types[i], special: this.specials[i], active: this.specialActive[i] });
         }
 
         // 自下而上回写，剩余位置在段顶补充新元素
         let w = bottom;
         for (const item of stack) {
           this.setType(w, c, item.type, item.special);
+          this.specialActive[this.idx(w, c)] = item.active;
           w -= 1;
         }
         while (w >= top) {
@@ -169,22 +188,26 @@ export class Board {
   serialize() {
     const board = [];
     const specials = [];
+    const specialActive = [];
     const ice = [];
     for (let r = 0; r < this.rows; r += 1) {
       const tRow = [];
       const sRow = [];
+      const aRow = [];
       const iRow = [];
       for (let c = 0; c < this.cols; c += 1) {
         const i = this.idx(r, c);
         tRow.push(this.types[i]);
         sRow.push(this.specials[i]);
+        aRow.push(this.specialActive[i]);
         iRow.push(this.ice[i]);
       }
       board.push(tRow);
       specials.push(sRow);
+      specialActive.push(aRow);
       ice.push(iRow);
     }
-    return { board, specials, ice };
+    return { board, specials, specialActive, ice };
   }
 
   /** 从存档结构恢复；字段缺失时按空棋盘处理，由调用方决定是否提示 */
@@ -198,6 +221,8 @@ export class Board {
         board.types[i] = data.board[r]?.[c] ?? -1;
         board.specials[i] = data.specials?.[r]?.[c] ?? SPECIAL_NONE;
         board.ice[i] = data.ice?.[r]?.[c] ?? 0;
+        const active = data.specialActive?.[r]?.[c];
+        board.specialActive[i] = active === 1 ? 1 : (board.specials[i] ? 1 : 0);
       }
     }
     for (const [r, c] of config.iceCells || []) {

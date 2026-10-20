@@ -21,12 +21,19 @@ export function isAdjacent(a, b) {
   return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
 }
 
+/** 读取关卡规则中的最低连线长度，默认 3 */
+function minMatchLength(board) {
+  const rules = board?.rules || {};
+  return Number.isInteger(rules.minMatchLength) && rules.minMatchLength >= 3 ? rules.minMatchLength : 3;
+}
+
 /**
  * 扫描全盘连线。
  * @returns {{cells:{r:number,c:number}[], dir:'row'|'col', type:number, length:number}[]}
  */
 export function findMatches(board) {
   const matches = [];
+  const minLen = minMatchLength(board);
 
   // 横向
   for (let r = 0; r < board.rows; r += 1) {
@@ -40,7 +47,7 @@ export function findMatches(board) {
       let end = c + 1;
       while (end < board.cols && board.isMatchable(r, end) && board.typeAt(r, end) === type) end += 1;
       const length = end - c;
-      if (length >= 3) {
+      if (length >= minLen) {
         const cells = [];
         for (let k = c; k < end; k += 1) cells.push({ r, c: k });
         matches.push({ cells, dir: 'row', type, length });
@@ -61,7 +68,7 @@ export function findMatches(board) {
       let end = r + 1;
       while (end < board.rows && board.isMatchable(end, c) && board.typeAt(end, c) === type) end += 1;
       const length = end - r;
-      if (length >= 3) {
+      if (length >= minLen) {
         const cells = [];
         for (let k = r; k < end; k += 1) cells.push({ r: k, c });
         matches.push({ cells, dir: 'col', type, length });
@@ -73,20 +80,21 @@ export function findMatches(board) {
   return matches;
 }
 
-/** 判断经过 (r,c) 的横纵方向是否已构成三连及以上 */
+/** 判断经过 (r,c) 的横纵方向是否已构成最低连线长度 */
 export function hasMatchAt(board, r, c) {
   if (!board.isMatchable(r, c)) return false;
   const type = board.typeAt(r, c);
+  const minLen = minMatchLength(board);
 
   let count = 1;
   for (let k = c - 1; k >= 0 && board.isMatchable(r, k) && board.typeAt(r, k) === type; k -= 1) count += 1;
   for (let k = c + 1; k < board.cols && board.isMatchable(r, k) && board.typeAt(r, k) === type; k += 1) count += 1;
-  if (count >= 3) return true;
+  if (count >= minLen) return true;
 
   count = 1;
   for (let k = r - 1; k >= 0 && board.isMatchable(k, c) && board.typeAt(k, c) === type; k -= 1) count += 1;
   for (let k = r + 1; k < board.rows && board.isMatchable(k, c) && board.typeAt(k, c) === type; k += 1) count += 1;
-  return count >= 3;
+  return count >= minLen;
 }
 
 /**
@@ -157,18 +165,34 @@ function groupMatches(matches) {
  *   直线五连 → 彩虹
  *   直线四连 → 条纹，方向由连线方向决定
  *
+ * EX 规则：minMatchLength 提高时，条纹与彩虹阈值也顺次提高；
+ *          bombChanceBoost 关卡会让直线五连有概率生成炸弹。
+ *
  * @param preferred 玩家本次交换涉及的格子，优先作为特殊元素落点
+ * @param rng 可选，用于 EX-3 的炸弹概率提升
  */
-export function planSpecials(board, matches, preferred = []) {
+export function planSpecials(board, matches, preferred = [], rng = null) {
   if (!matches.length) return [];
+  const minLen = minMatchLength(board);
+  const stripeThreshold = minLen + 1;
+  const rainbowThreshold = minLen + 2;
+  const bombBoost = Boolean(board?.rules?.bombChanceBoost) && rng;
   const preferredKeys = new Set(preferred.map((p) => key(p.r, p.c)));
   const plans = [];
 
   for (const group of groupMatches(matches)) {
     let special = null;
-    if (group.hasRow && group.hasCol) special = SPECIAL.BOMB;
-    else if (group.maxLen >= 5) special = SPECIAL.RAINBOW;
-    else if (group.maxLen === 4) special = group.longest.dir === 'row' ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
+    if (group.hasRow && group.hasCol) {
+      special = SPECIAL.BOMB;
+    } else if (group.maxLen >= rainbowThreshold) {
+      special = SPECIAL.RAINBOW;
+      // EX-3：五连有概率变成炸弹（炸弹生成概率提升）
+      if (bombBoost && !group.hasRow && !group.hasCol && rng.float() < 0.5) {
+        special = SPECIAL.BOMB;
+      }
+    } else if (group.maxLen >= stripeThreshold) {
+      special = group.longest.dir === 'row' ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
+    }
     if (!special) continue;
 
     /*
@@ -260,16 +284,21 @@ export function planSpecialSwap(board, a, b, rng) {
       if (board.iceAt(r, c) === 0 && board.typeAt(r, c) === targetType) sameType.push({ r, c });
     });
 
+    const rules = board?.rules || {};
+    const randomClear = Boolean(rules.rainbowRandomClear);
+    const randomCount = Number.isFinite(rules.rainbowRandomCount) ? rules.rainbowRandomCount : 8;
+    const selected = randomClear ? sample(sameType, randomCount, rng) : sameType;
+
     if (otherSpecial === SPECIAL.STRIPE_H || otherSpecial === SPECIAL.STRIPE_V) {
-      // 彩虹 + 条纹：把全部同色元素转为条纹再一起清除
-      sameType.forEach((cell, i) => {
+      // 彩虹 + 条纹：把选中的同色元素转为条纹再一起清除
+      selected.forEach((cell, i) => {
         board.setType(cell.r, cell.c, targetType, i % 2 === 0 ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V);
         seeds.push(cell);
       });
       return { cells: seeds, combo: 'rainbow+stripe' };
     }
 
-    for (const cell of sameType) seeds.push(cell);
+    for (const cell of selected) seeds.push(cell);
     return { cells: seeds, combo: 'rainbow+normal' };
   }
 
@@ -289,12 +318,26 @@ export function planSpecialSwap(board, a, b, rng) {
   return null;
 }
 
+/** 从数组中随机抽取 n 个元素（不修改原数组） */
+function sample(arr, n, rng) {
+  if (!rng || n >= arr.length) return arr.slice();
+  const pool = arr.slice();
+  const out = [];
+  for (let i = 0; i < n; i += 1) {
+    const idx = rng.int(pool.length);
+    out.push(pool[idx]);
+    pool.splice(idx, 1);
+  }
+  return out;
+}
+
 /** 某个特殊元素触发时波及的格子（不含自身） */
-export function blastCells(board, r, c, special) {
+export function blastCells(board, r, c, special, rng = null) {
   const out = [];
   const push = (rr, cc) => {
     if (board.inside(rr, cc) && !board.isBlocked(rr, cc)) out.push({ r: rr, c: cc });
   };
+  const rules = board?.rules || {};
   switch (special) {
     case SPECIAL.STRIPE_H:
       for (let cc = 0; cc < board.cols; cc += 1) if (cc !== c) push(r, cc);
@@ -302,37 +345,55 @@ export function blastCells(board, r, c, special) {
     case SPECIAL.STRIPE_V:
       for (let rr = 0; rr < board.rows; rr += 1) if (rr !== r) push(rr, c);
       break;
-    case SPECIAL.BOMB:
-      // 曼哈顿距离 ≤ 2 的菱形范围：以自身为中心共 13 格（横纵坐标之和不超过 2）
-      for (let dr = -2; dr <= 2; dr += 1) {
-        const span = 2 - Math.abs(dr);
-        for (let dc = -span; dc <= span; dc += 1) {
-          if (dr === 0 && dc === 0) continue;
-          push(r + dr, c + dc);
+    case SPECIAL.BOMB: {
+      // EX-3 炸弹范围缩小为周围 4 格（正交邻居），否则用默认菱形 13 格
+      const smallBomb = rules.bombRange === 4;
+      if (smallBomb) {
+        for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) push(r + dr, c + dc);
+      } else {
+        for (let dr = -2; dr <= 2; dr += 1) {
+          const span = 2 - Math.abs(dr);
+          for (let dc = -span; dc <= span; dc += 1) {
+            if (dr === 0 && dc === 0) continue;
+            push(r + dr, c + dc);
+          }
         }
       }
       break;
+    }
     case SPECIAL.RAINBOW: {
-      // 被卷入爆炸的彩虹：清除棋盘上数量最多的一种元素
-      const counts = new Map();
+      // EX-3：彩虹改为随机消除指定数量的同色方块
+      const randomClear = Boolean(rules.rainbowRandomClear);
+      const randomCount = Number.isFinite(rules.rainbowRandomCount) ? rules.rainbowRandomCount : 8;
+      const candidates = [];
       board.eachCell((rr, cc) => {
-        if (board.isMatchable(rr, cc)) {
-          const t = board.typeAt(rr, cc);
-          counts.set(t, (counts.get(t) || 0) + 1);
-        }
+        if (board.isMatchable(rr, cc)) candidates.push({ r: rr, c: cc, type: board.typeAt(rr, cc) });
       });
-      let best = -1;
-      let bestCount = -1;
-      for (const [t, n] of counts) {
-        if (n > bestCount) {
-          best = t;
-          bestCount = n;
+      if (!candidates.length) break;
+      let chosen = candidates;
+      if (randomClear) {
+        // 先随机选一种颜色，再随机选该颜色的若干格
+        const types = [...new Set(candidates.map((x) => x.type))];
+        const targetType = types[rng ? rng.int(types.length) : Math.floor(Math.random() * types.length)];
+        const same = candidates.filter((x) => x.type === targetType);
+        chosen = sample(same, randomCount, rng);
+      } else {
+        // 默认：清除数量最多的一种元素
+        const counts = new Map();
+        for (const x of candidates) counts.set(x.type, (counts.get(x.type) || 0) + 1);
+        let best = -1;
+        let bestCount = -1;
+        for (const [t, n] of counts) {
+          if (n > bestCount) {
+            best = t;
+            bestCount = n;
+          }
         }
+        chosen = candidates.filter((x) => x.type === best);
       }
-      if (best >= 0) {
-        board.eachCell((rr, cc) => {
-          if (board.typeAt(rr, cc) === best && !(rr === r && cc === c)) push(rr, cc);
-        });
+      for (const x of chosen) {
+        if (x.r === r && x.c === c) continue;
+        push(x.r, x.c);
       }
       break;
     }

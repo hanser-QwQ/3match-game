@@ -6,7 +6,7 @@
  * 也为单元测试提供明确的中间观测点（IF-D-03）。
  */
 
-import { SCORE, chainMultiplier } from '../core/constants.js';
+import { SCORE, chainMultiplier, SPECIAL } from '../core/constants.js';
 import { findMatches, planSpecials, blastCells, key, parseKey } from './matchEngine.js';
 
 /**
@@ -51,7 +51,7 @@ export function resolveCascade(board, options = {}) {
     } else {
       const matches = findMatches(board);
       if (!matches.length) break;
-      plans = planSpecials(board, matches, preferred);
+      plans = planSpecials(board, matches, preferred, rng);
       for (const plan of plans) exclude.add(key(plan.r, plan.c));
       for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
     }
@@ -61,14 +61,18 @@ export function resolveCascade(board, options = {}) {
     // 特殊元素连锁引爆：被卷入清除范围的特殊元素依次触发
     const triggered = new Set();
     const queue = [...clearMap.values()];
+    const specialCycle = Boolean(board?.rules?.specialCycle);
     while (queue.length) {
       const cell = queue.pop();
       const special = board.specialAt(cell.r, cell.c);
       if (!special) continue;
       const k = key(cell.r, cell.c);
       if (triggered.has(k)) continue;
+      // EX-5 节律：本轮已触发过的特殊方块暂时失效
+      if (specialCycle && !board.isSpecialActive(cell.r, cell.c)) continue;
       triggered.add(k);
-      for (const target of blastCells(board, cell.r, cell.c, special)) {
+      if (specialCycle) board.setSpecialActive(cell.r, cell.c, false);
+      for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
         if (board.iceAt(target.r, target.c) > 0) {
           iceHits.add(tk);
@@ -127,7 +131,25 @@ export function resolveCascade(board, options = {}) {
     if (rng) boardAfter.applyGravityAndRefill(rng);
     board.types.set(boardAfter.types);
     board.specials = boardAfter.specials;
+    board.specialActive.set(boardAfter.specialActive);
     board.ice.set(boardAfter.ice);
+
+    // EX-5 节律：本步结束后，若棋盘上还有特殊方块但全部处于冷却，则全体恢复可触发
+    if (specialCycle) {
+      let hasSpecial = 0;
+      let hasActive = 0;
+      for (let i = 0; i < board.specials.length; i += 1) {
+        if (board.specials[i]) {
+          hasSpecial += 1;
+          if (board.specialActive[i]) hasActive += 1;
+        }
+      }
+      if (hasSpecial > 0 && hasActive === 0) {
+        for (let i = 0; i < board.specials.length; i += 1) {
+          if (board.specials[i]) board.specialActive[i] = 1;
+        }
+      }
+    }
 
     sequence.push({
       index,

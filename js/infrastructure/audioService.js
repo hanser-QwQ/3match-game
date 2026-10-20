@@ -113,6 +113,10 @@ export class AudioService {
           // 交换成立但没有形成消除：轻而短的低音，不打断节奏也不带惩罚意味
           this._tone({ freq: 210, to: 170, type: 'sine', dur: 0.1, gain: 0.07 });
           break;
+        case 'freeze':
+          // 随机冰冻：清脆的碎裂感
+          this._tone({ freq: 1200, to: 600, type: 'sine', dur: 0.18, gain: 0.12 });
+          break;
         case 'clear': {
           const idx = Math.min(options.chainIndex || 1, 6);
           const freq = 440 * Math.pow(2, (idx - 1) / 6);
