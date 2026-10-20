@@ -6,7 +6,7 @@
  * 首次访问即断网时，导航请求回退到缓存的首页，不出现空白页。
  */
 
-const CACHE_NAME = 'match3-path-v8';
+const CACHE_NAME = 'match3-path-v9';
 const CORE = [
   './',
   './index.html',

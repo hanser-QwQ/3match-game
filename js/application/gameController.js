@@ -15,7 +15,7 @@ import { Board } from '../domain/board.js';
 import { createBoard } from '../domain/boardFactory.js';
 import { isAdjacent, isValidSwap, planSpecialSwap } from '../domain/matchEngine.js';
 import { resolveCascade } from '../domain/cascadeResolver.js';
-import { hasValidMove, reshuffle } from '../domain/deadlockDetector.js';
+import { hasValidMove, reshuffle, findAnyValidMove } from '../domain/deadlockDetector.js';
 import { settleScore, judgeStars } from '../domain/scorer.js';
 import { checkBooster, consumeBooster, boosterLimit } from '../domain/boosterService.js';
 import { goalSummary } from '../domain/goals.js';
@@ -143,7 +143,7 @@ export class GameController {
       }
     }
 
-    if (!board) board = createBoard(level.board, this.rng);
+    if (!board) board = createBoard({ ...level.board, rules: level.rules || {} }, this.rng);
     board.rules = level.rules || {};
 
     this.session = new GameSession({ level, board, resumed });
@@ -294,31 +294,20 @@ export class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
     this._stopMoveTimer();
-    const move = this.suggestMove();
+
+    // 优先使用合法的可行交换（会 respecting EX-5 冷却等规则）
+    const move = findAnyValidMove(s.board) || this.suggestMove();
     if (move) {
       this.toast('思考时间到，自动执行一步', 'warn');
       await this.handleSwap(move.a, move.b);
       return;
     }
-    // 没有可行交换时，随机交换两个相邻空格并消耗一步
-    const freePairs = [];
-    for (let r = 0; r < s.board.rows; r += 1) {
-      for (let c = 0; c < s.board.cols; c += 1) {
-        if (!s.board.isFree(r, c)) continue;
-        if (c + 1 < s.board.cols && s.board.isFree(r, c + 1)) freePairs.push([{ r, c }, { r, c: c + 1 }]);
-        if (r + 1 < s.board.rows && s.board.isFree(r + 1, c)) freePairs.push([{ r, c }, { r: r + 1, c }]);
-      }
-    }
-    if (freePairs.length) {
-      const [a, b] = freePairs[this.rng.int(freePairs.length)];
-      this.toast('思考时间到，自动交换', 'warn');
-      await this.handleSwap(a, b);
-    } else {
-      // 没有任何可交换的相邻空格，让 afterMove 自动重排
-      s.spendMove();
-      s.pendingFreeze = true;
-      await this.afterMove();
-    }
+
+    // 没有可行交换：直接消耗一步，交给 afterMove 自动重排
+    this.toast('思考时间到，没有可行交换，自动重排', 'warn');
+    s.spendMove();
+    s.pendingFreeze = true;
+    await this.afterMove();
   }
 
   async handleSwap(from, to) {
@@ -327,6 +316,15 @@ export class GameController {
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false, error: 'STATE_MISMATCH' };
     if (!from || !to || !isAdjacent(from, to)) return { ok: false, error: 'INVALID_COORD' };
     this._stopMoveTimer();
+
+    // EX-5 节律：已使用的特殊方块被冻住，禁止移动且无提示
+    if (s.board.rules?.specialCycle) {
+      const frozen = (r, c) => s.board.specialAt(r, c) && s.board.isSpecialFrozen(r, c);
+      if (frozen(from.r, from.c) || frozen(to.r, to.c)) {
+        this._startMoveTimer();
+        return { ok: false, error: 'FROZEN_SPECIAL' };
+      }
+    }
 
     if (!s.board.isFree(from.r, from.c) || !s.board.isFree(to.r, to.c)) {
       this.toast('冰块覆盖的元素不能交换', 'warn');

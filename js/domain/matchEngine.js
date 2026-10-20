@@ -21,6 +21,13 @@ export function isAdjacent(a, b) {
   return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
 }
 
+/** 判断一个格子是否为“冰冻中”的特殊方块（EX-5 节律） */
+function isFrozenSpecial(board, r, c) {
+  if (!board.inside(r, c)) return false;
+  const sp = board.specialAt(r, c);
+  return Boolean(sp) && board.isSpecialFrozen(r, c);
+}
+
 /** 读取关卡规则中的最低连线长度，默认 3 */
 function minMatchLength(board) {
   const rules = board?.rules || {};
@@ -104,6 +111,11 @@ export function hasMatchAt(board, r, c) {
 export function isValidSwap(board, a, b) {
   if (!isAdjacent(a, b)) return false;
   if (!board.isFree(a.r, a.c) || !board.isFree(b.r, b.c)) return false;
+
+  // EX-5 节律：冰冻中的特殊方块不能被移动（isFree 也会拒绝，这里显式兜底）
+  if (board.rules?.specialCycle) {
+    if (isFrozenSpecial(board, a.r, a.c) || isFrozenSpecial(board, b.r, b.c)) return false;
+  }
 
   board.swap(a, b);
   const ok = hasMatchAt(board, a.r, a.c) || hasMatchAt(board, b.r, b.c);

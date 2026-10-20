@@ -12,10 +12,11 @@ export const MAX_RESHUFFLE_ATTEMPTS = 20;
 
 /** 找出任意一次可行交换，找不到返回 null */
 export function findAnyValidMove(board) {
-  // 彩虹元素与任意相邻元素交换都有效，直接视为存在可行交换
+  // 彩虹元素与任意相邻元素交换都有效，直接视为存在可行交换（EX-5 冰冻中除外）
   for (let r = 0; r < board.rows; r += 1) {
     for (let c = 0; c < board.cols; c += 1) {
       if (board.specialAt(r, c) === 'rainbow' && board.iceAt(r, c) === 0) {
+        if (board.rules?.specialCycle && board.isSpecialFrozen(r, c)) continue;
         for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const rr = r + dr;
           const cc = c + dc;

@@ -594,7 +594,7 @@ export class Renderer {
         }
         const type = this.view.typeAt(r, c);
         if (type < 0) continue;
-        this._drawTile(r, c, type, this.view.specialAt(r, c), this.view.iceAt(r, c), now);
+        this._drawTile(r, c, type, this.view.specialAt(r, c), this.view.iceAt(r, c), this.view.isSpecialFrozen(r, c), now);
       }
     }
 
@@ -675,7 +675,7 @@ export class Renderer {
     return { cx, cy, s, alpha: f.alpha, f };
   }
 
-  _drawTile(r, c, type, special, ice, now) {
+  _drawTile(r, c, type, special, ice, frozen, now) {
     const ctx = this.ctx;
     const el = ELEMENTS[type] || ELEMENTS[0];
     const { cx, cy, s, alpha } = this._tileBox(r, c);
@@ -850,6 +850,31 @@ export class Renderer {
         ctx.fillText(String(ice), cx + s * 0.26, cy - s * 0.26);
         ctx.restore();
       }
+    }
+
+    // EX-5 节律：已触发过的特殊方块被冻住，绘制一层淡霜提示
+    if (frozen) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#d6f0ff';
+      roundRect(ctx, x - s * 0.02, y - s * 0.02, s * 1.04, s * 1.04, radius * 1.1);
+      ctx.fill();
+
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.lineWidth = Math.max(1.5, s * 0.045);
+      roundRect(ctx, x + s * 0.04, y + s * 0.04, s * 0.92, s * 0.92, radius * 0.9);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = Math.max(1.2, s * 0.03);
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.18, y + s * 0.22);
+      ctx.lineTo(x + s * 0.45, y + s * 0.48);
+      ctx.lineTo(x + s * 0.32, y + s * 0.74);
+      ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();

@@ -6,13 +6,21 @@
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-export const APP_VERSION = '1.4.2';
+export const APP_VERSION = '1.4.3';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 export const CHANGELOG = [
+  {
+    version: '1.4.3',
+    date: '2026-10-20',
+    notes: [
+      '重构 EX-5 节律机制：特殊方块生效后会像被冻住一样留在棋盘上，无法移动、匹配或下落',
+      'EX-5 必须所有特殊方块都生效一轮后才会统一解冻，期间不再弹出冷却提示',
+    ],
+  },
   {
     version: '1.4.2',
     date: '2026-10-20',

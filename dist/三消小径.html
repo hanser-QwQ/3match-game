@@ -1303,7 +1303,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.4.2</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.4.3</button>
     </div>
   </section>
 
@@ -2342,11 +2342,12 @@ __modules["js/domain/board.js"] = function (exports, __req) {
 /**
  * M01 棋盘模型 Board（领域层，零浏览器依赖）
  *
- * 内部用三组平行数组表示 64 个格子，而不是对象数组：
- *   types    元素类型，-1 表示空格（已被消除 / 不可用格）
- *   specials 特殊元素标识，null 表示普通元素
- *   ice      冰块剩余耐久，0 表示无冰
- *   blocked  不可用格，1 表示永远为空、不参与下落与匹配
+ * 内部用四组平行数组表示 64 个格子，而不是对象数组：
+ *   types          元素类型，-1 表示空格（已被消除 / 不可用格）
+ *   specials       特殊元素标识，null 表示普通元素
+ *   specialFrozen  特殊元素是否被“冻住”（EX-5 节律），1 表示暂时不可交互
+ *   ice            冰块剩余耐久，0 表示无冰
+ *   blocked        不可用格，1 表示永远为空、不参与下落与匹配
  *
  * 本模块只保证数据结构合法与一致，不做匹配判定，也不决定消除哪些格子。
  */
@@ -2361,8 +2362,10 @@ class Board {
     const n = rows * cols;
     this.types = new Int8Array(n).fill(-1);
     this.specials = new Array(n).fill(SPECIAL_NONE);
-    // 特殊方块“生效轮次”状态：1 表示可触发，0 表示本轮已触发（EX-5 节律）
+    // 特殊方块“生效轮次”状态：1 表示可触发，0 表示本轮已触发（EX-5 节律，由 specialFrozen 接管）
     this.specialActive = new Uint8Array(n).fill(0);
+    // EX-5 节律：特殊方块被冻住后不可交换、不参与匹配、不下落
+    this.specialFrozen = new Uint8Array(n);
     this.ice = new Uint8Array(n);
     this.blocked = new Uint8Array(n);
     this.rules = {};
@@ -2380,11 +2383,11 @@ class Board {
     return !this.inside(r, c) || this.blocked[this.idx(r, c)] === 1;
   }
 
-  /** 可见且可下落的格子：不在不可用格，且没有被冰封住 */
+  /** 可见且可下落的格子：不在不可用格，没有被冰封住，也没有被特殊冰冻冻住 */
   isFree(r, c) {
     if (!this.inside(r, c)) return false;
     const i = this.idx(r, c);
-    return this.blocked[i] === 0 && this.ice[i] === 0;
+    return this.blocked[i] === 0 && this.ice[i] === 0 && this.specialFrozen[i] === 0;
   }
 
   /** 是否可以被匹配：必须有元素；彩虹与炸弹没有颜色，不参与颜色匹配 */
@@ -2419,6 +2422,8 @@ class Board {
     this.types[i] = type;
     this.specials[i] = type < 0 ? SPECIAL_NONE : special;
     this.specialActive[i] = special ? 1 : 0;
+    // 新放置或清空元素时一并解除冰冻状态；需要冰冻应显式调用 setSpecialFrozen
+    this.specialFrozen[i] = 0;
   }
 
   setSpecialActive(r, c, active) {
@@ -2431,6 +2436,16 @@ class Board {
     return this.specialActive[this.idx(r, c)] === 1;
   }
 
+  setSpecialFrozen(r, c, frozen) {
+    if (!this.inside(r, c)) return;
+    this.specialFrozen[this.idx(r, c)] = frozen ? 1 : 0;
+  }
+
+  isSpecialFrozen(r, c) {
+    if (!this.inside(r, c)) return false;
+    return this.specialFrozen[this.idx(r, c)] === 1;
+  }
+
   /** 清空一个格子（消除），返回被清除的元素类型，供收集目标统计 */
   clearCell(r, c) {
     if (!this.inside(r, c)) return -1;
@@ -2439,6 +2454,7 @@ class Board {
     this.types[i] = -1;
     this.specials[i] = SPECIAL_NONE;
     this.specialActive[i] = 0;
+    this.specialFrozen[i] = 0;
     return type;
   }
 
@@ -2449,6 +2465,7 @@ class Board {
     [this.types[i], this.types[j]] = [this.types[j], this.types[i]];
     [this.specials[i], this.specials[j]] = [this.specials[j], this.specials[i]];
     [this.specialActive[i], this.specialActive[j]] = [this.specialActive[j], this.specialActive[i]];
+    [this.specialFrozen[i], this.specialFrozen[j]] = [this.specialFrozen[j], this.specialFrozen[i]];
   }
 
   countIce() {
@@ -2468,6 +2485,7 @@ class Board {
     copy.types.set(this.types);
     copy.specials = this.specials.slice();
     copy.specialActive.set(this.specialActive);
+    copy.specialFrozen.set(this.specialFrozen);
     copy.ice.set(this.ice);
     copy.blocked.set(this.blocked);
     copy.rules = this.rules;
@@ -2504,7 +2522,14 @@ class Board {
         const stack = [];
         for (let rr = bottom; rr >= top; rr -= 1) {
           const i = this.idx(rr, c);
-          if (this.types[i] >= 0) stack.push({ type: this.types[i], special: this.specials[i], active: this.specialActive[i] });
+          if (this.types[i] >= 0) {
+            stack.push({
+              type: this.types[i],
+              special: this.specials[i],
+              active: this.specialActive[i],
+              frozen: this.specialFrozen[i],
+            });
+          }
         }
 
         // 自下而上回写，剩余位置在段顶补充新元素
@@ -2512,6 +2537,7 @@ class Board {
         for (const item of stack) {
           this.setType(w, c, item.type, item.special);
           this.specialActive[this.idx(w, c)] = item.active;
+          this.specialFrozen[this.idx(w, c)] = item.frozen;
           w -= 1;
         }
         while (w >= top) {
@@ -2530,25 +2556,29 @@ class Board {
     const board = [];
     const specials = [];
     const specialActive = [];
+    const specialFrozen = [];
     const ice = [];
     for (let r = 0; r < this.rows; r += 1) {
       const tRow = [];
       const sRow = [];
       const aRow = [];
+      const fRow = [];
       const iRow = [];
       for (let c = 0; c < this.cols; c += 1) {
         const i = this.idx(r, c);
         tRow.push(this.types[i]);
         sRow.push(this.specials[i]);
         aRow.push(this.specialActive[i]);
+        fRow.push(this.specialFrozen[i]);
         iRow.push(this.ice[i]);
       }
       board.push(tRow);
       specials.push(sRow);
       specialActive.push(aRow);
+      specialFrozen.push(fRow);
       ice.push(iRow);
     }
-    return { board, specials, specialActive, ice };
+    return { board, specials, specialActive, specialFrozen, ice };
   }
 
   /** 从存档结构恢复；字段缺失时按空棋盘处理，由调用方决定是否提示 */
@@ -2564,6 +2594,7 @@ class Board {
         board.ice[i] = data.ice?.[r]?.[c] ?? 0;
         const active = data.specialActive?.[r]?.[c];
         board.specialActive[i] = active === 1 ? 1 : (board.specials[i] ? 1 : 0);
+        board.specialFrozen[i] = data.specialFrozen?.[r]?.[c] ? 1 : 0;
       }
     }
     for (const [r, c] of config.iceCells || []) {
@@ -2606,6 +2637,13 @@ const parseKey = (k) => {
 
 function isAdjacent(a, b) {
   return Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1;
+}
+
+/** 判断一个格子是否为“冰冻中”的特殊方块（EX-5 节律） */
+function isFrozenSpecial(board, r, c) {
+  if (!board.inside(r, c)) return false;
+  const sp = board.specialAt(r, c);
+  return Boolean(sp) && board.isSpecialFrozen(r, c);
 }
 
 /** 读取关卡规则中的最低连线长度，默认 3 */
@@ -2691,6 +2729,11 @@ function hasMatchAt(board, r, c) {
 function isValidSwap(board, a, b) {
   if (!isAdjacent(a, b)) return false;
   if (!board.isFree(a.r, a.c) || !board.isFree(b.r, b.c)) return false;
+
+  // EX-5 节律：冰冻中的特殊方块不能被移动（isFree 也会拒绝，这里显式兜底）
+  if (board.rules?.specialCycle) {
+    if (isFrozenSpecial(board, a.r, a.c) || isFrozenSpecial(board, b.r, b.c)) return false;
+  }
 
   board.swap(a, b);
   const ok = hasMatchAt(board, a.r, a.c) || hasMatchAt(board, b.r, b.c);
@@ -3017,10 +3060,11 @@ const MAX_RESHUFFLE_ATTEMPTS = 20;
 
 /** 找出任意一次可行交换，找不到返回 null */
 function findAnyValidMove(board) {
-  // 彩虹元素与任意相邻元素交换都有效，直接视为存在可行交换
+  // 彩虹元素与任意相邻元素交换都有效，直接视为存在可行交换（EX-5 冰冻中除外）
   for (let r = 0; r < board.rows; r += 1) {
     for (let c = 0; c < board.cols; c += 1) {
       if (board.specialAt(r, c) === 'rainbow' && board.iceAt(r, c) === 0) {
+        if (board.rules?.specialCycle && board.isSpecialFrozen(r, c)) continue;
         for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const rr = r + dr;
           const cc = c + dc;
@@ -3314,10 +3358,14 @@ function resolveCascade(board, options = {}) {
       if (!special) continue;
       const k = key(cell.r, cell.c);
       if (triggered.has(k)) continue;
-      // EX-5 节律：本轮已触发过的特殊方块暂时失效
-      if (specialCycle && !board.isSpecialActive(cell.r, cell.c)) continue;
+      // EX-5 节律：已被冻住的特殊方块本轮不能再触发
+      if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
-      if (specialCycle) board.setSpecialActive(cell.r, cell.c, false);
+      if (specialCycle) {
+        // 触发后保留在棋盘上并进入冰冻状态，不再被本次消除清掉
+        board.setSpecialFrozen(cell.r, cell.c, true);
+        clearMap.delete(k);
+      }
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
         if (board.iceAt(target.r, target.c) > 0) {
@@ -3380,20 +3428,18 @@ function resolveCascade(board, options = {}) {
     board.specialActive.set(boardAfter.specialActive);
     board.ice.set(boardAfter.ice);
 
-    // EX-5 节律：本步结束后，若棋盘上还有特殊方块但全部处于冷却，则全体恢复可触发
+    // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻
     if (specialCycle) {
       let hasSpecial = 0;
-      let hasActive = 0;
+      let frozenCount = 0;
       for (let i = 0; i < board.specials.length; i += 1) {
         if (board.specials[i]) {
           hasSpecial += 1;
-          if (board.specialActive[i]) hasActive += 1;
+          if (board.specialFrozen[i]) frozenCount += 1;
         }
       }
-      if (hasSpecial > 0 && hasActive === 0) {
-        for (let i = 0; i < board.specials.length; i += 1) {
-          if (board.specials[i]) board.specialActive[i] = 1;
-        }
+      if (hasSpecial > 0 && frozenCount === hasSpecial) {
+        board.specialFrozen.fill(0);
       }
     }
 
@@ -3814,7 +3860,7 @@ const { Board } = __req("js/domain/board.js");
 const { createBoard } = __req("js/domain/boardFactory.js");
 const { isAdjacent, isValidSwap, planSpecialSwap } = __req("js/domain/matchEngine.js");
 const { resolveCascade } = __req("js/domain/cascadeResolver.js");
-const { hasValidMove, reshuffle } = __req("js/domain/deadlockDetector.js");
+const { hasValidMove, reshuffle, findAnyValidMove } = __req("js/domain/deadlockDetector.js");
 const { settleScore, judgeStars } = __req("js/domain/scorer.js");
 const { checkBooster, consumeBooster, boosterLimit } = __req("js/domain/boosterService.js");
 const { goalSummary } = __req("js/domain/goals.js");
@@ -3942,7 +3988,7 @@ class GameController {
       }
     }
 
-    if (!board) board = createBoard(level.board, this.rng);
+    if (!board) board = createBoard({ ...level.board, rules: level.rules || {} }, this.rng);
     board.rules = level.rules || {};
 
     this.session = new GameSession({ level, board, resumed });
@@ -4093,31 +4139,20 @@ class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
     this._stopMoveTimer();
-    const move = this.suggestMove();
+
+    // 优先使用合法的可行交换（会 respecting EX-5 冷却等规则）
+    const move = findAnyValidMove(s.board) || this.suggestMove();
     if (move) {
       this.toast('思考时间到，自动执行一步', 'warn');
       await this.handleSwap(move.a, move.b);
       return;
     }
-    // 没有可行交换时，随机交换两个相邻空格并消耗一步
-    const freePairs = [];
-    for (let r = 0; r < s.board.rows; r += 1) {
-      for (let c = 0; c < s.board.cols; c += 1) {
-        if (!s.board.isFree(r, c)) continue;
-        if (c + 1 < s.board.cols && s.board.isFree(r, c + 1)) freePairs.push([{ r, c }, { r, c: c + 1 }]);
-        if (r + 1 < s.board.rows && s.board.isFree(r + 1, c)) freePairs.push([{ r, c }, { r: r + 1, c }]);
-      }
-    }
-    if (freePairs.length) {
-      const [a, b] = freePairs[this.rng.int(freePairs.length)];
-      this.toast('思考时间到，自动交换', 'warn');
-      await this.handleSwap(a, b);
-    } else {
-      // 没有任何可交换的相邻空格，让 afterMove 自动重排
-      s.spendMove();
-      s.pendingFreeze = true;
-      await this.afterMove();
-    }
+
+    // 没有可行交换：直接消耗一步，交给 afterMove 自动重排
+    this.toast('思考时间到，没有可行交换，自动重排', 'warn');
+    s.spendMove();
+    s.pendingFreeze = true;
+    await this.afterMove();
   }
 
   async handleSwap(from, to) {
@@ -4126,6 +4161,15 @@ class GameController {
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false, error: 'STATE_MISMATCH' };
     if (!from || !to || !isAdjacent(from, to)) return { ok: false, error: 'INVALID_COORD' };
     this._stopMoveTimer();
+
+    // EX-5 节律：已使用的特殊方块被冻住，禁止移动且无提示
+    if (s.board.rules?.specialCycle) {
+      const frozen = (r, c) => s.board.specialAt(r, c) && s.board.isSpecialFrozen(r, c);
+      if (frozen(from.r, from.c) || frozen(to.r, to.c)) {
+        this._startMoveTimer();
+        return { ok: false, error: 'FROZEN_SPECIAL' };
+      }
+    }
 
     if (!s.board.isFree(from.r, from.c) || !s.board.isFree(to.r, to.c)) {
       this.toast('冰块覆盖的元素不能交换', 'warn');
@@ -5369,7 +5413,7 @@ class Renderer {
         }
         const type = this.view.typeAt(r, c);
         if (type < 0) continue;
-        this._drawTile(r, c, type, this.view.specialAt(r, c), this.view.iceAt(r, c), now);
+        this._drawTile(r, c, type, this.view.specialAt(r, c), this.view.iceAt(r, c), this.view.isSpecialFrozen(r, c), now);
       }
     }
 
@@ -5450,7 +5494,7 @@ class Renderer {
     return { cx, cy, s, alpha: f.alpha, f };
   }
 
-  _drawTile(r, c, type, special, ice, now) {
+  _drawTile(r, c, type, special, ice, frozen, now) {
     const ctx = this.ctx;
     const el = ELEMENTS[type] || ELEMENTS[0];
     const { cx, cy, s, alpha } = this._tileBox(r, c);
@@ -5625,6 +5669,31 @@ class Renderer {
         ctx.fillText(String(ice), cx + s * 0.26, cy - s * 0.26);
         ctx.restore();
       }
+    }
+
+    // EX-5 节律：已触发过的特殊方块被冻住，绘制一层淡霜提示
+    if (frozen) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = '#d6f0ff';
+      roundRect(ctx, x - s * 0.02, y - s * 0.02, s * 1.04, s * 1.04, radius * 1.1);
+      ctx.fill();
+
+      ctx.globalAlpha = 0.7;
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.lineWidth = Math.max(1.5, s * 0.045);
+      roundRect(ctx, x + s * 0.04, y + s * 0.04, s * 0.92, s * 0.92, radius * 0.9);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = Math.max(1.2, s * 0.03);
+      ctx.beginPath();
+      ctx.moveTo(x + s * 0.18, y + s * 0.22);
+      ctx.lineTo(x + s * 0.45, y + s * 0.48);
+      ctx.lineTo(x + s * 0.32, y + s * 0.74);
+      ctx.stroke();
+      ctx.restore();
     }
 
     ctx.restore();
@@ -6099,13 +6168,21 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.4.2';
+const APP_VERSION = '1.4.3';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.4.3',
+    date: '2026-10-20',
+    notes: [
+      '重构 EX-5 节律机制：特殊方块生效后会像被冻住一样留在棋盘上，无法移动、匹配或下落',
+      'EX-5 必须所有特殊方块都生效一轮后才会统一解冻，期间不再弹出冷却提示',
+    ],
+  },
   {
     version: '1.4.2',
     date: '2026-10-20',

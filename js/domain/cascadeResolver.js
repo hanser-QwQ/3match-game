@@ -68,10 +68,14 @@ export function resolveCascade(board, options = {}) {
       if (!special) continue;
       const k = key(cell.r, cell.c);
       if (triggered.has(k)) continue;
-      // EX-5 节律：本轮已触发过的特殊方块暂时失效
-      if (specialCycle && !board.isSpecialActive(cell.r, cell.c)) continue;
+      // EX-5 节律：已被冻住的特殊方块本轮不能再触发
+      if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
-      if (specialCycle) board.setSpecialActive(cell.r, cell.c, false);
+      if (specialCycle) {
+        // 触发后保留在棋盘上并进入冰冻状态，不再被本次消除清掉
+        board.setSpecialFrozen(cell.r, cell.c, true);
+        clearMap.delete(k);
+      }
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
         if (board.iceAt(target.r, target.c) > 0) {
@@ -134,20 +138,18 @@ export function resolveCascade(board, options = {}) {
     board.specialActive.set(boardAfter.specialActive);
     board.ice.set(boardAfter.ice);
 
-    // EX-5 节律：本步结束后，若棋盘上还有特殊方块但全部处于冷却，则全体恢复可触发
+    // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻
     if (specialCycle) {
       let hasSpecial = 0;
-      let hasActive = 0;
+      let frozenCount = 0;
       for (let i = 0; i < board.specials.length; i += 1) {
         if (board.specials[i]) {
           hasSpecial += 1;
-          if (board.specialActive[i]) hasActive += 1;
+          if (board.specialFrozen[i]) frozenCount += 1;
         }
       }
-      if (hasSpecial > 0 && hasActive === 0) {
-        for (let i = 0; i < board.specials.length; i += 1) {
-          if (board.specials[i]) board.specialActive[i] = 1;
-        }
+      if (hasSpecial > 0 && frozenCount === hasSpecial) {
+        board.specialFrozen.fill(0);
       }
     }
 

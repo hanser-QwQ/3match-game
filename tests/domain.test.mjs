@@ -352,18 +352,58 @@ test('EX-4：双层冰需要两次相邻消除才会消失', () => {
   assert.equal(board.iceAt(0, 3), 1, '双层冰应还剩一层');
 });
 
-test('EX-5：特殊方块有独立的生效状态，可进入冷却并序列化', () => {
-  const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
-  board.setType(0, 3, 1, SPECIAL.BOMB);
-  assert.ok(board.isSpecialActive(0, 3), '新设置的特殊方块默认可触发');
-  board.setSpecialActive(0, 3, false);
-  assert.ok(!board.isSpecialActive(0, 3), '可手动设为冷却');
-
+test('EX-5：触发后的特殊方块保留在棋盘上并进入冰冻', () => {
+  const board = new Board(6, 6, 4);
+  for (let r = 0; r < 6; r += 1) {
+    for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
+  }
+  // 放两颗未冰冻的特殊方块，触发其中一颗，另一颗保持未冰冻
+  board.setType(0, 0, 0, SPECIAL.BOMB);
+  board.setType(5, 5, 1, SPECIAL.STRIPE_H);
   board.rules = { specialCycle: true };
-  const res = resolveCascade(board, { rng: rng(12) });
+
+  const res = resolveCascade(board, { initialCells: [{ r: 0, c: 0 }], rng: rng(12) });
   assert.ok(res.sequence.length >= 1, '特殊循环规则下仍可正常结算');
+  assert.equal(board.specialAt(0, 0), SPECIAL.BOMB, '炸弹触发后仍应留在棋盘上');
+  assert.ok(board.isSpecialFrozen(0, 0), '炸弹触发后应进入冰冻状态');
+  assert.ok(!board.isSpecialFrozen(5, 5), '未触发的特殊方块应保持未冰冻');
 
   const data = board.serialize();
-  const back = Board.deserialize(data, { rows: 4, cols: 4, elementTypes: 6 });
-  assert.deepEqual(back.specialActive, board.specialActive, '特殊方块激活状态应被序列化保留');
+  const back = Board.deserialize(data, { rows: 6, cols: 6, elementTypes: 4 });
+  assert.deepEqual(back.specialFrozen, board.specialFrozen, '冰冻状态应被序列化保留');
+  assert.equal(back.specialAt(0, 0), SPECIAL.BOMB);
+});
+
+test('EX-5：冰冻中的特殊方块不能被交换', () => {
+  const board = makeBoard(['ABCD', 'CDEF', 'DFCE', 'ECFD']);
+  board.setType(0, 0, 0, SPECIAL.BOMB);
+  board.setSpecialFrozen(0, 0, true);
+  board.rules = { specialCycle: true };
+  // (0,0) 炸弹被冻住，(0,1) 是普通元素，交换应被禁止
+  assert.equal(isValidSwap(board, { r: 0, c: 0 }, { r: 0, c: 1 }), false, '冰冻中的炸弹不可移动');
+  assert.ok(!board.isFree(0, 0), '冰冻中的特殊方块不是自由格');
+  // 同一规则下，两个普通元素仍可正常判定
+  const plain = makeBoard(['AAB', 'CDE', 'FGH']);
+  plain.rules = { specialCycle: true };
+  assert.equal(isValidSwap(plain, { r: 0, c: 1 }, { r: 0, c: 2 }), false);
+});
+
+test('EX-5：所有特殊方块都冰冻后统一解冻', () => {
+  const board = new Board(6, 6, 4);
+  for (let r = 0; r < 6; r += 1) {
+    for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
+  }
+  // 两颗都已冰冻：触发其中一颗后它会重新冰冻，此时全部冰冻 → 统一解冻
+  board.setType(0, 0, 0, SPECIAL.STRIPE_H);
+  board.setSpecialFrozen(0, 0, true);
+  board.setType(5, 5, 1, SPECIAL.BOMB);
+  board.setSpecialFrozen(5, 5, true);
+  board.rules = { specialCycle: true };
+
+  // 先临时解冻条纹并强制触发，验证统一解冻
+  board.setSpecialFrozen(0, 0, false);
+  const res = resolveCascade(board, { initialCells: [{ r: 0, c: 0 }], rng: rng(2) });
+  assert.ok(res.sequence.length >= 1, '条纹被强制触发');
+  assert.ok(!board.isSpecialFrozen(0, 0), '统一解冻后条纹恢复可交互');
+  assert.ok(!board.isSpecialFrozen(5, 5), '统一解冻后炸弹也恢复可交互');
 });
