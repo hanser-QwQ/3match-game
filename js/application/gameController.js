@@ -423,12 +423,11 @@ export class GameController {
     this._resetMoveTimer();
   }
 
-  /** EX-2：每走 N 步后随机冰冻若干空格 */
+  /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
   async applyFreezeRule() {
     const s = this.session;
     const rules = s.level.rules || {};
     const n = rules.freezeEveryNMoves;
-    const count = rules.freezeCount || 3;
     if (!n || s.turnCount % n !== 0) return;
 
     const free = [];
@@ -437,17 +436,21 @@ export class GameController {
     });
     if (!free.length) return;
 
-    // 随机抽取
+    // 随机抽取 1~4 个
     for (let i = free.length - 1; i > 0; i -= 1) {
       const j = this.rng.int(i + 1);
       [free[i], free[j]] = [free[j], free[i]];
     }
-    const pick = Math.min(count, free.length);
-    for (let i = 0; i < pick; i += 1) s.board.setIce(free[i].r, free[i].c, 1);
+    const pick = Math.min(1 + this.rng.int(4), free.length);
+    const frozen = free.slice(0, pick);
+    for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+    // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+    this.renderer?.syncBoard(s.board);
     this.audio?.play('freeze');
     this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
     this.emitSession();
-    await this.renderer?.playFreeze?.(free.slice(0, pick));
+    await this.renderer?.playFreeze?.(frozen);
   }
 
   /** 达成目标后主动结算，保留剩余步数奖励 */

@@ -6,13 +6,21 @@
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-export const APP_VERSION = '1.4.1';
+export const APP_VERSION = '1.4.2';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 export const CHANGELOG = [
+  {
+    version: '1.4.2',
+    date: '2026-10-20',
+    notes: [
+      '修复 EX-2 随机冰冻后冰块没有立即显示的问题',
+      'EX-2 每 2 步随机冰冻数量改为 1~4 个',
+    ],
+  },
   {
     version: '1.4.1',
     date: '2026-10-20',

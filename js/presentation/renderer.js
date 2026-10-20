@@ -158,6 +158,13 @@ export class Renderer {
     this._onResize();
   }
 
+  /** 不重置动画状态，仅把渲染视图同步回当前棋盘（用于 EX-2 的随机冰冻等中途状态变更） */
+  syncBoard(board) {
+    if (!board) return;
+    this.board = board;
+    this.view = board.clone();
+  }
+
   setInputLocked(value) {
     this.inputLocked = value;
   }
@@ -379,6 +386,28 @@ export class Renderer {
         this._burst(c, r, '#ffe9a8', 10);
       }
     }
+  }
+
+  /** EX-2：随机冰冻时给一个短促的视觉反馈 */
+  async playFreeze(cells) {
+    if (!this.view || !cells?.length) return;
+    for (const { r, c } of cells) {
+      const { cx, cy } = this._tileBox(r, c);
+      for (let i = 0; i < 6; i += 1) {
+        const angle = Math.PI * 2 * (i / 6);
+        this.particles.push({
+          x: cx + Math.cos(angle) * this.cell * 0.25,
+          y: cy + Math.sin(angle) * this.cell * 0.25,
+          vx: Math.cos(angle) * 0.6,
+          vy: Math.sin(angle) * 0.6,
+          size: 2 + Math.random() * 2,
+          color: '#8fd3f4',
+          born: performance.now(),
+          life: 280,
+        });
+      }
+    }
+    await this._animate(300, () => {});
   }
 
   async playReshuffle(board) {

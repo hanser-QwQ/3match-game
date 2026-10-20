@@ -23,8 +23,7 @@
   "disabledBoosters": [],
   "rules": {
     "moveTimeLimit": 7,
-    "freezeEveryNMoves": 2,
-    "freezeCount": 3
+    "freezeEveryNMoves": 2
   },
-  "tutorialHint": "每走 2 步会随机冻住若干元素，抓紧时间"
+  "tutorialHint": "每走 2 步会随机冻住 1~4 个元素，抓紧时间"
 }

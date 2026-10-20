@@ -1303,7 +1303,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.4.1</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.4.2</button>
     </div>
   </section>
 
@@ -4222,12 +4222,11 @@ class GameController {
     this._resetMoveTimer();
   }
 
-  /** EX-2：每走 N 步后随机冰冻若干空格 */
+  /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
   async applyFreezeRule() {
     const s = this.session;
     const rules = s.level.rules || {};
     const n = rules.freezeEveryNMoves;
-    const count = rules.freezeCount || 3;
     if (!n || s.turnCount % n !== 0) return;
 
     const free = [];
@@ -4236,17 +4235,21 @@ class GameController {
     });
     if (!free.length) return;
 
-    // 随机抽取
+    // 随机抽取 1~4 个
     for (let i = free.length - 1; i > 0; i -= 1) {
       const j = this.rng.int(i + 1);
       [free[i], free[j]] = [free[j], free[i]];
     }
-    const pick = Math.min(count, free.length);
-    for (let i = 0; i < pick; i += 1) s.board.setIce(free[i].r, free[i].c, 1);
+    const pick = Math.min(1 + this.rng.int(4), free.length);
+    const frozen = free.slice(0, pick);
+    for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+    // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+    this.renderer?.syncBoard(s.board);
     this.audio?.play('freeze');
     this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
     this.emitSession();
-    await this.renderer?.playFreeze?.(free.slice(0, pick));
+    await this.renderer?.playFreeze?.(frozen);
   }
 
   /** 达成目标后主动结算，保留剩余步数奖励 */
@@ -4930,6 +4933,13 @@ class Renderer {
     this._onResize();
   }
 
+  /** 不重置动画状态，仅把渲染视图同步回当前棋盘（用于 EX-2 的随机冰冻等中途状态变更） */
+  syncBoard(board) {
+    if (!board) return;
+    this.board = board;
+    this.view = board.clone();
+  }
+
   setInputLocked(value) {
     this.inputLocked = value;
   }
@@ -5151,6 +5161,28 @@ class Renderer {
         this._burst(c, r, '#ffe9a8', 10);
       }
     }
+  }
+
+  /** EX-2：随机冰冻时给一个短促的视觉反馈 */
+  async playFreeze(cells) {
+    if (!this.view || !cells?.length) return;
+    for (const { r, c } of cells) {
+      const { cx, cy } = this._tileBox(r, c);
+      for (let i = 0; i < 6; i += 1) {
+        const angle = Math.PI * 2 * (i / 6);
+        this.particles.push({
+          x: cx + Math.cos(angle) * this.cell * 0.25,
+          y: cy + Math.sin(angle) * this.cell * 0.25,
+          vx: Math.cos(angle) * 0.6,
+          vy: Math.sin(angle) * 0.6,
+          size: 2 + Math.random() * 2,
+          color: '#8fd3f4',
+          born: performance.now(),
+          life: 280,
+        });
+      }
+    }
+    await this._animate(300, () => {});
   }
 
   async playReshuffle(board) {
@@ -6067,13 +6099,21 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.4.1';
+const APP_VERSION = '1.4.2';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.4.2',
+    date: '2026-10-20',
+    notes: [
+      '修复 EX-2 随机冰冻后冰块没有立即显示的问题',
+      'EX-2 每 2 步随机冰冻数量改为 1~4 个',
+    ],
+  },
   {
     version: '1.4.1',
     date: '2026-10-20',
@@ -7472,10 +7512,9 @@ const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "freezeEveryNMoves": 2,
-      "freezeCount": 3
+      "freezeEveryNMoves": 2
     },
-    "tutorialHint": "每走 2 步会随机冻住若干元素，抓紧时间"
+    "tutorialHint": "每走 2 步会随机冻住 1~4 个元素，抓紧时间"
   },
   {
     "schemaVersion": 1,
