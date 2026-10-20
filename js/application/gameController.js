@@ -125,7 +125,14 @@ export class GameController {
     if (resume && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
       try {
         board = Board.deserialize(
-          { board: snap.board, specials: snap.specials, ice: snap.ice },
+          {
+            board: snap.board,
+            specials: snap.specials,
+            specialActive: snap.specialActive,
+            specialFrozen: snap.specialFrozen,
+            usedSpecialTypes: snap.usedSpecialTypes,
+            ice: snap.ice,
+          },
           { ...level.board, elementTypes: level.board.elementTypes }
         );
         if (board.countTiles() < 20) board = null;

@@ -22,6 +22,7 @@ export function resolveCascade(board, options = {}) {
 
   const sequence = [];
   const collected = {};
+  const specialCycle = Boolean(board?.rules?.specialCycle);
   let totalScore = 0;
   let specialsCreated = 0;
   let iceCleared = 0;
@@ -63,7 +64,6 @@ export function resolveCascade(board, options = {}) {
     // 特殊元素连锁引爆：被卷入清除范围的特殊元素依次触发
     const triggered = new Set();
     const queue = [...clearMap.values()];
-    const specialCycle = Boolean(board?.rules?.specialCycle);
     while (queue.length) {
       const cell = queue.pop();
       const special = board.specialAt(cell.r, cell.c);
@@ -73,11 +73,8 @@ export function resolveCascade(board, options = {}) {
       // EX-5 节律：已被冻住的特殊方块本轮不能再触发
       if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
-      if (specialCycle) {
-        // 触发后保留在棋盘上并进入冰冻状态，不再被本次消除清掉
-        board.setSpecialFrozen(cell.r, cell.c, true);
-        clearMap.delete(k);
-      }
+      // EX-5：记录“这一类特殊方块本轮已经用过”，随后它照常被消除
+      if (specialCycle) board.markSpecialUsed(special);
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
         // EX-5：冰冻特殊方块不被波及，也不因波及而触发
@@ -113,6 +110,8 @@ export function resolveCascade(board, options = {}) {
     // 生成特殊元素
     for (const plan of plans) {
       board.setType(plan.r, plan.c, board.typeAt(plan.r, plan.c), plan.special);
+      // EX-5：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
+      if (specialCycle) board.applySpecialCreationRule(plan.r, plan.c);
     }
     specialsCreated += plans.length;
 
@@ -145,21 +144,6 @@ export function resolveCascade(board, options = {}) {
     board.specialFrozen.set(boardAfter.specialFrozen);
     board.ice.set(boardAfter.ice);
 
-    // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻
-    if (specialCycle) {
-      let hasSpecial = 0;
-      let frozenCount = 0;
-      for (let i = 0; i < board.specials.length; i += 1) {
-        if (board.specials[i]) {
-          hasSpecial += 1;
-          if (board.specialFrozen[i]) frozenCount += 1;
-        }
-      }
-      if (hasSpecial > 0 && frozenCount === hasSpecial) {
-        board.specialFrozen.fill(0);
-      }
-    }
-
     sequence.push({
       index,
       multiplier,
@@ -175,6 +159,15 @@ export function resolveCascade(board, options = {}) {
     });
 
     if (index === maxChain) overflow = true;
+  }
+
+  /*
+   * EX-5 节律：一次结算（一次操作）结束后统一检查。
+   * 放在连锁之外而不是每一段之后，避免同一次操作的后续连锁立刻开启新一轮，
+   * 让“炸弹 / 彩虹 / 条纹各用一次”这一轮在玩家视角里完整走完。
+   */
+  if (specialCycle && board.allSpecialCategoriesUsed()) {
+    board.resetSpecialRound();
   }
 
   return {

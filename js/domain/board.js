@@ -13,6 +13,24 @@
 
 const SPECIAL_NONE = null;
 
+/**
+ * EX-5 的特殊类型分组：横条纹与竖条纹同属“条纹”，
+ * 任意方向、任意颜色都算同一类，使用一次即满足该类的节律条件。
+ */
+const SPECIAL_CATEGORY = {
+  bomb: 'bomb',
+  rainbow: 'rainbow',
+  stripe_h: 'stripe',
+  stripe_v: 'stripe',
+};
+
+const SPECIAL_CATEGORIES = ['bomb', 'rainbow', 'stripe'];
+
+/** 特殊标识 → 类型分组；普通元素返回 null */
+export function specialCategory(special) {
+  return SPECIAL_CATEGORY[special] || null;
+}
+
 export class Board {
   constructor(rows = 8, cols = 8, elementTypes = 6) {
     this.rows = rows;
@@ -25,6 +43,8 @@ export class Board {
     this.specialActive = new Uint8Array(n).fill(0);
     // EX-5 节律：特殊方块被冻住后不可交换、不参与匹配、不下落
     this.specialFrozen = new Uint8Array(n);
+    // EX-5 节律：本轮已经使用过的特殊类型（bomb / rainbow / stripe）
+    this.usedSpecialTypes = new Set();
     this.ice = new Uint8Array(n);
     this.blocked = new Uint8Array(n);
     this.rules = {};
@@ -105,6 +125,38 @@ export class Board {
     return this.specialFrozen[this.idx(r, c)] === 1;
   }
 
+  /** EX-5：把某个特殊类型标记为本轮已使用 */
+  markSpecialUsed(special) {
+    const category = specialCategory(special);
+    if (category) this.usedSpecialTypes.add(category);
+  }
+
+  /** EX-5：某个特殊类型本轮是否已经使用过 */
+  isSpecialCategoryUsed(special) {
+    const category = specialCategory(special);
+    return category ? this.usedSpecialTypes.has(category) : false;
+  }
+
+  /**
+   * EX-5：新生成的特殊方块要立即应用节律规则。
+   * 如果该类型本轮已经用过，新生方块直接以冰冻状态出现。
+   */
+  applySpecialCreationRule(r, c) {
+    const special = this.specialAt(r, c);
+    if (special && this.isSpecialCategoryUsed(special)) this.setSpecialFrozen(r, c, true);
+  }
+
+  /** EX-5：炸弹、彩虹、条纹三类是否都至少使用过一次 */
+  allSpecialCategoriesUsed() {
+    return SPECIAL_CATEGORIES.every((category) => this.usedSpecialTypes.has(category));
+  }
+
+  /** EX-5：一轮结束，清空使用记录并解冻所有特殊方块 */
+  resetSpecialRound() {
+    this.usedSpecialTypes.clear();
+    this.specialFrozen.fill(0);
+  }
+
   /** 清空一个格子（消除），返回被清除的元素类型，供收集目标统计 */
   clearCell(r, c) {
     if (!this.inside(r, c)) return -1;
@@ -145,6 +197,7 @@ export class Board {
     copy.specials = this.specials.slice();
     copy.specialActive.set(this.specialActive);
     copy.specialFrozen.set(this.specialFrozen);
+    copy.usedSpecialTypes = new Set(this.usedSpecialTypes);
     copy.ice.set(this.ice);
     copy.blocked.set(this.blocked);
     copy.rules = this.rules;
@@ -237,7 +290,14 @@ export class Board {
       specialFrozen.push(fRow);
       ice.push(iRow);
     }
-    return { board, specials, specialActive, specialFrozen, ice };
+    return {
+      board,
+      specials,
+      specialActive,
+      specialFrozen,
+      usedSpecialTypes: [...this.usedSpecialTypes],
+      ice,
+    };
   }
 
   /** 从存档结构恢复；字段缺失时按空棋盘处理，由调用方决定是否提示 */
@@ -255,6 +315,9 @@ export class Board {
         board.specialActive[i] = active === 1 ? 1 : (board.specials[i] ? 1 : 0);
         board.specialFrozen[i] = data.specialFrozen?.[r]?.[c] ? 1 : 0;
       }
+    }
+    for (const category of data.usedSpecialTypes || []) {
+      if (SPECIAL_CATEGORIES.includes(category)) board.usedSpecialTypes.add(category);
     }
     for (const [r, c] of config.iceCells || []) {
       if (board.inside(r, c) && board.ice[board.idx(r, c)] === 0) {

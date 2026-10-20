@@ -2354,6 +2354,24 @@ __modules["js/domain/board.js"] = function (exports, __req) {
 
 const SPECIAL_NONE = null;
 
+/**
+ * EX-5 的特殊类型分组：横条纹与竖条纹同属“条纹”，
+ * 任意方向、任意颜色都算同一类，使用一次即满足该类的节律条件。
+ */
+const SPECIAL_CATEGORY = {
+  bomb: 'bomb',
+  rainbow: 'rainbow',
+  stripe_h: 'stripe',
+  stripe_v: 'stripe',
+};
+
+const SPECIAL_CATEGORIES = ['bomb', 'rainbow', 'stripe'];
+
+/** 特殊标识 → 类型分组；普通元素返回 null */
+function specialCategory(special) {
+  return SPECIAL_CATEGORY[special] || null;
+}
+
 class Board {
   constructor(rows = 8, cols = 8, elementTypes = 6) {
     this.rows = rows;
@@ -2366,6 +2384,8 @@ class Board {
     this.specialActive = new Uint8Array(n).fill(0);
     // EX-5 节律：特殊方块被冻住后不可交换、不参与匹配、不下落
     this.specialFrozen = new Uint8Array(n);
+    // EX-5 节律：本轮已经使用过的特殊类型（bomb / rainbow / stripe）
+    this.usedSpecialTypes = new Set();
     this.ice = new Uint8Array(n);
     this.blocked = new Uint8Array(n);
     this.rules = {};
@@ -2446,6 +2466,38 @@ class Board {
     return this.specialFrozen[this.idx(r, c)] === 1;
   }
 
+  /** EX-5：把某个特殊类型标记为本轮已使用 */
+  markSpecialUsed(special) {
+    const category = specialCategory(special);
+    if (category) this.usedSpecialTypes.add(category);
+  }
+
+  /** EX-5：某个特殊类型本轮是否已经使用过 */
+  isSpecialCategoryUsed(special) {
+    const category = specialCategory(special);
+    return category ? this.usedSpecialTypes.has(category) : false;
+  }
+
+  /**
+   * EX-5：新生成的特殊方块要立即应用节律规则。
+   * 如果该类型本轮已经用过，新生方块直接以冰冻状态出现。
+   */
+  applySpecialCreationRule(r, c) {
+    const special = this.specialAt(r, c);
+    if (special && this.isSpecialCategoryUsed(special)) this.setSpecialFrozen(r, c, true);
+  }
+
+  /** EX-5：炸弹、彩虹、条纹三类是否都至少使用过一次 */
+  allSpecialCategoriesUsed() {
+    return SPECIAL_CATEGORIES.every((category) => this.usedSpecialTypes.has(category));
+  }
+
+  /** EX-5：一轮结束，清空使用记录并解冻所有特殊方块 */
+  resetSpecialRound() {
+    this.usedSpecialTypes.clear();
+    this.specialFrozen.fill(0);
+  }
+
   /** 清空一个格子（消除），返回被清除的元素类型，供收集目标统计 */
   clearCell(r, c) {
     if (!this.inside(r, c)) return -1;
@@ -2486,6 +2538,7 @@ class Board {
     copy.specials = this.specials.slice();
     copy.specialActive.set(this.specialActive);
     copy.specialFrozen.set(this.specialFrozen);
+    copy.usedSpecialTypes = new Set(this.usedSpecialTypes);
     copy.ice.set(this.ice);
     copy.blocked.set(this.blocked);
     copy.rules = this.rules;
@@ -2578,7 +2631,14 @@ class Board {
       specialFrozen.push(fRow);
       ice.push(iRow);
     }
-    return { board, specials, specialActive, specialFrozen, ice };
+    return {
+      board,
+      specials,
+      specialActive,
+      specialFrozen,
+      usedSpecialTypes: [...this.usedSpecialTypes],
+      ice,
+    };
   }
 
   /** 从存档结构恢复；字段缺失时按空棋盘处理，由调用方决定是否提示 */
@@ -2597,6 +2657,9 @@ class Board {
         board.specialFrozen[i] = data.specialFrozen?.[r]?.[c] ? 1 : 0;
       }
     }
+    for (const category of data.usedSpecialTypes || []) {
+      if (SPECIAL_CATEGORIES.includes(category)) board.usedSpecialTypes.add(category);
+    }
     for (const [r, c] of config.iceCells || []) {
       if (board.inside(r, c) && board.ice[board.idx(r, c)] === 0) {
         board.ice[board.idx(r, c)] = config.iceDurability || 1;
@@ -2612,6 +2675,7 @@ class Board {
   }
 }
 
+exports.specialCategory = specialCategory;
 exports.Board = Board;
 };
 
@@ -3317,6 +3381,7 @@ function resolveCascade(board, options = {}) {
 
   const sequence = [];
   const collected = {};
+  const specialCycle = Boolean(board?.rules?.specialCycle);
   let totalScore = 0;
   let specialsCreated = 0;
   let iceCleared = 0;
@@ -3358,7 +3423,6 @@ function resolveCascade(board, options = {}) {
     // 特殊元素连锁引爆：被卷入清除范围的特殊元素依次触发
     const triggered = new Set();
     const queue = [...clearMap.values()];
-    const specialCycle = Boolean(board?.rules?.specialCycle);
     while (queue.length) {
       const cell = queue.pop();
       const special = board.specialAt(cell.r, cell.c);
@@ -3368,11 +3432,8 @@ function resolveCascade(board, options = {}) {
       // EX-5 节律：已被冻住的特殊方块本轮不能再触发
       if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
-      if (specialCycle) {
-        // 触发后保留在棋盘上并进入冰冻状态，不再被本次消除清掉
-        board.setSpecialFrozen(cell.r, cell.c, true);
-        clearMap.delete(k);
-      }
+      // EX-5：记录“这一类特殊方块本轮已经用过”，随后它照常被消除
+      if (specialCycle) board.markSpecialUsed(special);
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
         const tk = key(target.r, target.c);
         // EX-5：冰冻特殊方块不被波及，也不因波及而触发
@@ -3408,6 +3469,8 @@ function resolveCascade(board, options = {}) {
     // 生成特殊元素
     for (const plan of plans) {
       board.setType(plan.r, plan.c, board.typeAt(plan.r, plan.c), plan.special);
+      // EX-5：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
+      if (specialCycle) board.applySpecialCreationRule(plan.r, plan.c);
     }
     specialsCreated += plans.length;
 
@@ -3440,21 +3503,6 @@ function resolveCascade(board, options = {}) {
     board.specialFrozen.set(boardAfter.specialFrozen);
     board.ice.set(boardAfter.ice);
 
-    // EX-5 节律：本步结束后，若棋盘上所有特殊方块都已冻住，则统一解冻
-    if (specialCycle) {
-      let hasSpecial = 0;
-      let frozenCount = 0;
-      for (let i = 0; i < board.specials.length; i += 1) {
-        if (board.specials[i]) {
-          hasSpecial += 1;
-          if (board.specialFrozen[i]) frozenCount += 1;
-        }
-      }
-      if (hasSpecial > 0 && frozenCount === hasSpecial) {
-        board.specialFrozen.fill(0);
-      }
-    }
-
     sequence.push({
       index,
       multiplier,
@@ -3470,6 +3518,15 @@ function resolveCascade(board, options = {}) {
     });
 
     if (index === maxChain) overflow = true;
+  }
+
+  /*
+   * EX-5 节律：一次结算（一次操作）结束后统一检查。
+   * 放在连锁之外而不是每一段之后，避免同一次操作的后续连锁立刻开启新一轮，
+   * 让“炸弹 / 彩虹 / 条纹各用一次”这一轮在玩家视角里完整走完。
+   */
+  if (specialCycle && board.allSpecialCategoriesUsed()) {
+    board.resetSpecialRound();
   }
 
   return {
@@ -3798,6 +3855,8 @@ class GameSession {
       board: boardData.board,
       specials: boardData.specials,
       specialActive: boardData.specialActive,
+      specialFrozen: boardData.specialFrozen,
+      usedSpecialTypes: boardData.usedSpecialTypes,
       ice: boardData.ice,
       movesLeft: this.movesLeft,
       score: this.counters.score,
@@ -3982,7 +4041,14 @@ class GameController {
     if (resume && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
       try {
         board = Board.deserialize(
-          { board: snap.board, specials: snap.specials, ice: snap.ice },
+          {
+            board: snap.board,
+            specials: snap.specials,
+            specialActive: snap.specialActive,
+            specialFrozen: snap.specialFrozen,
+            usedSpecialTypes: snap.usedSpecialTypes,
+            ice: snap.ice,
+          },
           { ...level.board, elementTypes: level.board.elementTypes }
         );
         if (board.countTiles() < 20) board = null;
@@ -6192,9 +6258,10 @@ const CHANGELOG = [
     version: '1.4.4',
     date: '2026-10-20',
     notes: [
-      '修复 EX-5 冰冻特殊方块仍会被爆炸波及、仍会播放爆炸特效的问题',
-      '冰冻特殊方块现在完全免疫消除与爆炸，并且停止脉冲/转动动画，明确表示暂时失效',
-      '修复下落补充后冰冻状态可能与棋盘错位的问题',
+      'EX-5 节律改为按类型循环：某种特殊方块使用后正常消失，之后新生成的同类方块会被冻住',
+      '炸弹、彩虹、条纹（任意方向）三类都用过一次后统一解冻，进入下一轮',
+      '冰冻方块免疫消除与爆炸，并停止脉冲/转动动画，明确表示暂时不可用',
+      '修复续玩时特殊方块冰冻状态与已使用类型未正确恢复的问题',
     ],
   },
   {
@@ -7703,7 +7770,7 @@ const LEVELS = [
       "moveTimeLimit": 7,
       "specialCycle": true
     },
-    "tutorialHint": "特殊方块生效后会被冻住，无法移动、匹配或再次触发；等所有特殊方块都生效一轮后才会统一解冻"
+    "tutorialHint": "某种特殊方块用过一次后，之后新生成的同类方块会被冻住；炸弹、彩虹、条纹三类都用过一轮后才会统一解冻"
   },
   {
     "schemaVersion": 1,

@@ -463,7 +463,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "specialCycle": true
     },
-    "tutorialHint": "特殊方块生效后会被冻住，无法移动、匹配或再次触发；等所有特殊方块都生效一轮后才会统一解冻"
+    "tutorialHint": "某种特殊方块用过一次后，之后新生成的同类方块会被冻住；炸弹、彩虹、条纹三类都用过一轮后才会统一解冻"
   },
   {
     "schemaVersion": 1,
