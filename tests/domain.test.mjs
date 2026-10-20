@@ -15,6 +15,7 @@ import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../j
 import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
 import { SPECIAL } from '../js/core/constants.js';
+import { LevelRepository } from '../js/infrastructure/levelRepository.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
 
@@ -358,14 +359,17 @@ test('EX-5：使用炸弹后炸弹消失，之后新生成的炸弹被冻住', (
     for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
   }
   board.setType(0, 0, 0, SPECIAL.BOMB);
-  board.setType(5, 5, 1, SPECIAL.STRIPE_H);
+  // 场上已有的另一颗炸弹：本轮炸弹用过之后应当被及时冻住
+  board.setType(5, 0, 1, SPECIAL.BOMB);
+  board.setType(5, 5, 2, SPECIAL.STRIPE_H);
   board.rules = { specialCycle: true };
 
   const res = resolveCascade(board, { initialCells: [{ r: 0, c: 0 }], rng: rng(12) });
   assert.ok(res.sequence.length >= 1, '炸弹应正常引爆结算');
   assert.equal(board.specialAt(0, 0), null, '被使用的炸弹应正常消失');
   assert.ok(board.isSpecialCategoryUsed(SPECIAL.BOMB), '炸弹类型应被标记为本轮已使用');
-  assert.ok(!board.isSpecialFrozen(5, 5), '已存在的条纹不会被追溯冻结');
+  assert.ok(board.isSpecialFrozen(5, 0), '场上已有的同类炸弹也应及时冻住');
+  assert.ok(!board.isSpecialFrozen(5, 5), '未使用类型的特殊方块不会被冻结');
 
   // 本轮再生成一颗炸弹：一出生就应该是冰冻状态
   board.setType(4, 0, 2, SPECIAL.BOMB);
@@ -387,6 +391,7 @@ test('EX-5：冰冻的特殊方块免疫爆炸，不会被炸掉也不会触发'
   board.setType(2, 0, 0, SPECIAL.STRIPE_H);
   board.setType(2, 3, 1, SPECIAL.BOMB);
   board.setSpecialFrozen(2, 3, true);
+  board.markSpecialUsed(SPECIAL.BOMB);
   board.rules = { specialCycle: true };
 
   const res = resolveCascade(board, { initialCells: [{ r: 2, c: 0 }], rng: rng(3) });
@@ -411,6 +416,27 @@ test('EX-5：冰冻中的特殊方块不能被交换', () => {
   const plain = makeBoard(['AAB', 'CDE', 'FGH']);
   plain.rules = { specialCycle: true };
   assert.equal(isValidSwap(plain, { r: 0, c: 1 }, { r: 0, c: 2 }), false);
+});
+
+test('关卡仓库：hidden 关卡不会进入列表与可玩列表', async () => {
+  const make = (levelId, hidden) => ({
+    levelId,
+    name: `L${levelId}`,
+    isEx: levelId > 100,
+    hidden,
+    board: { rows: 8, cols: 8, elementTypes: 6 },
+    goal: { type: 'score', amount: 1000 },
+    moves: 20,
+    starThresholds: [1000, 2000, 3000],
+    disabledBoosters: [],
+  });
+
+  const repo = new LevelRepository({ embedded: [make(1, false), make(105, true)] });
+  await repo.loadAll();
+  assert.equal(repo.list().length, 1, '隐藏关卡不应出现在列表里');
+  assert.equal(repo.playable().length, 1, '隐藏关卡不应进入可玩列表');
+  assert.equal(repo.get(105).hidden, true, '隐藏关卡的数据仍然保留，便于重新开放');
+  assert.equal(repo.all().length, 2, '诊断接口仍能看到全部关卡');
 });
 
 test('EX-5：炸弹、彩虹、条纹三类都用过一轮后统一解冻', () => {

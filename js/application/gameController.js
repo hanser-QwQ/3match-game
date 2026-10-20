@@ -55,6 +55,11 @@ export class GameController {
     this.save = loaded || createDefaultSave();
     if (!this.save.flags) this.save.flags = { addMovesRewarded: false };
     if (this.storage.lastReadState === 'corrupt') this.storageDegraded = true;
+    // 关卡被下线后，指向它的中断会话不应再把玩家带进一个不可见的关卡
+    const snap = this.save.interruptedSession;
+    if (snap && (!this.levels.get(snap.levelId) || this.levels.get(snap.levelId).hidden)) {
+      this.save.interruptedSession = null;
+    }
     this.applySettings();
     return this.save;
   }
@@ -111,6 +116,11 @@ export class GameController {
     const level = this.levels.get(levelId);
     if (!level || !level.valid) {
       this.toast('该关卡数据异常，暂时无法进入', 'warn');
+      this.navigate(SCENE.LEVELS);
+      return false;
+    }
+    if (level.hidden) {
+      this.toast('该关卡暂时下线，敬请期待', 'info');
       this.navigate(SCENE.LEVELS);
       return false;
     }
@@ -536,7 +546,8 @@ export class GameController {
     };
 
     const nextId = String(result.levelId + 1);
-    if (this.levels.get(result.levelId + 1)) {
+    const nextLevel = this.levels.get(result.levelId + 1);
+    if (nextLevel && !nextLevel.hidden) {
       const nx = this.save.progress[nextId] || {
         unlocked: false,
         cleared: false,
@@ -582,8 +593,11 @@ export class GameController {
       this.save.localBest.sort((a, b) => a.levelId - b.levelId);
     }
 
-    // 累计总得分 = 各关历史最高分之和（与存档迁移规则一致）
-    this.save.player.totalScore = Object.values(this.save.progress).reduce((sum, p) => sum + p.highScore, 0);
+    // 累计总得分 = 各可见关卡历史最高分之和（已下线关卡不计入）
+    this.save.player.totalScore = Object.entries(this.save.progress).reduce((sum, [id, p]) => {
+      const lv = this.levels.get(id);
+      return lv && !lv.hidden ? sum + p.highScore : sum;
+    }, 0);
   }
 
   // ---------------------------------------------------------------- 暂停与重开

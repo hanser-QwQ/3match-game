@@ -46,6 +46,7 @@ export function validateLevel(data) {
   if (!Number.isInteger(data.levelId) || data.levelId <= 0) errors.push('levelId 非法');
   if (typeof data.name !== 'string' || !data.name || data.name.length > 16) errors.push('name 缺失或超过 16 字');
   if (data.isEx !== undefined && typeof data.isEx !== 'boolean') errors.push('isEx 必须是布尔值');
+  if (data.hidden !== undefined && typeof data.hidden !== 'boolean') errors.push('hidden 必须是布尔值');
   if (data.rules !== undefined && (typeof data.rules !== 'object' || data.rules === null)) errors.push('rules 必须是对象');
 
   const board = data.board || {};
@@ -160,8 +161,18 @@ export class LevelRepository {
     return this.items.get(Number(id)) || null;
   }
 
-  /** 全部关卡（含损坏项），按关卡号排序 */
+  /**
+   * 对外可见的关卡，按关卡号排序。
+   * hidden 关卡仍然保留在 items 中（便于随时重新开放），但不会进入列表。
+   */
   list() {
+    return [...this.items.values()]
+      .filter((lv) => !lv.hidden)
+      .sort((a, b) => a.levelId - b.levelId);
+  }
+
+  /** 全部关卡（含隐藏与损坏项），仅供诊断使用 */
+  all() {
     return [...this.items.values()].sort((a, b) => a.levelId - b.levelId);
   }
 

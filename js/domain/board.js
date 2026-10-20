@@ -146,6 +146,18 @@ export class Board {
     if (special && this.isSpecialCategoryUsed(special)) this.setSpecialFrozen(r, c, true);
   }
 
+  /**
+   * EX-5：按“本轮已使用的类型”同步所有特殊方块的冰冻状态。
+   * 一次操作结束后调用，让场上已有的同类特殊方块也及时冻住，
+   * 而不只是新生成的那些。
+   */
+  syncSpecialFrozen() {
+    for (let i = 0; i < this.specials.length; i += 1) {
+      const special = this.specials[i];
+      this.specialFrozen[i] = special && this.isSpecialCategoryUsed(special) ? 1 : 0;
+    }
+  }
+
   /** EX-5：炸弹、彩虹、条纹三类是否都至少使用过一次 */
   allSpecialCategoriesUsed() {
     return SPECIAL_CATEGORIES.every((category) => this.usedSpecialTypes.has(category));

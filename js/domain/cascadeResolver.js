@@ -165,9 +165,13 @@ export function resolveCascade(board, options = {}) {
    * EX-5 节律：一次结算（一次操作）结束后统一检查。
    * 放在连锁之外而不是每一段之后，避免同一次操作的后续连锁立刻开启新一轮，
    * 让“炸弹 / 彩虹 / 条纹各用一次”这一轮在玩家视角里完整走完。
+   *
+   * 若本轮尚未结束，则把场上已有的同类特殊方块也一并冻住；
+   * 三种类型都用过一轮时直接解冻全部，进入下一轮。
    */
-  if (specialCycle && board.allSpecialCategoriesUsed()) {
-    board.resetSpecialRound();
+  if (specialCycle) {
+    if (board.allSpecialCategoriesUsed()) board.resetSpecialRound();
+    else board.syncSpecialFrozen();
   }
 
   return {

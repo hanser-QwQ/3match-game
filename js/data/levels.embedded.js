@@ -441,6 +441,7 @@ export const LEVELS = [
     "levelId": 105,
     "name": "EX-5 节律",
     "isEx": true,
+    "hidden": true,
     "board": {
       "rows": 8,
       "cols": 8,
@@ -463,7 +464,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "specialCycle": true
     },
-    "tutorialHint": "某种特殊方块用过一次后，之后新生成的同类方块会被冻住；炸弹、彩虹、条纹三类都用过一轮后才会统一解冻"
+    "tutorialHint": "某种特殊方块用过一次后，场上已有的和之后新生成的同类方块都会被冻住；炸弹、彩虹、条纹三类都用过一轮后才会统一解冻"
   },
   {
     "schemaVersion": 1,
