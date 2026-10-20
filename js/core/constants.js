@@ -59,6 +59,8 @@ export const SCENE = {
   RESULT: 'result',
   SETTINGS: 'settings',
   RANK: 'rank',
+  RULES: 'rules',
+  NOTICE: 'notice',
 };
 
 /** 存档键与版本（FR-07 / 第 7.4 节） */

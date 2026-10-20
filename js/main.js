@@ -95,14 +95,8 @@ async function boot() {
     return;
   }
 
-  const route = controller.firstRoute();
-  if (route.scene === SCENE.GAME) {
-    const ok = controller.startLevel(route.levelId, { resume: Boolean(route.resume) });
-    if (!ok) scenes.goto(SCENE.HOME);
-    else if (route.tutorial) tutorial.begin();
-  } else {
-    scenes.goto(SCENE.HOME);
-  }
+  // 固定先到首页：继续中断的会话与新手引导都等玩家点击开始后再触发
+  scenes.goto(controller.firstRoute().scene);
 
   if (storage.lastReadState === 'corrupt') {
     scenes.toast('存档读取失败，已保留原始副本并以新进度开始', 'warn');

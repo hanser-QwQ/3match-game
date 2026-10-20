@@ -44,6 +44,8 @@
       <div class="home-grid">
         <button class="btn btn-ghost" data-action="levels"><span class="ico">▦</span>关卡</button>
         <button class="btn btn-ghost" data-action="rank"><span class="ico">★</span>成绩</button>
+        <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
+        <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
       </div>
     </div>
@@ -193,7 +195,7 @@
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <p class="fine-print version-line">三消小径 v1.2.0</p>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.3.0</button>
     </div>
   </section>
 
@@ -217,6 +219,68 @@
     </div>
   </section>
 
+  <!-- ============================ 规则 ============================ -->
+  <section id="scene-rules" class="scene" data-scene="rules">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>玩法规则</h2>
+      <span class="topbar-meta"></span>
+    </header>
+    <div class="scroll-area">
+      <div class="panel">
+        <div class="panel-title">基本玩法</div>
+        <p class="rule-text">交换相邻的两个元素，让三个或以上同色元素连成一线即可消除。每次交换都会消耗一步，在步数用尽前完成本关目标即可通关。</p>
+        <p class="rule-text">冰块覆盖的元素不能交换，需要先消除冰块旁边的元素把冰敲碎。</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">特殊元素</div>
+        <dl class="rule-list">
+          <dt>条纹（四连）</dt>
+          <dd>四个连成一线时生成。条纹元素被消除时会清空所在的整行或整列。</dd>
+          <dt>彩虹（五连）</dt>
+          <dd>五个连成一线时生成，没有颜色。与任意元素交换，会消除棋盘上所有该颜色的元素。</dd>
+          <dt>炸弹（L / T 形）</dt>
+          <dd>横竖交叉的连线（L 形或 T 形）会生成炸弹，没有颜色。与任意元素交换即引爆，消除周围横纵距离之和不超过 2 的菱形区域（共 13 格）。</dd>
+          <dt>特殊 + 特殊</dt>
+          <dd>两个特殊元素互相交换会触发组合效果，威力更大，不妨试试看。</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <div class="panel-title">计分与星级</div>
+        <p class="rule-text">每个元素 10 分；一次交换引发的连锁会逐级提高倍率（1 → 1.5 → 2 → 2.5，最高 3 倍）。通关时剩余步数每步额外奖励 100 分。</p>
+        <p class="rule-text">达成目标后不会强制结算，可以继续消除把分数做高，随时点击“结算”结束本关；分数越高，星级越高（最多三星）。</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">道具</div>
+        <dl class="rule-list">
+          <dt>洗牌</dt><dd>重排整个棋盘，不消耗步数。</dd>
+          <dt>锤子</dt><dd>敲掉任意一个元素，不消耗步数。</dd>
+          <dt>加三步</dt><dd>本关剩余步数 +3。</dd>
+        </dl>
+        <p class="rule-text">通关与达成三星成就会赠送道具；部分关卡会禁用个别道具。</p>
+      </div>
+      <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 公告 ============================ -->
+  <section id="scene-notice" class="scene" data-scene="notice">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>更新公告</h2>
+      <span class="topbar-meta" id="notice-meta"></span>
+    </header>
+    <div class="scroll-area">
+      <div class="panel panel-update hidden" id="notice-update-panel">
+        <div class="panel-title">发现新版本 <span id="notice-new-version"></span></div>
+        <p class="rule-text">当前运行的是旧版本缓存。刷新页面后即可体验新版本，红点提示也会随之消失。</p>
+        <button class="btn btn-primary" id="btn-notice-refresh">立即刷新</button>
+      </div>
+      <div id="notice-list" class="notice-list"></div>
+      <p class="fine-print">公告只列出版本变化，玩法本身以“规则”页为准。</p>
+    </div>
+  </section>
+
   <!-- ============================ 暂停遮罩 ============================ -->
   <div id="pause-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="已暂停">
     <div class="overlay-card">
@@ -227,6 +291,7 @@
         <button class="btn btn-ghost" id="btn-restart">重开本关</button>
         <button class="btn btn-ghost" id="btn-quit">返回关卡</button>
       </div>
+      <button class="btn btn-ghost btn-block" id="btn-pause-home">返回首页</button>
     </div>
   </div>
 
@@ -251,7 +316,8 @@
 
   <!-- 线上部署后，重新发布时旧页面会提示刷新 -->
   <div id="update-bar" class="update-bar hidden" role="status">
-    <span class="update-text">有新版本可用</span>
+    <span class="update-text" id="update-text">有新版本可用</span>
+    <button id="btn-update-info" class="update-info">公告</button>
     <button id="btn-update" class="update-action">刷新</button>
     <button id="btn-update-later" class="update-dismiss" aria-label="稍后提醒">×</button>
   </div>

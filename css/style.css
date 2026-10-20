@@ -891,6 +891,86 @@ body {
   cursor: pointer;
 }
 
+.update-info {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #f0d9a8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 2px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ 规则与公告 */
+
+.btn-notice { position: relative; }
+
+.reddot {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d84a3a;
+  box-shadow: 0 0 0 2px rgba(255, 253, 248, 0.9);
+}
+
+.btn-block { width: 100%; margin-top: 8px; }
+
+.rule-text { font-size: 14px; line-height: 1.7; margin: 6px 0; color: var(--ink); }
+
+.rule-list { margin: 4px 0; font-size: 14px; line-height: 1.65; }
+.rule-list dt { font-weight: 700; margin-top: 10px; }
+.rule-list dd { margin: 2px 0 0; color: var(--ink-2); }
+
+.panel-update { border-color: #e3b45a; background: rgba(240, 217, 168, 0.28); }
+.panel-update .btn { margin-top: 10px; }
+
+.notice-list { display: flex; flex-direction: column; gap: 12px; }
+
+.notice-card {
+  background: rgba(255, 253, 248, 0.72);
+  border: 1px solid rgba(60, 50, 38, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.notice-head { display: flex; align-items: baseline; gap: 8px; }
+.notice-head b { font-size: 15px; }
+
+.notice-tag {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.notice-tag.current { background: #dfe9e4; color: #2f6f5e; }
+.notice-tag.new { background: #f6ddd8; color: #b03a2e; }
+
+.notice-date { margin-left: auto; font-size: 12px; opacity: 0.6; }
+
+.notice-card ul { margin: 8px 0 2px; padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+
+.version-line {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: inherit;
+}
+
 .toast-layer {
   position: fixed;
   left: 50%;

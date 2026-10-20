@@ -10,6 +10,7 @@ import { EVENTS } from '../core/events.js';
 import { SCENE } from '../core/constants.js';
 import { goalSummary } from '../domain/goals.js';
 import { drawShareCard, downloadShareCard, shareText } from './shareCard.js';
+import { APP_VERSION, CHANGELOG, compareVersions } from '../data/changelog.js';
 
 const STAR = '★';
 
@@ -25,6 +26,9 @@ export class SceneManager {
     this.lastScore = -1;
     this.tutorialAnchor = 'board';
     this.tutorialStep = null;
+    // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
+    this.serverVersion = null;
+    this.updateAvailable = false;
     this.el = {};
   }
 
@@ -33,6 +37,8 @@ export class SceneManager {
     this.bindStatic();
     this.bindBus();
     this.refreshHome();
+    if (this.el.versionLine) this.el.versionLine.textContent = `三消小径 v${APP_VERSION}`;
+    this.checkVersion();
     return this;
   }
 
@@ -75,6 +81,13 @@ export class SceneManager {
       tutorialText: $('tutorial-text'),
       toastLayer: $('toast-layer'),
       updateBar: $('update-bar'),
+      updateText: $('update-text'),
+      noticeDot: $('notice-dot'),
+      noticeList: $('notice-list'),
+      noticeMeta: $('notice-meta'),
+      noticeUpdatePanel: $('notice-update-panel'),
+      noticeNewVersion: $('notice-new-version'),
+      versionLine: $('version-line'),
       rankName: $('rank-name'),
       rankTotal: $('rank-total'),
       rankList: $('rank-list'),
@@ -111,7 +124,10 @@ export class SceneManager {
       const snap = c.save.interruptedSession;
       const target = snap?.levelId ?? c.nextLevelId();
       const resume = Boolean(snap && Number(snap.levelId) === Number(target));
-      c.startLevel(target, { resume });
+      // 首页固定为入口后，新手引导在玩家点击开始时再播放
+      if (c.startLevel(target, { resume }) && !resume && c.shouldStartTutorial(target)) {
+        c.tutorial?.begin();
+      }
     });
 
     this.el.levelGrid.addEventListener('click', (event) => {
@@ -120,7 +136,10 @@ export class SceneManager {
       this.audio.play('button');
       const id = Number(card.dataset.level);
       const snap = c.save.interruptedSession;
-      c.startLevel(id, { resume: Boolean(snap && Number(snap.levelId) === id) });
+      const resume = Boolean(snap && Number(snap.levelId) === id);
+      if (c.startLevel(id, { resume }) && !resume && c.shouldStartTutorial(id)) {
+        c.tutorial?.begin();
+      }
     });
 
     document.getElementById('btn-pause').addEventListener('click', () => {
@@ -144,6 +163,12 @@ export class SceneManager {
       this.hidePause();
       c.quit();
       this.goto(SCENE.LEVELS);
+    });
+
+    document.getElementById('btn-pause-home').addEventListener('click', () => {
+      this.audio.play('button');
+      this.hidePause();
+      c.goHome();
     });
 
     this.el.boosterBar.addEventListener('click', (event) => {
@@ -260,6 +285,17 @@ export class SceneManager {
       this.updateDismissed = true;
       this.el.updateBar?.classList.add('hidden');
     });
+    document.getElementById('btn-update-info')?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.goto(SCENE.NOTICE);
+    });
+    document.getElementById('btn-notice-refresh')?.addEventListener('click', () => {
+      location.reload();
+    });
+    this.el.versionLine?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.goto(SCENE.NOTICE);
+    });
   }
 
   bindBus() {
@@ -276,9 +312,107 @@ export class SceneManager {
     b.on('ui:resume-request', () => this.controller.resume());
     b.on(EVENTS.LEVEL_CLEARED, () => this.refreshHome());
     b.on('offline:update', () => {
-      if (this.updateDismissed) return;
-      this.el.updateBar?.classList.remove('hidden');
+      // Service Worker 检测到有新版本已装好、等待刷新
+      this.markUpdateAvailable(null);
     });
+  }
+
+  // ------------------------------------------------------------------ 版本与公告
+
+  /**
+   * 向服务器询问最新版本号（绕过本地缓存）。
+   * 若高于当前构建版本，则显示更新条并在首页公告入口点亮红点；
+   * 玩家刷新加载新版本后，两边版本一致，红点自然消失。
+   */
+  async checkVersion() {
+    try {
+      const res = await fetch(`./version.json?ts=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.version && compareVersions(data.version, APP_VERSION) > 0) {
+        this.markUpdateAvailable(data.version);
+      }
+    } catch {
+      /* 离线或旧部署没有 version.json 时静默跳过 */
+    }
+  }
+
+  /** 标记有可用更新：红点常显（直到刷新），更新条可手动关闭 */
+  markUpdateAvailable(version) {
+    if (version && compareVersions(version, APP_VERSION) <= 0) return;
+    this.serverVersion = version || this.serverVersion;
+    this.updateAvailable = true;
+    this.el.noticeDot?.classList.remove('hidden');
+    if (this.updateDismissed) return;
+    if (this.el.updateText && this.serverVersion) {
+      this.el.updateText.textContent = `新版本 v${this.serverVersion} 已发布`;
+    }
+    this.el.updateBar?.classList.remove('hidden');
+  }
+
+  renderNotice() {
+    if (!this.el.noticeList) return;
+    this.el.noticeMeta.textContent = `当前 v${APP_VERSION}`;
+    this.el.noticeUpdatePanel?.classList.toggle('hidden', !this.updateAvailable);
+    if (this.el.noticeNewVersion) {
+      this.el.noticeNewVersion.textContent = this.serverVersion ? `v${this.serverVersion}` : '';
+    }
+
+    this.el.noticeList.textContent = '';
+    const latestKnown = this.serverVersion && compareVersions(this.serverVersion, APP_VERSION) > 0
+      ? this.serverVersion : null;
+    // 服务器版本比本地公告还新时，先放一张占位卡片，详细内容刷新后即可查看
+    if (latestKnown && !CHANGELOG.some((e) => e.version === latestKnown)) {
+      const card = document.createElement('div');
+      card.className = 'notice-card';
+      const head = document.createElement('div');
+      head.className = 'notice-head';
+      const title = document.createElement('b');
+      title.textContent = `v${latestKnown}`;
+      const tag = document.createElement('span');
+      tag.className = 'notice-tag new';
+      tag.textContent = '新版本';
+      head.append(title, tag);
+      card.appendChild(head);
+      const p = document.createElement('p');
+      p.className = 'rule-text';
+      p.textContent = '该版本的详细公告将在刷新页面后显示。';
+      card.appendChild(p);
+      this.el.noticeList.appendChild(card);
+    }
+    for (const entry of CHANGELOG) {
+      const card = document.createElement('div');
+      card.className = 'notice-card';
+      const head = document.createElement('div');
+      head.className = 'notice-head';
+      const title = document.createElement('b');
+      title.textContent = `v${entry.version}`;
+      head.appendChild(title);
+      if (entry.version === APP_VERSION) {
+        const tag = document.createElement('span');
+        tag.className = 'notice-tag current';
+        tag.textContent = '当前版本';
+        head.appendChild(tag);
+      } else if (latestKnown && compareVersions(entry.version, APP_VERSION) > 0) {
+        const tag = document.createElement('span');
+        tag.className = 'notice-tag new';
+        tag.textContent = '新版本';
+        head.appendChild(tag);
+      }
+      const date = document.createElement('span');
+      date.className = 'notice-date';
+      date.textContent = entry.date;
+      head.appendChild(date);
+      card.appendChild(head);
+      const ul = document.createElement('ul');
+      for (const note of entry.notes) {
+        const li = document.createElement('li');
+        li.textContent = note;
+        ul.appendChild(li);
+      }
+      card.appendChild(ul);
+      this.el.noticeList.appendChild(card);
+    }
   }
 
   // ------------------------------------------------------------------ 场景
@@ -298,6 +432,7 @@ export class SceneManager {
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
+    if (scene === SCENE.NOTICE) this.renderNotice();
     if (scene === SCENE.HOME) this.refreshHome();
     if (scene === SCENE.GAME) {
       this.lastScore = -1;

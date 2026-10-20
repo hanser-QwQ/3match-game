@@ -901,6 +901,86 @@ body {
   cursor: pointer;
 }
 
+.update-info {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #f0d9a8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 2px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ------------------------------------------------------------------ 规则与公告 */
+
+.btn-notice { position: relative; }
+
+.reddot {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #d84a3a;
+  box-shadow: 0 0 0 2px rgba(255, 253, 248, 0.9);
+}
+
+.btn-block { width: 100%; margin-top: 8px; }
+
+.rule-text { font-size: 14px; line-height: 1.7; margin: 6px 0; color: var(--ink); }
+
+.rule-list { margin: 4px 0; font-size: 14px; line-height: 1.65; }
+.rule-list dt { font-weight: 700; margin-top: 10px; }
+.rule-list dd { margin: 2px 0 0; color: var(--ink-2); }
+
+.panel-update { border-color: #e3b45a; background: rgba(240, 217, 168, 0.28); }
+.panel-update .btn { margin-top: 10px; }
+
+.notice-list { display: flex; flex-direction: column; gap: 12px; }
+
+.notice-card {
+  background: rgba(255, 253, 248, 0.72);
+  border: 1px solid rgba(60, 50, 38, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.notice-head { display: flex; align-items: baseline; gap: 8px; }
+.notice-head b { font-size: 15px; }
+
+.notice-tag {
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.notice-tag.current { background: #dfe9e4; color: #2f6f5e; }
+.notice-tag.new { background: #f6ddd8; color: #b03a2e; }
+
+.notice-date { margin-left: auto; font-size: 12px; opacity: 0.6; }
+
+.notice-card ul { margin: 8px 0 2px; padding-left: 18px; font-size: 13.5px; line-height: 1.7; }
+
+.version-line {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  color: inherit;
+}
+
 .toast-layer {
   position: fixed;
   left: 50%;
@@ -1030,6 +1110,8 @@ body {
       <div class="home-grid">
         <button class="btn btn-ghost" data-action="levels"><span class="ico">▦</span>关卡</button>
         <button class="btn btn-ghost" data-action="rank"><span class="ico">★</span>成绩</button>
+        <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
+        <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
       </div>
     </div>
@@ -1179,7 +1261,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
       </div>
 
-      <p class="fine-print version-line">三消小径 v1.2.0</p>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.3.0</button>
     </div>
   </section>
 
@@ -1203,6 +1285,68 @@ body {
     </div>
   </section>
 
+  <!-- ============================ 规则 ============================ -->
+  <section id="scene-rules" class="scene" data-scene="rules">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>玩法规则</h2>
+      <span class="topbar-meta"></span>
+    </header>
+    <div class="scroll-area">
+      <div class="panel">
+        <div class="panel-title">基本玩法</div>
+        <p class="rule-text">交换相邻的两个元素，让三个或以上同色元素连成一线即可消除。每次交换都会消耗一步，在步数用尽前完成本关目标即可通关。</p>
+        <p class="rule-text">冰块覆盖的元素不能交换，需要先消除冰块旁边的元素把冰敲碎。</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">特殊元素</div>
+        <dl class="rule-list">
+          <dt>条纹（四连）</dt>
+          <dd>四个连成一线时生成。条纹元素被消除时会清空所在的整行或整列。</dd>
+          <dt>彩虹（五连）</dt>
+          <dd>五个连成一线时生成，没有颜色。与任意元素交换，会消除棋盘上所有该颜色的元素。</dd>
+          <dt>炸弹（L / T 形）</dt>
+          <dd>横竖交叉的连线（L 形或 T 形）会生成炸弹，没有颜色。与任意元素交换即引爆，消除周围横纵距离之和不超过 2 的菱形区域（共 13 格）。</dd>
+          <dt>特殊 + 特殊</dt>
+          <dd>两个特殊元素互相交换会触发组合效果，威力更大，不妨试试看。</dd>
+        </dl>
+      </div>
+      <div class="panel">
+        <div class="panel-title">计分与星级</div>
+        <p class="rule-text">每个元素 10 分；一次交换引发的连锁会逐级提高倍率（1 → 1.5 → 2 → 2.5，最高 3 倍）。通关时剩余步数每步额外奖励 100 分。</p>
+        <p class="rule-text">达成目标后不会强制结算，可以继续消除把分数做高，随时点击“结算”结束本关；分数越高，星级越高（最多三星）。</p>
+      </div>
+      <div class="panel">
+        <div class="panel-title">道具</div>
+        <dl class="rule-list">
+          <dt>洗牌</dt><dd>重排整个棋盘，不消耗步数。</dd>
+          <dt>锤子</dt><dd>敲掉任意一个元素，不消耗步数。</dd>
+          <dt>加三步</dt><dd>本关剩余步数 +3。</dd>
+        </dl>
+        <p class="rule-text">通关与达成三星成就会赠送道具；部分关卡会禁用个别道具。</p>
+      </div>
+      <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 公告 ============================ -->
+  <section id="scene-notice" class="scene" data-scene="notice">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>更新公告</h2>
+      <span class="topbar-meta" id="notice-meta"></span>
+    </header>
+    <div class="scroll-area">
+      <div class="panel panel-update hidden" id="notice-update-panel">
+        <div class="panel-title">发现新版本 <span id="notice-new-version"></span></div>
+        <p class="rule-text">当前运行的是旧版本缓存。刷新页面后即可体验新版本，红点提示也会随之消失。</p>
+        <button class="btn btn-primary" id="btn-notice-refresh">立即刷新</button>
+      </div>
+      <div id="notice-list" class="notice-list"></div>
+      <p class="fine-print">公告只列出版本变化，玩法本身以“规则”页为准。</p>
+    </div>
+  </section>
+
   <!-- ============================ 暂停遮罩 ============================ -->
   <div id="pause-overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-label="已暂停">
     <div class="overlay-card">
@@ -1213,6 +1357,7 @@ body {
         <button class="btn btn-ghost" id="btn-restart">重开本关</button>
         <button class="btn btn-ghost" id="btn-quit">返回关卡</button>
       </div>
+      <button class="btn btn-ghost btn-block" id="btn-pause-home">返回首页</button>
     </div>
   </div>
 
@@ -1237,7 +1382,8 @@ body {
 
   <!-- 线上部署后，重新发布时旧页面会提示刷新 -->
   <div id="update-bar" class="update-bar hidden" role="status">
-    <span class="update-text">有新版本可用</span>
+    <span class="update-text" id="update-text">有新版本可用</span>
+    <button id="btn-update-info" class="update-info">公告</button>
     <button id="btn-update" class="update-action">刷新</button>
     <button id="btn-update-later" class="update-dismiss" aria-label="稍后提醒">×</button>
   </div>
@@ -1450,6 +1596,8 @@ const SCENE = {
   RESULT: 'result',
   SETTINGS: 'settings',
   RANK: 'rank',
+  RULES: 'rules',
+  NOTICE: 'notice',
 };
 
 /** 存档键与版本（FR-07 / 第 7.4 节） */
@@ -3528,17 +3676,18 @@ class GameController {
     return this.save;
   }
 
-  /** 首次进入的路由决策（首次使用用户旅程） */
+  /**
+   * 首次进入固定落在首页：是否继续中断的会话、是否播放新手引导，
+   * 都由玩家从首页主动点击"开始/继续"时再决定，不在打开网站时替玩家做决定。
+   */
   firstRoute() {
-    const hasProgress = Object.keys(this.save.progress).length > 0;
-    if (!hasProgress && !this.save.tutorialDone) {
-      return { scene: SCENE.GAME, levelId: 1, tutorial: true };
-    }
-    const snap = this.save.interruptedSession;
-    if (snap && this.levels.get(snap.levelId)?.valid) {
-      return { scene: SCENE.GAME, levelId: snap.levelId, resume: true };
-    }
     return { scene: SCENE.HOME };
+  }
+
+  /** 是否应在本关开始时播放新手引导（仅第 1 关且从未完成过引导） */
+  shouldStartTutorial(levelId) {
+    const hasProgress = Object.values(this.save.progress).some((p) => p.cleared);
+    return Number(levelId) === 1 && !this.save.tutorialDone && !hasProgress;
   }
 
   applySettings() {
@@ -4563,16 +4712,22 @@ class Renderer {
   }
 
   _evaluateFps(fps) {
+    // 切到后台时浏览器会暂停/节流动画，此时的低帧率是假信号，不参与判断
+    if (typeof document !== 'undefined' && document.hidden) return;
+
     if (fps < 45) {
       this._lowStreak += 1;
-      if (this._lowStreak >= 2 && this.quality !== 'low') {
+      if (this._lowStreak >= 3 && this.quality !== 'low') {
+        /*
+         * 静默降级：不弹任何提示，也不再自动恢复。
+         * 之前的实现会弹"已自动降低动画精度"，并且在帧率回升到 55 以上时切回高画质，
+         * 一旦在阈值附近波动就会反复弹窗，比掉帧本身更烦人。
+         */
         this.quality = 'low';
         this.bus?.emit(EVENTS.FRAME_DROP, { fps: Math.round(fps) });
-        this.bus?.emit(EVENTS.TOAST, { type: 'info', text: '已自动降低动画精度以保持流畅' });
       }
     } else {
       this._lowStreak = 0;
-      if (fps > 55 && this.quality === 'low') this.quality = 'high';
     }
   }
 
@@ -5577,6 +5732,85 @@ exports.downloadShareCard = downloadShareCard;
 exports.shareText = shareText;
 };
 
+__modules["js/data/changelog.js"] = function (exports, __req) {
+/**
+ * 版本与更新公告（数据层）
+ *
+ * APP_VERSION 是当前构建的版本号，每次发布时与 sw.js 的 CACHE_NAME、
+ * version.json 一起更新。线上玩家打开旧缓存页面时，首页公告入口会出现
+ * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
+ */
+
+const APP_VERSION = '1.3.0';
+
+/**
+ * 更新公告，按版本从新到旧排列。
+ * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
+ */
+const CHANGELOG = [
+  {
+    version: '1.3.0',
+    date: '2026-10-20',
+    notes: [
+      '新增首页“规则”页：交换、连线、特殊元素与计分规则一页看懂',
+      '新增“公告”页：每次更新的内容都能在这里回看',
+      '发布新版本后首页会出现红点提醒，刷新页面即可体验新版本',
+      '暂停菜单增加“返回首页”，随时可以退到标题界面',
+      '进入网站时固定先到首页，不再直接跳进关卡',
+      '低帧率时自动降低动画精度，不再弹出提示打断游戏',
+    ],
+  },
+  {
+    version: '1.2.0',
+    date: '2026-10-19',
+    notes: [
+      '炸弹改为无颜色元素：与任意相邻元素交换即可引爆',
+      '炸弹爆炸范围扩大为横纵距离之和不超过 2 的菱形（共 13 格），并新增爆炸特效与震屏',
+      '修复条纹元素消除后条纹图案残留在棋盘上的问题',
+      '修复横向条纹的绘制错位（之前会画到别的行上）',
+    ],
+  },
+  {
+    version: '1.1.0',
+    date: '2026-10-17',
+    notes: [
+      '任意相邻交换都会真正执行并消耗一步，不再拦截“不能消除”的交换',
+      '达成目标后不再强制结算，可以继续消除冲分，随时手动结算',
+      '结算页新增“返回首页”按钮',
+      '检测到有新版本时会在页面底部提示刷新',
+    ],
+  },
+  {
+    version: '1.0.0',
+    date: '2026-10-15',
+    notes: [
+      '首个正式版本：20 个关卡、冰块障碍、三种道具',
+      '条纹、彩虹、炸弹等特殊元素与连锁倍率计分',
+      '新手引导、色觉增强、减弱动效等无障碍选项',
+      '支持断网游玩，进度保存在浏览器本地',
+    ],
+  },
+];
+
+/**
+ * 比较两个 x.y.z 版本号：a 较新返回正数，相等返回 0，a 较旧返回负数。
+ * 非标准写法按缺失段为 0 处理。
+ */
+function compareVersions(a, b) {
+  const pa = String(a || '').split('.').map((x) => parseInt(x, 10) || 0);
+  const pb = String(b || '').split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < 3; i += 1) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+exports.APP_VERSION = APP_VERSION;
+exports.CHANGELOG = CHANGELOG;
+exports.compareVersions = compareVersions;
+};
+
 __modules["js/presentation/sceneManager.js"] = function (exports, __req) {
 /**
  * M16 场景与界面 SceneManager（表现层／应用层之间）
@@ -5590,6 +5824,7 @@ const { EVENTS } = __req("js/core/events.js");
 const { SCENE } = __req("js/core/constants.js");
 const { goalSummary } = __req("js/domain/goals.js");
 const { drawShareCard, downloadShareCard, shareText } = __req("js/presentation/shareCard.js");
+const { APP_VERSION, CHANGELOG, compareVersions } = __req("js/data/changelog.js");
 
 const STAR = '★';
 
@@ -5605,6 +5840,9 @@ class SceneManager {
     this.lastScore = -1;
     this.tutorialAnchor = 'board';
     this.tutorialStep = null;
+    // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
+    this.serverVersion = null;
+    this.updateAvailable = false;
     this.el = {};
   }
 
@@ -5613,6 +5851,8 @@ class SceneManager {
     this.bindStatic();
     this.bindBus();
     this.refreshHome();
+    if (this.el.versionLine) this.el.versionLine.textContent = `三消小径 v${APP_VERSION}`;
+    this.checkVersion();
     return this;
   }
 
@@ -5655,6 +5895,13 @@ class SceneManager {
       tutorialText: $('tutorial-text'),
       toastLayer: $('toast-layer'),
       updateBar: $('update-bar'),
+      updateText: $('update-text'),
+      noticeDot: $('notice-dot'),
+      noticeList: $('notice-list'),
+      noticeMeta: $('notice-meta'),
+      noticeUpdatePanel: $('notice-update-panel'),
+      noticeNewVersion: $('notice-new-version'),
+      versionLine: $('version-line'),
       rankName: $('rank-name'),
       rankTotal: $('rank-total'),
       rankList: $('rank-list'),
@@ -5691,7 +5938,10 @@ class SceneManager {
       const snap = c.save.interruptedSession;
       const target = snap?.levelId ?? c.nextLevelId();
       const resume = Boolean(snap && Number(snap.levelId) === Number(target));
-      c.startLevel(target, { resume });
+      // 首页固定为入口后，新手引导在玩家点击开始时再播放
+      if (c.startLevel(target, { resume }) && !resume && c.shouldStartTutorial(target)) {
+        c.tutorial?.begin();
+      }
     });
 
     this.el.levelGrid.addEventListener('click', (event) => {
@@ -5700,7 +5950,10 @@ class SceneManager {
       this.audio.play('button');
       const id = Number(card.dataset.level);
       const snap = c.save.interruptedSession;
-      c.startLevel(id, { resume: Boolean(snap && Number(snap.levelId) === id) });
+      const resume = Boolean(snap && Number(snap.levelId) === id);
+      if (c.startLevel(id, { resume }) && !resume && c.shouldStartTutorial(id)) {
+        c.tutorial?.begin();
+      }
     });
 
     document.getElementById('btn-pause').addEventListener('click', () => {
@@ -5724,6 +5977,12 @@ class SceneManager {
       this.hidePause();
       c.quit();
       this.goto(SCENE.LEVELS);
+    });
+
+    document.getElementById('btn-pause-home').addEventListener('click', () => {
+      this.audio.play('button');
+      this.hidePause();
+      c.goHome();
     });
 
     this.el.boosterBar.addEventListener('click', (event) => {
@@ -5840,6 +6099,17 @@ class SceneManager {
       this.updateDismissed = true;
       this.el.updateBar?.classList.add('hidden');
     });
+    document.getElementById('btn-update-info')?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.goto(SCENE.NOTICE);
+    });
+    document.getElementById('btn-notice-refresh')?.addEventListener('click', () => {
+      location.reload();
+    });
+    this.el.versionLine?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.goto(SCENE.NOTICE);
+    });
   }
 
   bindBus() {
@@ -5856,9 +6126,107 @@ class SceneManager {
     b.on('ui:resume-request', () => this.controller.resume());
     b.on(EVENTS.LEVEL_CLEARED, () => this.refreshHome());
     b.on('offline:update', () => {
-      if (this.updateDismissed) return;
-      this.el.updateBar?.classList.remove('hidden');
+      // Service Worker 检测到有新版本已装好、等待刷新
+      this.markUpdateAvailable(null);
     });
+  }
+
+  // ------------------------------------------------------------------ 版本与公告
+
+  /**
+   * 向服务器询问最新版本号（绕过本地缓存）。
+   * 若高于当前构建版本，则显示更新条并在首页公告入口点亮红点；
+   * 玩家刷新加载新版本后，两边版本一致，红点自然消失。
+   */
+  async checkVersion() {
+    try {
+      const res = await fetch(`./version.json?ts=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.version && compareVersions(data.version, APP_VERSION) > 0) {
+        this.markUpdateAvailable(data.version);
+      }
+    } catch {
+      /* 离线或旧部署没有 version.json 时静默跳过 */
+    }
+  }
+
+  /** 标记有可用更新：红点常显（直到刷新），更新条可手动关闭 */
+  markUpdateAvailable(version) {
+    if (version && compareVersions(version, APP_VERSION) <= 0) return;
+    this.serverVersion = version || this.serverVersion;
+    this.updateAvailable = true;
+    this.el.noticeDot?.classList.remove('hidden');
+    if (this.updateDismissed) return;
+    if (this.el.updateText && this.serverVersion) {
+      this.el.updateText.textContent = `新版本 v${this.serverVersion} 已发布`;
+    }
+    this.el.updateBar?.classList.remove('hidden');
+  }
+
+  renderNotice() {
+    if (!this.el.noticeList) return;
+    this.el.noticeMeta.textContent = `当前 v${APP_VERSION}`;
+    this.el.noticeUpdatePanel?.classList.toggle('hidden', !this.updateAvailable);
+    if (this.el.noticeNewVersion) {
+      this.el.noticeNewVersion.textContent = this.serverVersion ? `v${this.serverVersion}` : '';
+    }
+
+    this.el.noticeList.textContent = '';
+    const latestKnown = this.serverVersion && compareVersions(this.serverVersion, APP_VERSION) > 0
+      ? this.serverVersion : null;
+    // 服务器版本比本地公告还新时，先放一张占位卡片，详细内容刷新后即可查看
+    if (latestKnown && !CHANGELOG.some((e) => e.version === latestKnown)) {
+      const card = document.createElement('div');
+      card.className = 'notice-card';
+      const head = document.createElement('div');
+      head.className = 'notice-head';
+      const title = document.createElement('b');
+      title.textContent = `v${latestKnown}`;
+      const tag = document.createElement('span');
+      tag.className = 'notice-tag new';
+      tag.textContent = '新版本';
+      head.append(title, tag);
+      card.appendChild(head);
+      const p = document.createElement('p');
+      p.className = 'rule-text';
+      p.textContent = '该版本的详细公告将在刷新页面后显示。';
+      card.appendChild(p);
+      this.el.noticeList.appendChild(card);
+    }
+    for (const entry of CHANGELOG) {
+      const card = document.createElement('div');
+      card.className = 'notice-card';
+      const head = document.createElement('div');
+      head.className = 'notice-head';
+      const title = document.createElement('b');
+      title.textContent = `v${entry.version}`;
+      head.appendChild(title);
+      if (entry.version === APP_VERSION) {
+        const tag = document.createElement('span');
+        tag.className = 'notice-tag current';
+        tag.textContent = '当前版本';
+        head.appendChild(tag);
+      } else if (latestKnown && compareVersions(entry.version, APP_VERSION) > 0) {
+        const tag = document.createElement('span');
+        tag.className = 'notice-tag new';
+        tag.textContent = '新版本';
+        head.appendChild(tag);
+      }
+      const date = document.createElement('span');
+      date.className = 'notice-date';
+      date.textContent = entry.date;
+      head.appendChild(date);
+      card.appendChild(head);
+      const ul = document.createElement('ul');
+      for (const note of entry.notes) {
+        const li = document.createElement('li');
+        li.textContent = note;
+        ul.appendChild(li);
+      }
+      card.appendChild(ul);
+      this.el.noticeList.appendChild(card);
+    }
   }
 
   // ------------------------------------------------------------------ 场景
@@ -5878,6 +6246,7 @@ class SceneManager {
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
+    if (scene === SCENE.NOTICE) this.renderNotice();
     if (scene === SCENE.HOME) this.refreshHome();
     if (scene === SCENE.GAME) {
       this.lastScore = -1;
@@ -6327,14 +6696,8 @@ async function boot() {
     return;
   }
 
-  const route = controller.firstRoute();
-  if (route.scene === SCENE.GAME) {
-    const ok = controller.startLevel(route.levelId, { resume: Boolean(route.resume) });
-    if (!ok) scenes.goto(SCENE.HOME);
-    else if (route.tutorial) tutorial.begin();
-  } else {
-    scenes.goto(SCENE.HOME);
-  }
+  // 固定先到首页：继续中断的会话与新手引导都等玩家点击开始后再触发
+  scenes.goto(controller.firstRoute().scene);
 
   if (storage.lastReadState === 'corrupt') {
     scenes.toast('存档读取失败，已保留原始副本并以新进度开始', 'warn');

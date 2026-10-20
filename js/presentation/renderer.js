@@ -266,16 +266,22 @@ export class Renderer {
   }
 
   _evaluateFps(fps) {
+    // 切到后台时浏览器会暂停/节流动画，此时的低帧率是假信号，不参与判断
+    if (typeof document !== 'undefined' && document.hidden) return;
+
     if (fps < 45) {
       this._lowStreak += 1;
-      if (this._lowStreak >= 2 && this.quality !== 'low') {
+      if (this._lowStreak >= 3 && this.quality !== 'low') {
+        /*
+         * 静默降级：不弹任何提示，也不再自动恢复。
+         * 之前的实现会弹"已自动降低动画精度"，并且在帧率回升到 55 以上时切回高画质，
+         * 一旦在阈值附近波动就会反复弹窗，比掉帧本身更烦人。
+         */
         this.quality = 'low';
         this.bus?.emit(EVENTS.FRAME_DROP, { fps: Math.round(fps) });
-        this.bus?.emit(EVENTS.TOAST, { type: 'info', text: '已自动降低动画精度以保持流畅' });
       }
     } else {
       this._lowStreak = 0;
-      if (fps > 55 && this.quality === 'low') this.quality = 'high';
     }
   }
 

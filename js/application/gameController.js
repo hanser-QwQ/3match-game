@@ -56,17 +56,18 @@ export class GameController {
     return this.save;
   }
 
-  /** 首次进入的路由决策（首次使用用户旅程） */
+  /**
+   * 首次进入固定落在首页：是否继续中断的会话、是否播放新手引导，
+   * 都由玩家从首页主动点击"开始/继续"时再决定，不在打开网站时替玩家做决定。
+   */
   firstRoute() {
-    const hasProgress = Object.keys(this.save.progress).length > 0;
-    if (!hasProgress && !this.save.tutorialDone) {
-      return { scene: SCENE.GAME, levelId: 1, tutorial: true };
-    }
-    const snap = this.save.interruptedSession;
-    if (snap && this.levels.get(snap.levelId)?.valid) {
-      return { scene: SCENE.GAME, levelId: snap.levelId, resume: true };
-    }
     return { scene: SCENE.HOME };
+  }
+
+  /** 是否应在本关开始时播放新手引导（仅第 1 关且从未完成过引导） */
+  shouldStartTutorial(levelId) {
+    const hasProgress = Object.values(this.save.progress).some((p) => p.cleared);
+    return Number(levelId) === 1 && !this.save.tutorialDone && !hasProgress;
   }
 
   applySettings() {
