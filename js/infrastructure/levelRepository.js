@@ -48,6 +48,18 @@ export function validateLevel(data) {
   if (data.isEx !== undefined && typeof data.isEx !== 'boolean') errors.push('isEx 必须是布尔值');
   if (data.hidden !== undefined && typeof data.hidden !== 'boolean') errors.push('hidden 必须是布尔值');
   if (data.rules !== undefined && (typeof data.rules !== 'object' || data.rules === null)) errors.push('rules 必须是对象');
+  const quota = data.rules?.specialQuota;
+  if (quota !== undefined) {
+    if (!quota || typeof quota !== 'object' || Array.isArray(quota)) {
+      errors.push('specialQuota 必须是对象');
+    } else {
+      for (const key of ['stripe', 'bomb', 'rainbow']) {
+        if (quota[key] !== undefined && (!Number.isInteger(quota[key]) || quota[key] < 0)) {
+          errors.push(`specialQuota.${key} 必须是非负整数`);
+        }
+      }
+    }
+  }
 
   const board = data.board || {};
   const rows = board.rows;

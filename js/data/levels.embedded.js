@@ -439,9 +439,8 @@ export const LEVELS = [
   {
     "schemaVersion": 1,
     "levelId": 105,
-    "name": "EX-5 节律",
+    "name": "EX-5 限量",
     "isEx": true,
-    "hidden": true,
     "board": {
       "rows": 8,
       "cols": 8,
@@ -462,9 +461,13 @@ export const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "specialCycle": true
+      "specialQuota": {
+        "stripe": 4,
+        "bomb": 3,
+        "rainbow": 1
+      }
     },
-    "tutorialHint": "某种特殊方块用过一次后，场上已有的和之后新生成的同类方块都会被冻住；炸弹、彩虹、条纹三类都用过一轮后才会统一解冻"
+    "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
   },
   {
     "schemaVersion": 1,

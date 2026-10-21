@@ -79,6 +79,7 @@ export class GameSession {
       specialActive: boardData.specialActive,
       specialFrozen: boardData.specialFrozen,
       usedSpecialTypes: boardData.usedSpecialTypes,
+      specialGenerated: boardData.specialGenerated,
       ice: boardData.ice,
       movesLeft: this.movesLeft,
       score: this.counters.score,

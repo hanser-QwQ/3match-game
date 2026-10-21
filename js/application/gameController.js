@@ -141,6 +141,7 @@ export class GameController {
             specialActive: snap.specialActive,
             specialFrozen: snap.specialFrozen,
             usedSpecialTypes: snap.usedSpecialTypes,
+            specialGenerated: snap.specialGenerated,
             ice: snap.ice,
           },
           { ...level.board, elementTypes: level.board.elementTypes }

@@ -353,7 +353,42 @@ test('EX-4：双层冰需要两次相邻消除才会消失', () => {
   assert.equal(board.iceAt(0, 3), 1, '双层冰应还剩一层');
 });
 
-test('EX-5：使用炸弹后炸弹消失，之后新生成的炸弹被冻住', () => {
+test('EX-5 限量：特殊方块按类型配额生成，配额用完后不再生成', () => {
+  const board = new Board(8, 8, 6);
+  board.rules = { specialQuota: { stripe: 4, bomb: 3, rainbow: 1 } };
+
+  assert.equal(board.canGenerateSpecial(SPECIAL.STRIPE_H), true);
+  for (let i = 0; i < 4; i += 1) board.recordSpecialGenerated(SPECIAL.STRIPE_V);
+  assert.equal(board.canGenerateSpecial(SPECIAL.STRIPE_H), false, '横竖条纹共用 stripe 配额');
+  assert.equal(board.canGenerateSpecial(SPECIAL.STRIPE_V), false);
+  assert.equal(board.specialGenerated.stripe, 4);
+
+  for (let i = 0; i < 3; i += 1) board.recordSpecialGenerated(SPECIAL.BOMB);
+  assert.equal(board.canGenerateSpecial(SPECIAL.BOMB), false, '炸弹配额 3 用完后不再生成');
+
+  board.recordSpecialGenerated(SPECIAL.RAINBOW);
+  assert.equal(board.canGenerateSpecial(SPECIAL.RAINBOW), false, '彩虹配额 1 用完后不再生成');
+
+  const data = board.serialize();
+  const back = Board.deserialize(data, { rows: 8, cols: 8, elementTypes: 6 });
+  assert.deepEqual(back.specialGenerated, { stripe: 4, bomb: 3, rainbow: 1 }, '生成计数应被序列化保留');
+});
+
+test('EX-5 限量：配额为 0 时四连只消除、不生成条纹', () => {
+  const blocked = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
+  blocked.rules = { specialQuota: { stripe: 0, bomb: 0, rainbow: 0 } };
+  const res = resolveCascade(blocked, { rng: rng(7) });
+  assert.equal(res.specialsCreated, 0, '所有配额为 0 时不应生成任何特殊方块');
+  assert.equal(blocked.specialGenerated.stripe, 0);
+
+  const allowed = makeBoard(['AAAAB', 'CDEFG', 'DFGCE', 'EGCDF']);
+  allowed.rules = { specialQuota: { stripe: 1, bomb: 0, rainbow: 0 } };
+  const res2 = resolveCascade(allowed, { rng: rng(7) });
+  assert.equal(res2.specialsCreated, 1, '条纹配额 1 时只生成一个条纹');
+  assert.equal(allowed.specialGenerated.stripe, 1);
+});
+
+test('特殊节律（保留规则）：使用炸弹后炸弹消失，之后新生成的炸弹被冻住', () => {
   const board = new Board(6, 6, 4);
   for (let r = 0; r < 6; r += 1) {
     for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
@@ -382,7 +417,7 @@ test('EX-5：使用炸弹后炸弹消失，之后新生成的炸弹被冻住', (
   assert.ok(back.isSpecialFrozen(4, 0), '冰冻状态应被序列化保留');
 });
 
-test('EX-5：冰冻的特殊方块免疫爆炸，不会被炸掉也不会触发', () => {
+test('特殊节律（保留规则）：冰冻的特殊方块免疫爆炸，不会被炸掉也不会触发', () => {
   const board = new Board(6, 6, 4);
   for (let r = 0; r < 6; r += 1) {
     for (let c = 0; c < 6; c += 1) board.setType(r, c, (r + c) % 4);
@@ -403,7 +438,7 @@ test('EX-5：冰冻的特殊方块免疫爆炸，不会被炸掉也不会触发'
   assert.ok(board.isSpecialFrozen(2, 3), '冰冻炸弹应保持冰冻');
 });
 
-test('EX-5：冰冻中的特殊方块不能被交换', () => {
+test('特殊节律（保留规则）：冰冻中的特殊方块不能被交换', () => {
   const board = makeBoard(['ABCD', 'CDEF', 'DFCE', 'ECFD']);
   board.setType(0, 0, 0, SPECIAL.BOMB);
   board.setSpecialFrozen(0, 0, true);
@@ -439,7 +474,7 @@ test('关卡仓库：hidden 关卡不会进入列表与可玩列表', async () =
   assert.equal(repo.all().length, 2, '诊断接口仍能看到全部关卡');
 });
 
-test('EX-5：炸弹、彩虹、条纹三类都用过一轮后统一解冻', () => {
+test('特殊节律（保留规则）：炸弹、彩虹、条纹三类都用过一轮后统一解冻', () => {
   const board = makeBoard(['AAAB', 'CDEF', 'DFCE', 'ECFD']);
   board.rules = { specialCycle: true };
   // 放入一颗已经冰冻的炸弹，代表“炸弹本轮已用过”

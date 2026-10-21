@@ -45,6 +45,8 @@ export class Board {
     this.specialFrozen = new Uint8Array(n);
     // EX-5 节律：本轮已经使用过的特殊类型（bomb / rainbow / stripe）
     this.usedSpecialTypes = new Set();
+    // EX-5 限量规则：本局各类特殊方块已经生成的个数
+    this.specialGenerated = { stripe: 0, bomb: 0, rainbow: 0 };
     this.ice = new Uint8Array(n);
     this.blocked = new Uint8Array(n);
     this.rules = {};
@@ -169,6 +171,29 @@ export class Board {
     this.specialFrozen.fill(0);
   }
 
+  /** 某类特殊方块的生成配额；关卡未配置时返回 Infinity（不限量） */
+  specialQuotaFor(special) {
+    const category = specialCategory(special);
+    if (!category) return 0;
+    const quota = this.rules?.specialQuota;
+    const value = quota?.[category];
+    return Number.isInteger(value) && value >= 0 ? value : Infinity;
+  }
+
+  /** 某类特殊方块是否还能继续生成 */
+  canGenerateSpecial(special) {
+    const category = specialCategory(special);
+    if (!category) return false;
+    return (this.specialGenerated[category] || 0) < this.specialQuotaFor(special);
+  }
+
+  /** 记录一次特殊方块生成，配额按生成次数累计 */
+  recordSpecialGenerated(special) {
+    const category = specialCategory(special);
+    if (!category) return;
+    this.specialGenerated[category] = (this.specialGenerated[category] || 0) + 1;
+  }
+
   /** 清空一个格子（消除），返回被清除的元素类型，供收集目标统计 */
   clearCell(r, c) {
     if (!this.inside(r, c)) return -1;
@@ -210,6 +235,7 @@ export class Board {
     copy.specialActive.set(this.specialActive);
     copy.specialFrozen.set(this.specialFrozen);
     copy.usedSpecialTypes = new Set(this.usedSpecialTypes);
+    copy.specialGenerated = { ...this.specialGenerated };
     copy.ice.set(this.ice);
     copy.blocked.set(this.blocked);
     copy.rules = this.rules;
@@ -308,6 +334,7 @@ export class Board {
       specialActive,
       specialFrozen,
       usedSpecialTypes: [...this.usedSpecialTypes],
+      specialGenerated: { ...this.specialGenerated },
       ice,
     };
   }
@@ -330,6 +357,10 @@ export class Board {
     }
     for (const category of data.usedSpecialTypes || []) {
       if (SPECIAL_CATEGORIES.includes(category)) board.usedSpecialTypes.add(category);
+    }
+    for (const category of SPECIAL_CATEGORIES) {
+      const value = Number(data.specialGenerated?.[category]) || 0;
+      board.specialGenerated[category] = Math.max(0, Math.floor(value));
     }
     for (const [r, c] of config.iceCells || []) {
       if (board.inside(r, c) && board.ice[board.idx(r, c)] === 0) {

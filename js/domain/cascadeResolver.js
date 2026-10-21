@@ -54,7 +54,8 @@ export function resolveCascade(board, options = {}) {
     } else {
       const matches = findMatches(board);
       if (!matches.length) break;
-      plans = planSpecials(board, matches, preferred, rng);
+      // EX-5 限量规则的实现位置：配额用完的类型不再进入生成计划（该次匹配只消除、不生成）
+      plans = planSpecials(board, matches, preferred, rng).filter((plan) => board.canGenerateSpecial(plan.special));
       for (const plan of plans) exclude.add(key(plan.r, plan.c));
       for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
     }
@@ -110,7 +111,9 @@ export function resolveCascade(board, options = {}) {
     // 生成特殊元素
     for (const plan of plans) {
       board.setType(plan.r, plan.c, board.typeAt(plan.r, plan.c), plan.special);
-      // EX-5：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
+      // EX-5 限量规则：记录本局该类特殊方块的生成次数
+      board.recordSpecialGenerated(plan.special);
+      // EX-5 节律（保留规则）：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
       if (specialCycle) board.applySpecialCreationRule(plan.r, plan.c);
     }
     specialsCreated += plans.length;
