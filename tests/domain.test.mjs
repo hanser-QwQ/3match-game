@@ -16,6 +16,10 @@ import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
 import { SPECIAL } from '../js/core/constants.js';
 import { LevelRepository } from '../js/infrastructure/levelRepository.js';
+import { GameController } from '../js/application/gameController.js';
+import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '../js/domain/boosterService.js';
+import { GameSession } from '../js/application/gameSession.js';
+import { createDefaultSave, normalizeSave } from '../js/infrastructure/storageService.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
 
@@ -472,6 +476,145 @@ test('关卡仓库：hidden 关卡不会进入列表与可玩列表', async () =
   assert.equal(repo.playable().length, 1, '隐藏关卡不应进入可玩列表');
   assert.equal(repo.get(105).hidden, true, '隐藏关卡的数据仍然保留，便于重新开放');
   assert.equal(repo.all().length, 2, '诊断接口仍能看到全部关卡');
+});
+
+test('首页入口：继续按钮显示的关卡与点击进入的关卡一致', () => {
+  const items = new Map([
+    [1, { levelId: 1, isEx: false, valid: true, hidden: false }],
+    [2, { levelId: 2, isEx: false, valid: true, hidden: false }],
+    [101, { levelId: 101, isEx: true, valid: true, hidden: false }],
+    [105, { levelId: 105, isEx: true, valid: true, hidden: true }],
+  ]);
+  const levels = {
+    get(id) {
+      return items.get(Number(id)) || null;
+    },
+    playable() {
+      return [...items.values()].filter((lv) => lv.valid && !lv.hidden).sort((a, b) => a.levelId - b.levelId);
+    },
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels,
+    audio: { setEnabled() {}, setVolume() {} },
+    renderer: null,
+    tutorial: null,
+    rng: null,
+    navigate() {},
+    toast() {},
+  });
+  controller.save = { progress: { 1: { cleared: true } }, interruptedSession: null };
+
+  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: false }, '没有中断会话时进入下一未通关普通关');
+
+  controller.save.interruptedSession = { levelId: 101, board: [[1]] };
+  assert.deepEqual(controller.homeEntry(), { levelId: 101, resume: true }, '暂停在 EX 关时应续玩 EX 关，而不是下一普通关');
+
+  controller.save.interruptedSession = { levelId: 2, board: [[1]] };
+  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: true }, '暂停在普通关时应续玩该关');
+
+  controller.save.interruptedSession = { levelId: 105, board: [[1]] };
+  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: false }, '隐藏关卡的中断会话应回退到下一普通关');
+});
+
+test('道具：每关三种道具共用 2 次，不再有库存概念', () => {
+  assert.equal(boosterLimit(), 2, '每关总次数为 2');
+
+  assert.equal(checkBooster('shuffle', { usedTotal: 0, state: 'in_progress' }).ok, true);
+  const hammer = checkBooster('hammer', { usedTotal: 1, state: 'in_progress' });
+  assert.equal(hammer.ok, true, '总次数还剩 1 次时仍可使用其它道具');
+  assert.equal(hammer.needsTarget, true, '锤子需要点选目标');
+
+  const exhausted = checkBooster('addMoves', { usedTotal: 2, state: 'in_progress' });
+  assert.equal(exhausted.ok, false);
+  assert.equal(exhausted.reason, 'LIMIT', '共用次数用完后所有道具都不能再用');
+
+  const disabled = checkBooster('hammer', { usedTotal: 0, disabled: ['hammer'], state: 'in_progress' });
+  assert.equal(disabled.ok, false);
+  assert.equal(disabled.reason, 'DISABLED');
+
+  // 共享次数池：洗牌用一次后锤子仍可用，但总数只剩 1 次
+  const usage = { shuffle: 0, hammer: 0, addMoves: 0 };
+  usage.shuffle = consumeBooster('shuffle', { used: usage.shuffle }).used;
+  assert.equal(boosterUsedTotal(usage), 1);
+  usage.hammer = consumeBooster('hammer', { used: usage.hammer }).used;
+  assert.equal(boosterUsedTotal(usage), 2);
+  assert.equal(checkBooster('addMoves', { usedTotal: boosterUsedTotal(usage) }).ok, false);
+});
+
+test('道具：会话按三种道具的合计次数计算共享次数', () => {
+  const session = new GameSession({
+    level: { moves: 20, goal: { type: 'score', amount: 100 } },
+    board: new Board(8, 8, 6),
+  });
+  session.boosterUsage = { shuffle: 1, hammer: 1, addMoves: 0 };
+  assert.equal(session.boosterUsedTotal, 2, '洗牌 + 锤子各一次后共用次数已用完');
+  assert.equal(checkBooster('addMoves', { usedTotal: session.boosterUsedTotal }).ok, false);
+});
+
+test('续玩：加三步后的剩余步数与总步数都不会被截回初始值', () => {
+  const level = {
+    levelId: 1,
+    name: 'L1',
+    isEx: false,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 100 },
+    board: { rows: 8, cols: 8, elementTypes: 6, iceCells: [], blockedCells: [] },
+    rules: {},
+    disabledBoosters: [],
+  };
+  const board = new Board(8, 8, 6);
+  for (let r = 0; r < 8; r += 1) {
+    for (let c = 0; c < 8; c += 1) board.setType(r, c, (r + c) % 6);
+  }
+  const data = board.serialize();
+  const snap = {
+    levelId: 1,
+    board: data.board,
+    specials: data.specials,
+    ice: data.ice,
+    movesLeft: 23,
+    movesTotal: 23,
+    boostersUsed: { shuffle: 0, hammer: 0, addMoves: 1 },
+    score: 0,
+  };
+
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: (id) => (Number(id) === 1 ? level : null), playable: () => [level] },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer: null,
+    tutorial: null,
+    rng: new RandomSource(1),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    interruptedSession: snap,
+    localBest: [],
+    player: { totalScore: 0 },
+  };
+
+  assert.equal(controller.startLevel(1, { resume: true }), true);
+  assert.equal(controller.session.movesLeft, 23, '续玩后剩余步数应保留加三步的加成');
+  assert.equal(controller.session.movesTotal, 23, '续玩后总步数应保留加三步的加成');
+  assert.equal(controller.session.boosterUsage.addMoves, 1, '道具使用次数也应被恢复');
+});
+
+test('存档：旧版 boosters 库存字段被丢弃，默认存档不再包含库存', () => {
+  const save = createDefaultSave();
+  assert.equal('boosters' in save, false, '默认存档不再包含道具库存');
+  assert.equal('flags' in save, false, '一次性奖励标记已不再使用');
+
+  const migrated = normalizeSave({ boosters: { shuffle: 3, hammer: 2, addMoves: 1 }, progress: {} });
+  assert.equal('boosters' in migrated, false, '旧存档的库存字段不应继续保留');
+  assert.equal('flags' in migrated, false);
 });
 
 test('特殊节律（保留规则）：炸弹、彩虹、条纹三类都用过一轮后统一解冻', () => {

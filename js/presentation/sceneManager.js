@@ -124,11 +124,10 @@ export class SceneManager {
 
     this.el.btnContinue.addEventListener('click', () => {
       this.audio.play('button');
-      const snap = c.save.interruptedSession;
-      const target = snap?.levelId ?? c.nextLevelId();
-      const resume = Boolean(snap && Number(snap.levelId) === Number(target));
+      // 与首页标签共用同一个入口，避免显示与点击进入的关卡不一致
+      const entry = c.homeEntry();
       // 首页固定为入口后，新手引导在玩家点击开始时再播放
-      if (c.startLevel(target, { resume }) && !resume && c.shouldStartTutorial(target)) {
+      if (c.startLevel(entry.levelId, { resume: entry.resume }) && !entry.resume && c.shouldStartTutorial(entry.levelId)) {
         c.tutorial?.begin();
       }
     });
@@ -194,10 +193,15 @@ export class SceneManager {
         c.startLevel(r.levelId);
         return;
       }
-      if (c.levels.get(r.levelId + 1)) c.startLevel(r.levelId + 1);
-      else {
+      const nextLevel = c.levels.get(r.levelId + 1);
+      if (nextLevel && nextLevel.valid && !nextLevel.hidden) {
+        c.startLevel(r.levelId + 1);
+      } else {
         this.goto(SCENE.LEVELS);
-        this.toast('已经通关全部关卡，可以重复挑战刷新记录', 'good');
+        this.toast(
+          nextLevel ? '下一关暂未开放，可以重复挑战刷新记录' : '已经通关全部关卡，可以重复挑战刷新记录',
+          'good'
+        );
       }
     });
 
@@ -464,17 +468,23 @@ export class SceneManager {
 
   refreshHome() {
     const save = this.controller.save;
-    const cleared = Object.values(save.progress).filter((p) => p.cleared).length;
-    const total = this.controller.levels.count() || 20;
-    const nextId = this.controller.nextLevelId();
+    // 只统计对外可见的关卡，隐藏关卡既不显示在列表里，也不计入总进度
+    const visible = this.controller.levels.list();
+    const visibleIds = new Set(visible.map((lv) => String(lv.levelId)));
+    const cleared = Object.entries(save.progress).filter(([id, p]) => p.cleared && visibleIds.has(id)).length;
+    const total = visible.length || 20;
+    // 标签与点击共用 homeEntry()，保证“显示哪一关就进哪一关”
+    const entry = this.controller.homeEntry();
+    const nextId = entry.levelId;
     const nextLevel = this.controller.levels.get(nextId);
+    const levelLabel = nextLevel?.isEx ? `EX-${nextId - 100}` : `第 ${nextId} 关`;
     const label = this.el.btnContinue.querySelector('.btn-continue-label');
     const sub = this.el.btnContinue.querySelector('.btn-continue-sub');
-    if (cleared === 0) {
+    if (cleared === 0 && !entry.resume) {
       label.textContent = '开始第 1 关';
       sub.textContent = '四个元素连成一线';
     } else {
-      label.textContent = `继续第 ${nextId} 关`;
+      label.textContent = `继续 ${levelLabel}`;
       const goal = nextLevel ? goalSummary(nextLevel.goal) : '';
       sub.textContent = nextLevel ? `${nextLevel.name} · ${goal}` : '全部关卡已通关';
     }
@@ -530,16 +540,17 @@ export class SceneManager {
       btn.className = 'booster' + (b.armed ? ' armed' : '');
       btn.dataset.booster = b.id;
       btn.disabled = !b.available && !b.armed;
-      btn.setAttribute('aria-label', `${b.name}，剩余 ${b.count} 个，本关已用 ${b.used} 次`);
+      btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
       const count = document.createElement('span');
       count.className = 'b-count';
+      // 三种道具共用次数池，三张卡显示同一个剩余次数
       count.textContent = String(b.count);
       const name = document.createElement('span');
       name.className = 'b-name';
       name.textContent = b.name;
       const limit = document.createElement('span');
       limit.className = 'b-limit';
-      limit.textContent = b.disabled ? '本关禁用' : `本关 ${b.used}/${b.limit}`;
+      limit.textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
       btn.append(count, name, limit);
       this.el.boosterBar.appendChild(btn);
     }
@@ -574,7 +585,8 @@ export class SceneManager {
     const cleared = list.filter((l) => l.cleared).length;
     this.el.levelsMeta.textContent = `${cleared} / ${list.length}`;
     this.el.levelGrid.textContent = '';
-    const currentId = this.controller.nextLevelId();
+    // 与首页“继续”按钮共用 homeEntry()，让高亮、按钮文案、点击目标三者一致
+    const currentId = this.controller.homeEntry().levelId;
     let exHeaderAdded = false;
 
     for (const lv of list) {
@@ -597,7 +609,7 @@ export class SceneManager {
         btn.disabled = true;
       }
       if (lv.cleared) btn.classList.add('cleared');
-      if (!lv.isEx && lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
+      if (lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
 
       const no = document.createElement('span');
       no.className = 'level-no';
@@ -681,7 +693,8 @@ export class SceneManager {
       this.el.resultDetail.append(dt, dd);
     }
 
-    const hasNext = Boolean(this.controller.levels.get(result.levelId + 1));
+    const nextLevel = this.controller.levels.get(result.levelId + 1);
+    const hasNext = Boolean(nextLevel && nextLevel.valid && !nextLevel.hidden);
     this.el.resultNext.textContent = result.cleared ? (hasNext ? '下一关' : '返回关卡') : '再试一次';
     // 未通关时隐藏与主按钮重复的"再玩一次"，以及不可用的成绩卡片
     this.el.resultRetry.classList.toggle('hidden', !result.cleared);

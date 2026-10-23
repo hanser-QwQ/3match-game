@@ -39,10 +39,13 @@ export const SCORE = {
 
 /** 道具定义（FR-12） */
 export const BOOSTERS = {
-  shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', limit: 1, desc: '重排整个棋盘' },
-  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', limit: 2, desc: '敲掉任意一个元素' },
-  addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', limit: 1, desc: '本关剩余步数 +3' },
+  shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', desc: '重排整个棋盘' },
+  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素' },
+  addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', desc: '本关剩余步数 +3' },
 };
+
+/** 每关三种道具共用的使用次数（不是每种各 2 次） */
+export const BOOSTER_TOTAL_LIMIT = 2;
 
 /** 会话状态（TB-03） */
 export const SESSION_STATE = {

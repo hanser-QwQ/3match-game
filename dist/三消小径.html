@@ -308,6 +308,7 @@ body {
 
 .level-card.ex { background: linear-gradient(180deg, #fffdf8, #f8f0e4); border-color: #e4d2b8; }
 .level-card.ex .level-no { color: var(--warm); }
+.level-card.ex.current { border-color: var(--accent); }
 
 .level-divider {
   grid-column: 1 / -1;
@@ -1300,10 +1301,10 @@ body {
       <div class="panel panel-danger">
         <div class="panel-title">数据</div>
         <button class="btn btn-ghost btn-danger" id="btn-reset">清空本地进度</button>
-        <p class="fine-print">清空后所有关卡星级、最高分与道具库存都会重置，操作不可撤销。</p>
+        <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.4.4</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.5.0</button>
     </div>
   </section>
 
@@ -1365,7 +1366,7 @@ body {
           <dt>锤子</dt><dd>敲掉任意一个元素，不消耗步数。</dd>
           <dt>加三步</dt><dd>本关剩余步数 +3。</dd>
         </dl>
-        <p class="rule-text">通关与达成三星成就会赠送道具；部分关卡会禁用个别道具。</p>
+        <p class="rule-text">每关三种道具共用 2 次使用机会，可以自由选择用哪一种；部分关卡会禁用个别道具。</p>
       </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
@@ -1618,10 +1619,13 @@ const SCORE = {
 
 /** 道具定义（FR-12） */
 const BOOSTERS = {
-  shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', limit: 1, desc: '重排整个棋盘' },
-  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', limit: 2, desc: '敲掉任意一个元素' },
-  addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', limit: 1, desc: '本关剩余步数 +3' },
+  shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', desc: '重排整个棋盘' },
+  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素' },
+  addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', desc: '本关剩余步数 +3' },
 };
+
+/** 每关三种道具共用的使用次数（不是每种各 2 次） */
+const BOOSTER_TOTAL_LIMIT = 2;
 
 /** 会话状态（TB-03） */
 const SESSION_STATE = {
@@ -1666,6 +1670,7 @@ exports.ELEMENTS = ELEMENTS;
 exports.SPECIAL = SPECIAL;
 exports.SCORE = SCORE;
 exports.BOOSTERS = BOOSTERS;
+exports.BOOSTER_TOTAL_LIMIT = BOOSTER_TOTAL_LIMIT;
 exports.SESSION_STATE = SESSION_STATE;
 exports.SCENE = SCENE;
 exports.SAVE_KEY = SAVE_KEY;
@@ -1888,7 +1893,8 @@ __modules["js/infrastructure/storageService.js"] = function (exports, __req) {
  * M10 存档服务 StorageService（基础设施层）
  *
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
- *   player / progress / boosters / settings / interruptedSession / localBest
+ *   player / progress / settings / interruptedSession / localBest
+ * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
  * 失败路径（FR-07 / NFR-14 / AC-11、AC-35）：
@@ -1926,13 +1932,10 @@ function createDefaultSave() {
     saveVersion: SAVE_VERSION,
     player: { nickname: '玩家', totalScore: 0, createdAt: now },
     progress: {},
-    boosters: { shuffle: 1, hammer: 1, addMoves: 0 },
     settings: defaultSettings(),
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
-    // 扩展字段：一次性奖励的发放标记，避免同一奖励重复发放
-    flags: { addMovesRewarded: false },
   };
 }
 
@@ -1962,7 +1965,6 @@ function migrateV1(data) {
     ...base,
     player: { nickname: '玩家', totalScore: total, createdAt: base.player.createdAt },
     progress,
-    boosters: { ...base.boosters, ...(data.boosters || {}) },
     settings: {
       ...base.settings,
       soundEnabled: data.settings?.soundEnabled !== false,
@@ -2007,11 +2009,6 @@ function normalizeSave(input) {
       createdAt: data.player?.createdAt || base.player.createdAt,
     },
     progress,
-    boosters: {
-      shuffle: Math.max(0, Number(data.boosters?.shuffle) || 0),
-      hammer: Math.max(0, Number(data.boosters?.hammer) || 0),
-      addMoves: Math.max(0, Number(data.boosters?.addMoves) || 0),
-    },
     settings: {
       soundEnabled: settings.soundEnabled !== false,
       volume: clamp(Number(settings.volume) || 0, 0, 100),
@@ -2023,7 +2020,6 @@ function normalizeSave(input) {
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
-    flags: { addMovesRewarded: Boolean(data.flags?.addMovesRewarded) },
   };
 }
 
@@ -3675,24 +3671,30 @@ __modules["js/domain/boosterService.js"] = function (exports, __req) {
  * M09 道具服务 BoosterService（领域层，零浏览器依赖）
  *
  * 只负责"能不能用"的规则判定。真正的效果（重排棋盘、敲掉元素、
- * 加步数）由应用层调用领域能力完成，库存扣减与写档同事务处理。
+ * 加步数）由应用层调用领域能力完成，次数计数与写档同事务处理。
+ *
+ * 规则：每关三种道具共用 2 次使用机会，不再有跨关库存。
  */
 
-const { BOOSTERS } = __req("js/core/constants.js");
+const { BOOSTERS, BOOSTER_TOTAL_LIMIT } = __req("js/core/constants.js");
 
 const BOOSTER_IDS = Object.keys(BOOSTERS);
 
-function boosterLimit(id) {
-  return BOOSTERS[id]?.limit ?? 0;
+/** 每关道具总次数（三种道具共享） */
+function boosterLimit() {
+  return BOOSTER_TOTAL_LIMIT;
+}
+
+/** 本关三种道具已经使用的总次数 */
+function boosterUsedTotal(usage = {}) {
+  return Object.values(usage).reduce((sum, n) => sum + (Number(n) || 0), 0);
 }
 
 /**
  * @param id 道具标识
- * @param ctx.inventory 库存数量
- * @param ctx.used 本关已使用次数
+ * @param ctx.usedTotal 本关三种道具已使用的总次数
  * @param ctx.disabled 本关禁用的道具列表
  * @param ctx.state 会话状态
- * @param ctx.needsTarget 是否需要点选目标格（锤子）
  */
 function checkBooster(id, ctx = {}) {
   const def = BOOSTERS[id];
@@ -3703,21 +3705,15 @@ function checkBooster(id, ctx = {}) {
   if ((ctx.disabled || []).includes(id)) {
     return { ok: false, reason: 'DISABLED', message: '本关不能使用该道具' };
   }
-  if ((ctx.inventory || 0) <= 0) {
-    return { ok: false, reason: 'EMPTY', message: '道具数量不足' };
-  }
-  if ((ctx.used || 0) >= boosterLimit(id)) {
-    return { ok: false, reason: 'LIMIT', message: '本关使用次数已用完' };
+  if ((ctx.usedTotal || 0) >= boosterLimit()) {
+    return { ok: false, reason: 'LIMIT', message: '本关道具次数已用完' };
   }
   return { ok: true, needsTarget: id === 'hammer' };
 }
 
-/** 道具使用后的库存与计数（返回新对象，便于同事务写档） */
-function consumeBooster(id, { inventory, used }) {
-  return {
-    inventory: Math.max(0, (inventory || 0) - 1),
-    used: (used || 0) + 1,
-  };
+/** 道具使用后的本道具计数（返回新对象，便于同事务写档） */
+function consumeBooster(id, { used }) {
+  return { used: (used || 0) + 1 };
 }
 
 function boosterList() {
@@ -3726,6 +3722,7 @@ function boosterList() {
 
 exports.BOOSTER_IDS = BOOSTER_IDS;
 exports.boosterLimit = boosterLimit;
+exports.boosterUsedTotal = boosterUsedTotal;
 exports.checkBooster = checkBooster;
 exports.consumeBooster = consumeBooster;
 exports.boosterList = boosterList;
@@ -3866,7 +3863,14 @@ class GameSession {
     this.board = board;
     this.state = SESSION_STATE.IN_PROGRESS;
     this.movesLeft = resumed?.movesLeft ?? level.moves;
-    this.movesTotal = level.moves;
+    /*
+     * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
+     * 否则剩余步数会被截回初始值，结算页的总步数也会少掉加成。
+     */
+    const restoredTotal = Number(resumed?.movesTotal);
+    this.movesTotal = Number.isFinite(restoredTotal) && restoredTotal >= this.movesLeft
+      ? restoredTotal
+      : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
     this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
     this.chainBest = resumed?.chainBest ?? 0;
@@ -3888,6 +3892,11 @@ class GameSession {
 
   get isOver() {
     return this.state === SESSION_STATE.RESOLVED;
+  }
+
+  /** 本关三种道具已经使用的总次数（共享次数池） */
+  get boosterUsedTotal() {
+    return Object.values(this.boosterUsage).reduce((sum, n) => sum + (Number(n) || 0), 0);
   }
 
   /** 消耗一步 */
@@ -3933,6 +3942,7 @@ class GameSession {
       specialGenerated: boardData.specialGenerated,
       ice: boardData.ice,
       movesLeft: this.movesLeft,
+      movesTotal: this.movesTotal,
       score: this.counters.score,
       boostersUsed: { ...this.boosterUsage },
       goalProgress: { cleared: first.cleared, total: first.total },
@@ -4043,7 +4053,6 @@ class GameController {
     await this.levels.loadAll();
     const loaded = this.storage.read();
     this.save = loaded || createDefaultSave();
-    if (!this.save.flags) this.save.flags = { addMovesRewarded: false };
     if (this.storage.lastReadState === 'corrupt') this.storageDegraded = true;
     // 关卡被下线后，指向它的中断会话不应再把玩家带进一个不可见的关卡
     const snap = this.save.interruptedSession;
@@ -4100,6 +4109,25 @@ class GameController {
     return list.length ? list[list.length - 1].levelId : 1;
   }
 
+  /**
+   * 首页“开始 / 继续”按钮的唯一入口。
+   *
+   * 首页标签与点击必须共用同一个结果：之前标签按 nextLevelId() 显示，
+   * 点击却优先用 interruptedSession.levelId，于是暂停在 EX 关或非下一关时，
+   * 会出现“外面显示第 X 关、点进去却是第 Y 关”。
+   */
+  homeEntry() {
+    const snap = this.save.interruptedSession;
+    const snapId = Number(snap?.levelId);
+    if (snap && Number.isInteger(snapId) && Array.isArray(snap.board) && snap.board.length) {
+      const level = this.levels.get(snapId);
+      if (level && level.valid && !level.hidden) {
+        return { levelId: snapId, resume: true };
+      }
+    }
+    return { levelId: this.nextLevelId(), resume: false };
+  }
+
   startLevel(levelId, { resume = false } = {}) {
     // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
     if (this.busy) return false;
@@ -4138,12 +4166,25 @@ class GameController {
         );
         if (board.countTiles() < 20) board = null;
         else {
+          /*
+           * 加三步会让剩余步数超过关卡初始步数，续玩时不能再按 level.moves 截断，
+           * 否则会出现“道具次数被扣了、步数却没加”的问题。
+           * 上限按“初始步数 + 全部道具都用在加三步”计算，仅用于防御异常存档。
+           */
+          const maxMoves = level.moves + 3 * boosterLimit();
+          const restoredLeft = Math.max(0, Math.min(Number(snap.movesLeft) || 0, maxMoves));
+          const restoredTotalRaw = Number(snap.movesTotal);
+          const restoredTotal = Number.isFinite(restoredTotalRaw) && restoredTotalRaw >= restoredLeft
+            ? Math.min(restoredTotalRaw, maxMoves)
+            : Math.max(level.moves, restoredLeft);
           resumed = {
-            movesLeft: Math.max(0, Math.min(Number(snap.movesLeft) || 0, level.moves)),
+            movesLeft: restoredLeft,
+            movesTotal: restoredTotal,
             counters: GameSession.restoreCounters(snap, board),
             boosterUsage: { shuffle: 0, hammer: 0, addMoves: 0, ...(snap.boostersUsed || {}) },
             chainBest: Number(snap.chainBest) || 0,
             tilesCleared: Number(snap.tilesCleared) || 0,
+            turnCount: Number(snap.turnCount) || 0,
           };
         }
       } catch {
@@ -4525,8 +4566,6 @@ class GameController {
       highScore: 0,
       clearedAt: null,
     };
-    const firstClear = !prev.cleared;
-
     // 仅当本次星级更高时才更新星级记录（AC-08）
     this.save.progress[id] = {
       unlocked: true,
@@ -4548,22 +4587,6 @@ class GameController {
       };
       nx.unlocked = true;
       this.save.progress[nextId] = nx;
-    }
-
-    // 首次获得三星额外赠送 1 个洗牌
-    if (firstClear && result.stars === 3) this.save.boosters.shuffle += 1;
-
-    // 累计通关 10 关且其中至少 5 个三星时赠送 1 个加三步（只发一次）
-    if (!this.save.flags) this.save.flags = { addMovesRewarded: false };
-    if (!this.save.flags.addMovesRewarded) {
-      const values = Object.values(this.save.progress);
-      const clearedCount = values.filter((p) => p.cleared).length;
-      const threeStar = values.filter((p) => p.stars === 3).length;
-      if (clearedCount >= 10 && threeStar >= 5) {
-        this.save.boosters.addMoves += 1;
-        this.save.flags.addMovesRewarded = true;
-        this.toast('达成 10 关通关且 5 个三星，获得加三步 ×1', 'good');
-      }
     }
 
     // 本地成绩记录
@@ -4668,8 +4691,7 @@ class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false };
     const check = checkBooster(id, {
-      inventory: this.save.boosters[id],
-      used: s.boosterUsage[id],
+      usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
     });
@@ -4690,8 +4712,7 @@ class GameController {
     if (!BOOSTERS[id]) return { ok: false, error: 'UNKNOWN_BOOSTER' };
 
     const check = checkBooster(id, {
-      inventory: this.save.boosters[id],
-      used: s.boosterUsage[id],
+      usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
     });
@@ -4711,8 +4732,7 @@ class GameController {
       }
     }
 
-    const consumed = consumeBooster(id, { inventory: this.save.boosters[id], used: s.boosterUsage[id] });
-    this.save.boosters[id] = consumed.inventory;
+    const consumed = consumeBooster(id, { used: s.boosterUsage[id] });
     s.boosterUsage[id] = consumed.used;
     this.boosterArmed = null;
     this.renderer?.setArmedTarget(null);
@@ -4760,10 +4780,12 @@ class GameController {
     if (!s) {
       return { scene: SCENE.HOME, settings, save: this.save, storageDegraded: this.storageDegraded };
     }
+    const usedTotal = s.boosterUsedTotal;
+    const limit = boosterLimit();
+    const remaining = Math.max(0, limit - usedTotal);
     const boosters = Object.values(BOOSTERS).map((def) => {
       const check = checkBooster(def.id, {
-        inventory: this.save.boosters[def.id],
-        used: s.boosterUsage[def.id],
+        usedTotal,
         disabled: s.level.disabledBoosters,
         state: s.state,
       });
@@ -4771,9 +4793,11 @@ class GameController {
         id: def.id,
         name: def.name,
         desc: def.desc,
-        count: this.save.boosters[def.id],
+        // 三种道具共用次数池：count 是共享剩余次数
+        count: remaining,
         used: s.boosterUsage[def.id],
-        limit: boosterLimit(def.id),
+        usedTotal,
+        limit,
         disabled: (s.level.disabledBoosters || []).includes(def.id),
         available: check.ok,
         armed: this.boosterArmed === def.id,
@@ -6336,13 +6360,23 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.4.4';
+const APP_VERSION = '1.5.0';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.5.0',
+    date: '2026-10-23',
+    notes: [
+      '道具改为每关三种道具共用 2 次使用机会，不再有跨关库存',
+      '移除通关赠送道具的奖励，降低前期道具门槛',
+      '修复首页“继续”按钮显示关卡与点进去关卡不一致的问题',
+      '修复使用加三步后退出再续玩时步数丢失的问题',
+    ],
+  },
   {
     version: '1.4.4',
     date: '2026-10-21',
@@ -6573,11 +6607,10 @@ class SceneManager {
 
     this.el.btnContinue.addEventListener('click', () => {
       this.audio.play('button');
-      const snap = c.save.interruptedSession;
-      const target = snap?.levelId ?? c.nextLevelId();
-      const resume = Boolean(snap && Number(snap.levelId) === Number(target));
+      // 与首页标签共用同一个入口，避免显示与点击进入的关卡不一致
+      const entry = c.homeEntry();
       // 首页固定为入口后，新手引导在玩家点击开始时再播放
-      if (c.startLevel(target, { resume }) && !resume && c.shouldStartTutorial(target)) {
+      if (c.startLevel(entry.levelId, { resume: entry.resume }) && !entry.resume && c.shouldStartTutorial(entry.levelId)) {
         c.tutorial?.begin();
       }
     });
@@ -6643,10 +6676,15 @@ class SceneManager {
         c.startLevel(r.levelId);
         return;
       }
-      if (c.levels.get(r.levelId + 1)) c.startLevel(r.levelId + 1);
-      else {
+      const nextLevel = c.levels.get(r.levelId + 1);
+      if (nextLevel && nextLevel.valid && !nextLevel.hidden) {
+        c.startLevel(r.levelId + 1);
+      } else {
         this.goto(SCENE.LEVELS);
-        this.toast('已经通关全部关卡，可以重复挑战刷新记录', 'good');
+        this.toast(
+          nextLevel ? '下一关暂未开放，可以重复挑战刷新记录' : '已经通关全部关卡，可以重复挑战刷新记录',
+          'good'
+        );
       }
     });
 
@@ -6913,17 +6951,23 @@ class SceneManager {
 
   refreshHome() {
     const save = this.controller.save;
-    const cleared = Object.values(save.progress).filter((p) => p.cleared).length;
-    const total = this.controller.levels.count() || 20;
-    const nextId = this.controller.nextLevelId();
+    // 只统计对外可见的关卡，隐藏关卡既不显示在列表里，也不计入总进度
+    const visible = this.controller.levels.list();
+    const visibleIds = new Set(visible.map((lv) => String(lv.levelId)));
+    const cleared = Object.entries(save.progress).filter(([id, p]) => p.cleared && visibleIds.has(id)).length;
+    const total = visible.length || 20;
+    // 标签与点击共用 homeEntry()，保证“显示哪一关就进哪一关”
+    const entry = this.controller.homeEntry();
+    const nextId = entry.levelId;
     const nextLevel = this.controller.levels.get(nextId);
+    const levelLabel = nextLevel?.isEx ? `EX-${nextId - 100}` : `第 ${nextId} 关`;
     const label = this.el.btnContinue.querySelector('.btn-continue-label');
     const sub = this.el.btnContinue.querySelector('.btn-continue-sub');
-    if (cleared === 0) {
+    if (cleared === 0 && !entry.resume) {
       label.textContent = '开始第 1 关';
       sub.textContent = '四个元素连成一线';
     } else {
-      label.textContent = `继续第 ${nextId} 关`;
+      label.textContent = `继续 ${levelLabel}`;
       const goal = nextLevel ? goalSummary(nextLevel.goal) : '';
       sub.textContent = nextLevel ? `${nextLevel.name} · ${goal}` : '全部关卡已通关';
     }
@@ -6979,16 +7023,17 @@ class SceneManager {
       btn.className = 'booster' + (b.armed ? ' armed' : '');
       btn.dataset.booster = b.id;
       btn.disabled = !b.available && !b.armed;
-      btn.setAttribute('aria-label', `${b.name}，剩余 ${b.count} 个，本关已用 ${b.used} 次`);
+      btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
       const count = document.createElement('span');
       count.className = 'b-count';
+      // 三种道具共用次数池，三张卡显示同一个剩余次数
       count.textContent = String(b.count);
       const name = document.createElement('span');
       name.className = 'b-name';
       name.textContent = b.name;
       const limit = document.createElement('span');
       limit.className = 'b-limit';
-      limit.textContent = b.disabled ? '本关禁用' : `本关 ${b.used}/${b.limit}`;
+      limit.textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
       btn.append(count, name, limit);
       this.el.boosterBar.appendChild(btn);
     }
@@ -7023,7 +7068,8 @@ class SceneManager {
     const cleared = list.filter((l) => l.cleared).length;
     this.el.levelsMeta.textContent = `${cleared} / ${list.length}`;
     this.el.levelGrid.textContent = '';
-    const currentId = this.controller.nextLevelId();
+    // 与首页“继续”按钮共用 homeEntry()，让高亮、按钮文案、点击目标三者一致
+    const currentId = this.controller.homeEntry().levelId;
     let exHeaderAdded = false;
 
     for (const lv of list) {
@@ -7046,7 +7092,7 @@ class SceneManager {
         btn.disabled = true;
       }
       if (lv.cleared) btn.classList.add('cleared');
-      if (!lv.isEx && lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
+      if (lv.levelId === currentId && lv.unlocked) btn.classList.add('current');
 
       const no = document.createElement('span');
       no.className = 'level-no';
@@ -7130,7 +7176,8 @@ class SceneManager {
       this.el.resultDetail.append(dt, dd);
     }
 
-    const hasNext = Boolean(this.controller.levels.get(result.levelId + 1));
+    const nextLevel = this.controller.levels.get(result.levelId + 1);
+    const hasNext = Boolean(nextLevel && nextLevel.valid && !nextLevel.hidden);
     this.el.resultNext.textContent = result.cleared ? (hasNext ? '下一关' : '返回关卡') : '再试一次';
     // 未通关时隐藏与主按钮重复的"再玩一次"，以及不可用的成绩卡片
     this.el.resultRetry.classList.toggle('hidden', !result.cleared);

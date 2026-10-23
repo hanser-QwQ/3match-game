@@ -53,7 +53,6 @@ export class GameController {
     await this.levels.loadAll();
     const loaded = this.storage.read();
     this.save = loaded || createDefaultSave();
-    if (!this.save.flags) this.save.flags = { addMovesRewarded: false };
     if (this.storage.lastReadState === 'corrupt') this.storageDegraded = true;
     // 关卡被下线后，指向它的中断会话不应再把玩家带进一个不可见的关卡
     const snap = this.save.interruptedSession;
@@ -110,6 +109,25 @@ export class GameController {
     return list.length ? list[list.length - 1].levelId : 1;
   }
 
+  /**
+   * 首页“开始 / 继续”按钮的唯一入口。
+   *
+   * 首页标签与点击必须共用同一个结果：之前标签按 nextLevelId() 显示，
+   * 点击却优先用 interruptedSession.levelId，于是暂停在 EX 关或非下一关时，
+   * 会出现“外面显示第 X 关、点进去却是第 Y 关”。
+   */
+  homeEntry() {
+    const snap = this.save.interruptedSession;
+    const snapId = Number(snap?.levelId);
+    if (snap && Number.isInteger(snapId) && Array.isArray(snap.board) && snap.board.length) {
+      const level = this.levels.get(snapId);
+      if (level && level.valid && !level.hidden) {
+        return { levelId: snapId, resume: true };
+      }
+    }
+    return { levelId: this.nextLevelId(), resume: false };
+  }
+
   startLevel(levelId, { resume = false } = {}) {
     // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
     if (this.busy) return false;
@@ -148,12 +166,25 @@ export class GameController {
         );
         if (board.countTiles() < 20) board = null;
         else {
+          /*
+           * 加三步会让剩余步数超过关卡初始步数，续玩时不能再按 level.moves 截断，
+           * 否则会出现“道具次数被扣了、步数却没加”的问题。
+           * 上限按“初始步数 + 全部道具都用在加三步”计算，仅用于防御异常存档。
+           */
+          const maxMoves = level.moves + 3 * boosterLimit();
+          const restoredLeft = Math.max(0, Math.min(Number(snap.movesLeft) || 0, maxMoves));
+          const restoredTotalRaw = Number(snap.movesTotal);
+          const restoredTotal = Number.isFinite(restoredTotalRaw) && restoredTotalRaw >= restoredLeft
+            ? Math.min(restoredTotalRaw, maxMoves)
+            : Math.max(level.moves, restoredLeft);
           resumed = {
-            movesLeft: Math.max(0, Math.min(Number(snap.movesLeft) || 0, level.moves)),
+            movesLeft: restoredLeft,
+            movesTotal: restoredTotal,
             counters: GameSession.restoreCounters(snap, board),
             boosterUsage: { shuffle: 0, hammer: 0, addMoves: 0, ...(snap.boostersUsed || {}) },
             chainBest: Number(snap.chainBest) || 0,
             tilesCleared: Number(snap.tilesCleared) || 0,
+            turnCount: Number(snap.turnCount) || 0,
           };
         }
       } catch {
@@ -535,8 +566,6 @@ export class GameController {
       highScore: 0,
       clearedAt: null,
     };
-    const firstClear = !prev.cleared;
-
     // 仅当本次星级更高时才更新星级记录（AC-08）
     this.save.progress[id] = {
       unlocked: true,
@@ -558,22 +587,6 @@ export class GameController {
       };
       nx.unlocked = true;
       this.save.progress[nextId] = nx;
-    }
-
-    // 首次获得三星额外赠送 1 个洗牌
-    if (firstClear && result.stars === 3) this.save.boosters.shuffle += 1;
-
-    // 累计通关 10 关且其中至少 5 个三星时赠送 1 个加三步（只发一次）
-    if (!this.save.flags) this.save.flags = { addMovesRewarded: false };
-    if (!this.save.flags.addMovesRewarded) {
-      const values = Object.values(this.save.progress);
-      const clearedCount = values.filter((p) => p.cleared).length;
-      const threeStar = values.filter((p) => p.stars === 3).length;
-      if (clearedCount >= 10 && threeStar >= 5) {
-        this.save.boosters.addMoves += 1;
-        this.save.flags.addMovesRewarded = true;
-        this.toast('达成 10 关通关且 5 个三星，获得加三步 ×1', 'good');
-      }
     }
 
     // 本地成绩记录
@@ -678,8 +691,7 @@ export class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false };
     const check = checkBooster(id, {
-      inventory: this.save.boosters[id],
-      used: s.boosterUsage[id],
+      usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
     });
@@ -700,8 +712,7 @@ export class GameController {
     if (!BOOSTERS[id]) return { ok: false, error: 'UNKNOWN_BOOSTER' };
 
     const check = checkBooster(id, {
-      inventory: this.save.boosters[id],
-      used: s.boosterUsage[id],
+      usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
     });
@@ -721,8 +732,7 @@ export class GameController {
       }
     }
 
-    const consumed = consumeBooster(id, { inventory: this.save.boosters[id], used: s.boosterUsage[id] });
-    this.save.boosters[id] = consumed.inventory;
+    const consumed = consumeBooster(id, { used: s.boosterUsage[id] });
     s.boosterUsage[id] = consumed.used;
     this.boosterArmed = null;
     this.renderer?.setArmedTarget(null);
@@ -770,10 +780,12 @@ export class GameController {
     if (!s) {
       return { scene: SCENE.HOME, settings, save: this.save, storageDegraded: this.storageDegraded };
     }
+    const usedTotal = s.boosterUsedTotal;
+    const limit = boosterLimit();
+    const remaining = Math.max(0, limit - usedTotal);
     const boosters = Object.values(BOOSTERS).map((def) => {
       const check = checkBooster(def.id, {
-        inventory: this.save.boosters[def.id],
-        used: s.boosterUsage[def.id],
+        usedTotal,
         disabled: s.level.disabledBoosters,
         state: s.state,
       });
@@ -781,9 +793,11 @@ export class GameController {
         id: def.id,
         name: def.name,
         desc: def.desc,
-        count: this.save.boosters[def.id],
+        // 三种道具共用次数池：count 是共享剩余次数
+        count: remaining,
         used: s.boosterUsage[def.id],
-        limit: boosterLimit(def.id),
+        usedTotal,
+        limit,
         disabled: (s.level.disabledBoosters || []).includes(def.id),
         available: check.ok,
         armed: this.boosterArmed === def.id,

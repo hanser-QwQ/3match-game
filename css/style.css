@@ -298,6 +298,7 @@ body {
 
 .level-card.ex { background: linear-gradient(180deg, #fffdf8, #f8f0e4); border-color: #e4d2b8; }
 .level-card.ex .level-no { color: var(--warm); }
+.level-card.ex.current { border-color: var(--accent); }
 
 .level-divider {
   grid-column: 1 / -1;

@@ -15,7 +15,14 @@ export class GameSession {
     this.board = board;
     this.state = SESSION_STATE.IN_PROGRESS;
     this.movesLeft = resumed?.movesLeft ?? level.moves;
-    this.movesTotal = level.moves;
+    /*
+     * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
+     * 否则剩余步数会被截回初始值，结算页的总步数也会少掉加成。
+     */
+    const restoredTotal = Number(resumed?.movesTotal);
+    this.movesTotal = Number.isFinite(restoredTotal) && restoredTotal >= this.movesLeft
+      ? restoredTotal
+      : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
     this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
     this.chainBest = resumed?.chainBest ?? 0;
@@ -37,6 +44,11 @@ export class GameSession {
 
   get isOver() {
     return this.state === SESSION_STATE.RESOLVED;
+  }
+
+  /** 本关三种道具已经使用的总次数（共享次数池） */
+  get boosterUsedTotal() {
+    return Object.values(this.boosterUsage).reduce((sum, n) => sum + (Number(n) || 0), 0);
   }
 
   /** 消耗一步 */
@@ -82,6 +94,7 @@ export class GameSession {
       specialGenerated: boardData.specialGenerated,
       ice: boardData.ice,
       movesLeft: this.movesLeft,
+      movesTotal: this.movesTotal,
       score: this.counters.score,
       boostersUsed: { ...this.boosterUsage },
       goalProgress: { cleared: first.cleared, total: first.total },

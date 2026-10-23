@@ -2,7 +2,8 @@
  * M10 存档服务 StorageService（基础设施层）
  *
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
- *   player / progress / boosters / settings / interruptedSession / localBest
+ *   player / progress / settings / interruptedSession / localBest
+ * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
  * 失败路径（FR-07 / NFR-14 / AC-11、AC-35）：
@@ -40,13 +41,10 @@ export function createDefaultSave() {
     saveVersion: SAVE_VERSION,
     player: { nickname: '玩家', totalScore: 0, createdAt: now },
     progress: {},
-    boosters: { shuffle: 1, hammer: 1, addMoves: 0 },
     settings: defaultSettings(),
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
-    // 扩展字段：一次性奖励的发放标记，避免同一奖励重复发放
-    flags: { addMovesRewarded: false },
   };
 }
 
@@ -76,7 +74,6 @@ export function migrateV1(data) {
     ...base,
     player: { nickname: '玩家', totalScore: total, createdAt: base.player.createdAt },
     progress,
-    boosters: { ...base.boosters, ...(data.boosters || {}) },
     settings: {
       ...base.settings,
       soundEnabled: data.settings?.soundEnabled !== false,
@@ -121,11 +118,6 @@ export function normalizeSave(input) {
       createdAt: data.player?.createdAt || base.player.createdAt,
     },
     progress,
-    boosters: {
-      shuffle: Math.max(0, Number(data.boosters?.shuffle) || 0),
-      hammer: Math.max(0, Number(data.boosters?.hammer) || 0),
-      addMoves: Math.max(0, Number(data.boosters?.addMoves) || 0),
-    },
     settings: {
       soundEnabled: settings.soundEnabled !== false,
       volume: clamp(Number(settings.volume) || 0, 0, 100),
@@ -137,7 +129,6 @@ export function normalizeSave(input) {
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
-    flags: { addMovesRewarded: Boolean(data.flags?.addMovesRewarded) },
   };
 }
 
