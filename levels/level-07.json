@@ -16,9 +16,9 @@
   },
   "moves": 23,
   "starThresholds": [
-    1950,
-    2590,
-    3190
+    1750,
+    2350,
+    2900
   ],
   "disabledBoosters": [],
   "tutorialHint": "元素种类变多，找准一处能连带的位置再动手"

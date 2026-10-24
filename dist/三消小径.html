@@ -834,22 +834,83 @@ body {
 .overlay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
 .overlay-row .btn { font-size: 14px; }
 
-.ex-intro-card { max-width: 350px; }
-.ex-intro-kicker {
+.level-intro-card {
+  max-width: 360px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.level-intro-kicker {
   margin: 0 0 6px;
   font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--warm);
 }
-.ex-intro-text {
+
+.level-intro-facts {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  text-align: left;
+}
+.level-intro-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--paper-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.level-intro-facts dt {
+  flex: 0 0 auto;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.level-intro-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.45;
+  text-align: right;
+}
+
+.level-intro-stars {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper-2);
+  text-align: left;
+}
+.level-intro-stars-title {
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+}
+.level-intro-star-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.level-intro-star-row span { color: #d99a1f; letter-spacing: 1px; }
+.level-intro-star-row b { font-weight: 600; color: var(--ink); }
+
+.level-intro-mechanic {
   margin: 0 0 10px;
-  font-size: 14px;
-  line-height: 1.75;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--warm-soft);
+  font-size: 13px;
+  line-height: 1.7;
   color: var(--ink-2);
   text-align: left;
 }
-.ex-intro-timer {
-  margin: 0 0 18px;
+.level-intro-timer {
+  margin: 0 0 16px;
   padding: 8px 10px;
   border-radius: 10px;
   background: var(--paper-2);
@@ -1329,7 +1390,7 @@ body {
         <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.5.1</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.5.2</button>
     </div>
   </section>
 
@@ -1429,14 +1490,33 @@ body {
     </div>
   </div>
 
-  <!-- ============================ EX 关追加机制弹窗 ============================ -->
-  <div id="ex-intro" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ex-intro-title">
-    <div class="overlay-card ex-intro-card">
-      <p class="ex-intro-kicker">EX 关卡追加机制</p>
-      <h2 id="ex-intro-title">EX-1</h2>
-      <p class="ex-intro-text" id="ex-intro-text"></p>
-      <p class="ex-intro-timer" id="ex-intro-timer"></p>
-      <button class="btn btn-primary" id="btn-ex-start">知道了，开始挑战</button>
+  <!-- ============================ 关卡开始信息弹窗 ============================ -->
+  <div id="level-intro" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="level-intro-title">
+    <div class="overlay-card level-intro-card">
+      <p class="level-intro-kicker" id="level-intro-kicker">关卡信息</p>
+      <h2 id="level-intro-title">第 1 关 · 初见</h2>
+
+      <dl class="level-intro-facts">
+        <div>
+          <dt>通关目标</dt>
+          <dd id="level-intro-goal"></dd>
+        </div>
+        <div>
+          <dt>步数</dt>
+          <dd id="level-intro-moves"></dd>
+        </div>
+      </dl>
+
+      <div class="level-intro-stars">
+        <div class="level-intro-stars-title">评星标准</div>
+        <div class="level-intro-star-row"><span>★</span><b id="level-intro-star1"></b></div>
+        <div class="level-intro-star-row"><span>★★</span><b id="level-intro-star2"></b></div>
+        <div class="level-intro-star-row"><span>★★★</span><b id="level-intro-star3"></b></div>
+      </div>
+
+      <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
+      <p class="level-intro-timer hidden" id="level-intro-timer"></p>
+      <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
     </div>
   </div>
 
@@ -3806,8 +3886,15 @@ function taskProgress(def, counters) {
     case GOAL.COLLECT:
       return { cleared: Math.min(counters.collected[def.element] || 0, def.amount), total: def.amount };
     case GOAL.CLEAR_ICE: {
-      const total = counters.initialIce ?? 0;
-      return { cleared: total - counters.iceLeft, total };
+      /*
+       * 以关卡配置的 amount 为准，而不是棋盘上的全部冰块。
+       * 有些关卡会故意多放几块冰作为干扰，若按 initialIce 计算，
+       * 会把“清除 10 块”实际变成“清除全部 12 块”，明显偏严。
+       */
+      const initial = counters.initialIce ?? 0;
+      const total = Math.max(0, Math.min(def.amount || initial, initial));
+      const cleared = Math.max(0, initial - counters.iceLeft);
+      return { cleared: Math.min(total, cleared), total };
     }
     default:
       return { cleared: 0, total: def.amount || 0 };
@@ -3863,7 +3950,7 @@ function goalSummary(goal) {
         case GOAL.COLLECT:
           return `收集 ${d.amount} 个${elementShortName(d.element)}`;
         case GOAL.CLEAR_ICE:
-          return `清除全部 ${d.amount} 块冰`;
+          return `清除 ${d.amount} 块冰`;
         default:
           return '';
       }
@@ -6435,13 +6522,22 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.5.1';
+const APP_VERSION = '1.5.2';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.5.2',
+    date: '2026-10-24',
+    notes: [
+      '所有关卡开始前会显示通关目标、步数与评星标准，EX 关额外说明追加机制',
+      '后段关卡整体降低难度：第 11、13–20 关与 EX-4、EX-5 的步数、目标或星级有所放宽',
+      '修复破冰关目标数量计算偏严的问题',
+    ],
+  },
   {
     version: '1.5.1',
     date: '2026-10-24',
@@ -6592,8 +6688,8 @@ class SceneManager {
     this.current = null;
     this.lastResult = null;
     this.lastScore = -1;
-    // 记录已经弹过追加机制说明的会话，避免同一局重复弹出
-    this.exIntroSessionId = null;
+    // 记录已经弹过关卡开始信息的会话，避免同一局重复弹出
+    this.introSessionId = null;
     // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
     this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
@@ -6649,11 +6745,17 @@ class SceneManager {
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
-      exIntro: $('ex-intro'),
-      exIntroTitle: $('ex-intro-title'),
-      exIntroText: $('ex-intro-text'),
-      exIntroTimer: $('ex-intro-timer'),
-      btnExStart: $('btn-ex-start'),
+      levelIntro: $('level-intro'),
+      levelIntroKicker: $('level-intro-kicker'),
+      levelIntroTitle: $('level-intro-title'),
+      levelIntroGoal: $('level-intro-goal'),
+      levelIntroMoves: $('level-intro-moves'),
+      levelIntroStar1: $('level-intro-star1'),
+      levelIntroStar2: $('level-intro-star2'),
+      levelIntroStar3: $('level-intro-star3'),
+      levelIntroMechanic: $('level-intro-mechanic'),
+      levelIntroTimer: $('level-intro-timer'),
+      btnLevelStart: $('btn-level-start'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -6731,10 +6833,10 @@ class SceneManager {
       c.resume();
     });
 
-    this.el.btnExStart?.addEventListener('click', () => {
+    this.el.btnLevelStart?.addEventListener('click', () => {
       this.audio.play('button');
-      this.hideExIntro();
-      this.el.btnExStart.blur();
+      this.hideLevelIntro();
+      this.el.btnLevelStart.blur();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -7018,7 +7120,7 @@ class SceneManager {
       } else s.classList.remove('active');
     });
     this.current = scene;
-    if (scene !== SCENE.GAME) this.hideExIntro();
+    if (scene !== SCENE.GAME) this.hideLevelIntro();
 
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
@@ -7038,27 +7140,47 @@ class SceneManager {
     }
   }
 
-  /** EX 关卡进入时的追加机制说明 */
-  showExIntro(level) {
-    if (!this.el.exIntro || !level) return;
+  /** 所有关卡进入时的目标、步数与评星标准 */
+  showLevelIntro(level) {
+    if (!this.el.levelIntro || !level) return;
     this.controller.introOpen = true;
-    this.el.exIntroTitle.textContent = level.name || 'EX 关卡';
-    this.el.exIntroText.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
-    const limit = level.rules?.moveTimeLimit;
-    this.el.exIntroTimer.textContent = limit
-      ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
-      : '本关没有单步时间限制。';
-    this.el.exIntro.classList.remove('hidden');
-    this.el.btnExStart?.focus({ preventScroll: true });
+    const isEx = Boolean(level.isEx);
+    const stars = Array.isArray(level.starThresholds) ? level.starThresholds : [];
+
+    this.el.levelIntroKicker.textContent = isEx ? 'EX 关卡追加机制' : '关卡信息';
+    this.el.levelIntroTitle.textContent = isEx
+      ? level.name
+      : `第 ${level.levelId} 关 · ${level.name}`;
+    this.el.levelIntroGoal.textContent = goalSummary(level.goal) || '完成本关目标';
+    this.el.levelIntroMoves.textContent = `${level.moves} 步`;
+    this.el.levelIntroStar1.textContent = stars[0] ? `${stars[0]} 分` : '-';
+    this.el.levelIntroStar2.textContent = stars[1] ? `${stars[1]} 分` : '-';
+    this.el.levelIntroStar3.textContent = stars[2] ? `${stars[2]} 分` : '-';
+
+    if (isEx) {
+      this.el.levelIntroMechanic.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
+      this.el.levelIntroMechanic.classList.remove('hidden');
+      const limit = level.rules?.moveTimeLimit;
+      this.el.levelIntroTimer.textContent = limit
+        ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
+        : '本关没有单步时间限制。';
+      this.el.levelIntroTimer.classList.remove('hidden');
+    } else {
+      this.el.levelIntroMechanic.classList.add('hidden');
+      this.el.levelIntroTimer.classList.add('hidden');
+    }
+
+    this.el.levelIntro.classList.remove('hidden');
+    this.el.btnLevelStart?.focus({ preventScroll: true });
   }
 
-  hideExIntro() {
+  hideLevelIntro() {
     this.controller.introOpen = false;
-    this.el.exIntro?.classList.add('hidden');
+    this.el.levelIntro?.classList.add('hidden');
   }
 
   showPause() {
-    this.hideExIntro();
+    this.hideLevelIntro();
     this.el.pause.classList.remove('hidden');
     this.el.tutorial.classList.add('hidden');
   }
@@ -7101,10 +7223,10 @@ class SceneManager {
     if (!vm || !vm.board) return;
     if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
 
-    // 每次进入 EX 关（首次进入 / 续玩 / 重开）弹一次追加机制说明
-    if (vm.level?.isEx && this.exIntroSessionId !== vm.sessionId) {
-      this.exIntroSessionId = vm.sessionId;
-      this.showExIntro(vm.level);
+    // 每次进入关卡（首次进入 / 续玩 / 重开）弹一次开始信息
+    if (vm.level && this.introSessionId !== vm.sessionId) {
+      this.introSessionId = vm.sessionId;
+      this.showLevelIntro(vm.level);
     }
 
     this.el.levelName.textContent = vm.levelId >= 100
@@ -7609,9 +7731,9 @@ const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
+      1500,
       2100,
-      2775,
-      3450
+      2800
     ],
     "disabledBoosters": [],
     "tutorialHint": "交换相邻的两个元素，连成三个即可消除"
@@ -7633,9 +7755,9 @@ const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2100,
-      2775,
-      3450
+      1700,
+      2300,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "一次消除四个，会得到更强的条纹元素"
@@ -7657,9 +7779,9 @@ const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2100,
-      2775,
-      3450
+      1900,
+      2450,
+      3050
     ],
     "disabledBoosters": [],
     "tutorialHint": "剩余的步数会在通关时折算成额外分数"
@@ -7682,9 +7804,9 @@ const LEVELS = [
     },
     "moves": 24,
     "starThresholds": [
-      2000,
-      2680,
-      3280
+      1800,
+      2400,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "消除指定元素，累计到目标数量即可过关"
@@ -7707,9 +7829,9 @@ const LEVELS = [
     },
     "moves": 24,
     "starThresholds": [
-      2000,
-      2680,
-      3280
+      1800,
+      2400,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "优先消除目标元素，边上留出的空位会带来连锁"
@@ -7732,9 +7854,9 @@ const LEVELS = [
     },
     "moves": 23,
     "starThresholds": [
-      1950,
-      2590,
-      3190
+      1750,
+      2350,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "连锁的倍率会一路涨到三倍，尽量制造连续消除"
@@ -7757,9 +7879,9 @@ const LEVELS = [
     },
     "moves": 23,
     "starThresholds": [
-      1950,
-      2590,
-      3190
+      1750,
+      2350,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "元素种类变多，找准一处能连带的位置再动手"
@@ -7789,9 +7911,9 @@ const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1700,
+      2250,
+      2800
     ],
     "disabledBoosters": [],
     "tutorialHint": "两个目标要同时完成，别只顾着堆分数"
@@ -7838,9 +7960,9 @@ const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1650,
+      2200,
+      2750
     ],
     "disabledBoosters": [],
     "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"
@@ -7895,9 +8017,9 @@ const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1650,
+      2200,
+      2750
     ],
     "disabledBoosters": [],
     "tutorialHint": "条纹元素可以整行或整列清除，用来破冰最有效"
@@ -7920,9 +8042,9 @@ const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      2500,
-      3500,
-      4500
+      2000,
+      3000,
+      4000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -7951,9 +8073,9 @@ const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      3000,
-      4200,
-      5500
+      2500,
+      3700,
+      4900
     ],
     "disabledBoosters": [],
     "rules": {
@@ -7980,9 +8102,9 @@ const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      3000,
-      4200,
-      5500
+      2500,
+      3700,
+      4900
     ],
     "disabledBoosters": [],
     "rules": {
@@ -8008,13 +8130,13 @@ const LEVELS = [
     },
     "goal": {
       "type": "clear_ice",
-      "amount": 18
+      "amount": 16
     },
     "moves": 25,
     "starThresholds": [
-      3000,
-      4500,
-      6000
+      2500,
+      3700,
+      5000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -8037,13 +8159,13 @@ const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 3000
+      "amount": 2600
     },
     "moves": 22,
     "starThresholds": [
-      4000,
-      5500,
-      7000
+      2600,
+      3800,
+      5000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -8112,11 +8234,11 @@ const LEVELS = [
         "amount": 14
       }
     },
-    "moves": 21,
+    "moves": 22,
     "starThresholds": [
-      1840,
-      2410,
-      3010
+      1600,
+      2150,
+      2700
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
@@ -8179,9 +8301,9 @@ const LEVELS = [
     },
     "moves": 21,
     "starThresholds": [
-      1840,
-      2410,
-      3010
+      1600,
+      2150,
+      2700
     ],
     "disabledBoosters": [],
     "tutorialHint": "被困住的元素不能交换，先清掉它旁边的位置"
@@ -8242,18 +8364,18 @@ const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "clear_ice",
-        "amount": 10
+        "amount": 9
       },
       "secondary": {
         "type": "score",
-        "amount": 2200
+        "amount": 1900
       }
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1750,
+      2300,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "分数与破冰都要顾及，连锁能同时推进两者"
@@ -8324,9 +8446,9 @@ const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1550,
+      2000,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "边缘的冰块更难触及，必要时用锤子敲开"
@@ -8379,7 +8501,7 @@ const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2400
+        "amount": 2100
       },
       "secondary": {
         "type": "clear_ice",
@@ -8388,9 +8510,9 @@ const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1600,
+      2100,
+      2600
     ],
     "disabledBoosters": [],
     "tutorialHint": "步数只有二十步，每一步都要争取形成连锁"
@@ -8449,14 +8571,14 @@ const LEVELS = [
       },
       "secondary": {
         "type": "clear_ice",
-        "amount": 8
+        "amount": 7
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1500,
+      2000,
+      2500
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块耐久翻倍，需要两次相邻消除才能敲开"
@@ -8510,7 +8632,7 @@ const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2600
+        "amount": 1900
       },
       "secondary": {
         "type": "collect",
@@ -8518,11 +8640,11 @@ const LEVELS = [
         "amount": 16
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1550,
+      2000,
+      2450
     ],
     "disabledBoosters": [],
     "tutorialHint": "彩虹元素与条纹交换，可以清掉同色的全部元素"
@@ -8584,7 +8706,7 @@ const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "clear_ice",
-        "amount": 10
+        "amount": 9
       },
       "secondary": {
         "type": "collect",
@@ -8592,11 +8714,11 @@ const LEVELS = [
         "amount": 15
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1500,
+      1950,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "先破中间的冰，棋盘的通路会顺畅很多"
@@ -8666,18 +8788,18 @@ const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2600
+        "amount": 1850
       },
       "secondary": {
         "type": "clear_ice",
-        "amount": 12
+        "amount": 9
       }
     },
-    "moves": 19,
+    "moves": 20,
     "starThresholds": [
-      1720,
-      2230,
-      2740
+      1500,
+      1950,
+      2350
     ],
     "disabledBoosters": [],
     "tutorialHint": "道具不消耗步数，卡住的时候别硬撑"
@@ -8743,14 +8865,14 @@ const LEVELS = [
       },
       "secondary": {
         "type": "score",
-        "amount": 2400
+        "amount": 1800
       }
     },
-    "moves": 18,
+    "moves": 19,
     "starThresholds": [
-      1650,
-      2140,
-      2620
+      1450,
+      1900,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "最后一步之前，先算清剩余的冰与分数"

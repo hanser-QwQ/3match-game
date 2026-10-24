@@ -46,7 +46,7 @@
     "type": "combo",
     "primary": {
       "type": "score",
-      "amount": 2400
+      "amount": 2100
     },
     "secondary": {
       "type": "clear_ice",
@@ -55,9 +55,9 @@
   },
   "moves": 20,
   "starThresholds": [
-    1780,
-    2320,
-    2860
+    1600,
+    2100,
+    2600
   ],
   "disabledBoosters": [],
   "tutorialHint": "步数只有二十步，每一步都要争取形成连锁"

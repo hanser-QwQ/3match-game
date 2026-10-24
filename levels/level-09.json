@@ -40,9 +40,9 @@
   },
   "moves": 22,
   "starThresholds": [
-    1900,
-    2500,
-    3100
+    1650,
+    2200,
+    2750
   ],
   "disabledBoosters": [],
   "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"

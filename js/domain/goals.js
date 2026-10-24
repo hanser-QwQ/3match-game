@@ -39,8 +39,15 @@ function taskProgress(def, counters) {
     case GOAL.COLLECT:
       return { cleared: Math.min(counters.collected[def.element] || 0, def.amount), total: def.amount };
     case GOAL.CLEAR_ICE: {
-      const total = counters.initialIce ?? 0;
-      return { cleared: total - counters.iceLeft, total };
+      /*
+       * 以关卡配置的 amount 为准，而不是棋盘上的全部冰块。
+       * 有些关卡会故意多放几块冰作为干扰，若按 initialIce 计算，
+       * 会把“清除 10 块”实际变成“清除全部 12 块”，明显偏严。
+       */
+      const initial = counters.initialIce ?? 0;
+      const total = Math.max(0, Math.min(def.amount || initial, initial));
+      const cleared = Math.max(0, initial - counters.iceLeft);
+      return { cleared: Math.min(total, cleared), total };
     }
     default:
       return { cleared: 0, total: def.amount || 0 };
@@ -96,7 +103,7 @@ export function goalSummary(goal) {
         case GOAL.COLLECT:
           return `收集 ${d.amount} 个${elementShortName(d.element)}`;
         case GOAL.CLEAR_ICE:
-          return `清除全部 ${d.amount} 块冰`;
+          return `清除 ${d.amount} 块冰`;
         default:
           return '';
       }

@@ -64,9 +64,9 @@
   },
   "moves": 20,
   "starThresholds": [
-    1780,
-    2320,
-    2860
+    1550,
+    2000,
+    2400
   ],
   "disabledBoosters": [],
   "tutorialHint": "边缘的冰块更难触及，必要时用锤子敲开"

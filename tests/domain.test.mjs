@@ -12,6 +12,7 @@ import { findMatches, isValidSwap, planSpecials, planSpecialSwap, hasMatchAt, bl
 import { resolveCascade } from '../js/domain/cascadeResolver.js';
 import { hasValidMove, findAnyValidMove, reshuffle } from '../js/domain/deadlockDetector.js';
 import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../js/domain/scorer.js';
+import { goalTasks } from '../js/domain/goals.js';
 import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
 import { SPECIAL } from '../js/core/constants.js';
@@ -19,6 +20,7 @@ import { LevelRepository } from '../js/infrastructure/levelRepository.js';
 import { GameController } from '../js/application/gameController.js';
 import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '../js/domain/boosterService.js';
 import { GameSession } from '../js/application/gameSession.js';
+import { readFileSync } from 'node:fs';
 import { createDefaultSave, normalizeSave } from '../js/infrastructure/storageService.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
@@ -476,6 +478,41 @@ test('关卡仓库：hidden 关卡不会进入列表与可玩列表', async () =
   assert.equal(repo.playable().length, 1, '隐藏关卡不应进入可玩列表');
   assert.equal(repo.get(105).hidden, true, '隐藏关卡的数据仍然保留，便于重新开放');
   assert.equal(repo.all().length, 2, '诊断接口仍能看到全部关卡');
+});
+
+test('破冰目标：棋盘冰块多于目标时，只计算目标数量', () => {
+  const counters = { score: 0, collected: {}, iceLeft: 2, initialIce: 12 };
+  const [task] = goalTasks({ type: 'clear_ice', amount: 10 }, counters);
+  assert.equal(task.total, 10, '目标总量应为配置的 10，而不是棋盘上的 12');
+  assert.equal(task.cleared, 10);
+  assert.equal(task.done, true, '清掉 10 块冰后目标应完成');
+});
+
+test('关卡数据：评星阈值严格递增，3 星线高于分数目标', () => {
+  const levelsRoot = new URL('../levels/', import.meta.url);
+  const index = JSON.parse(readFileSync(new URL('index.json', levelsRoot), 'utf8'));
+  for (const id of index.levels) {
+    const file = new URL(`level-${String(id).padStart(2, '0')}.json`, levelsRoot);
+    const level = JSON.parse(readFileSync(file, 'utf8'));
+    const thresholds = level.starThresholds;
+    assert.ok(Array.isArray(thresholds) && thresholds.length === 3, `关卡 ${id} 缺少三个星级阈值`);
+    assert.ok(
+      thresholds[0] > 0 && thresholds[1] > thresholds[0] && thresholds[2] > thresholds[1],
+      `关卡 ${id} 的星级阈值必须严格递增`
+    );
+
+    const scoreGoal = (() => {
+      if (level.goal?.type === 'score') return level.goal.amount;
+      if (level.goal?.type === 'combo') {
+        if (level.goal.primary?.type === 'score') return level.goal.primary.amount;
+        if (level.goal.secondary?.type === 'score') return level.goal.secondary.amount;
+      }
+      return 0;
+    })();
+    if (scoreGoal) {
+      assert.ok(thresholds[2] > scoreGoal, `关卡 ${id} 的 3 星线应高于分数目标`);
+    }
+  }
 });
 
 test('首页入口：继续按钮显示的关卡与点击进入的关卡一致', () => {

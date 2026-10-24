@@ -24,8 +24,8 @@ export class SceneManager {
     this.current = null;
     this.lastResult = null;
     this.lastScore = -1;
-    // 记录已经弹过追加机制说明的会话，避免同一局重复弹出
-    this.exIntroSessionId = null;
+    // 记录已经弹过关卡开始信息的会话，避免同一局重复弹出
+    this.introSessionId = null;
     // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
     this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
@@ -81,11 +81,17 @@ export class SceneManager {
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
-      exIntro: $('ex-intro'),
-      exIntroTitle: $('ex-intro-title'),
-      exIntroText: $('ex-intro-text'),
-      exIntroTimer: $('ex-intro-timer'),
-      btnExStart: $('btn-ex-start'),
+      levelIntro: $('level-intro'),
+      levelIntroKicker: $('level-intro-kicker'),
+      levelIntroTitle: $('level-intro-title'),
+      levelIntroGoal: $('level-intro-goal'),
+      levelIntroMoves: $('level-intro-moves'),
+      levelIntroStar1: $('level-intro-star1'),
+      levelIntroStar2: $('level-intro-star2'),
+      levelIntroStar3: $('level-intro-star3'),
+      levelIntroMechanic: $('level-intro-mechanic'),
+      levelIntroTimer: $('level-intro-timer'),
+      btnLevelStart: $('btn-level-start'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -163,10 +169,10 @@ export class SceneManager {
       c.resume();
     });
 
-    this.el.btnExStart?.addEventListener('click', () => {
+    this.el.btnLevelStart?.addEventListener('click', () => {
       this.audio.play('button');
-      this.hideExIntro();
-      this.el.btnExStart.blur();
+      this.hideLevelIntro();
+      this.el.btnLevelStart.blur();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -450,7 +456,7 @@ export class SceneManager {
       } else s.classList.remove('active');
     });
     this.current = scene;
-    if (scene !== SCENE.GAME) this.hideExIntro();
+    if (scene !== SCENE.GAME) this.hideLevelIntro();
 
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
@@ -470,27 +476,47 @@ export class SceneManager {
     }
   }
 
-  /** EX 关卡进入时的追加机制说明 */
-  showExIntro(level) {
-    if (!this.el.exIntro || !level) return;
+  /** 所有关卡进入时的目标、步数与评星标准 */
+  showLevelIntro(level) {
+    if (!this.el.levelIntro || !level) return;
     this.controller.introOpen = true;
-    this.el.exIntroTitle.textContent = level.name || 'EX 关卡';
-    this.el.exIntroText.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
-    const limit = level.rules?.moveTimeLimit;
-    this.el.exIntroTimer.textContent = limit
-      ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
-      : '本关没有单步时间限制。';
-    this.el.exIntro.classList.remove('hidden');
-    this.el.btnExStart?.focus({ preventScroll: true });
+    const isEx = Boolean(level.isEx);
+    const stars = Array.isArray(level.starThresholds) ? level.starThresholds : [];
+
+    this.el.levelIntroKicker.textContent = isEx ? 'EX 关卡追加机制' : '关卡信息';
+    this.el.levelIntroTitle.textContent = isEx
+      ? level.name
+      : `第 ${level.levelId} 关 · ${level.name}`;
+    this.el.levelIntroGoal.textContent = goalSummary(level.goal) || '完成本关目标';
+    this.el.levelIntroMoves.textContent = `${level.moves} 步`;
+    this.el.levelIntroStar1.textContent = stars[0] ? `${stars[0]} 分` : '-';
+    this.el.levelIntroStar2.textContent = stars[1] ? `${stars[1]} 分` : '-';
+    this.el.levelIntroStar3.textContent = stars[2] ? `${stars[2]} 分` : '-';
+
+    if (isEx) {
+      this.el.levelIntroMechanic.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
+      this.el.levelIntroMechanic.classList.remove('hidden');
+      const limit = level.rules?.moveTimeLimit;
+      this.el.levelIntroTimer.textContent = limit
+        ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
+        : '本关没有单步时间限制。';
+      this.el.levelIntroTimer.classList.remove('hidden');
+    } else {
+      this.el.levelIntroMechanic.classList.add('hidden');
+      this.el.levelIntroTimer.classList.add('hidden');
+    }
+
+    this.el.levelIntro.classList.remove('hidden');
+    this.el.btnLevelStart?.focus({ preventScroll: true });
   }
 
-  hideExIntro() {
+  hideLevelIntro() {
     this.controller.introOpen = false;
-    this.el.exIntro?.classList.add('hidden');
+    this.el.levelIntro?.classList.add('hidden');
   }
 
   showPause() {
-    this.hideExIntro();
+    this.hideLevelIntro();
     this.el.pause.classList.remove('hidden');
     this.el.tutorial.classList.add('hidden');
   }
@@ -533,10 +559,10 @@ export class SceneManager {
     if (!vm || !vm.board) return;
     if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
 
-    // 每次进入 EX 关（首次进入 / 续玩 / 重开）弹一次追加机制说明
-    if (vm.level?.isEx && this.exIntroSessionId !== vm.sessionId) {
-      this.exIntroSessionId = vm.sessionId;
-      this.showExIntro(vm.level);
+    // 每次进入关卡（首次进入 / 续玩 / 重开）弹一次开始信息
+    if (vm.level && this.introSessionId !== vm.sessionId) {
+      this.introSessionId = vm.sessionId;
+      this.showLevelIntro(vm.level);
     }
 
     this.el.levelName.textContent = vm.levelId >= 100

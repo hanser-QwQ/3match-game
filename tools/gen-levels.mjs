@@ -5,7 +5,7 @@
  * 运行：node tools/gen-levels.mjs
  * 说明：生成结果为唯一数据源，游戏运行时只读取 JSON，不读取本脚本。
  */
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -23,6 +23,34 @@ const STAR_TABLE = {
   20: [1780, 2320, 2860],
   19: [1720, 2230, 2740],
   18: [1650, 2140, 2620],
+};
+
+/**
+ * 1.5.1 平衡调整：下调偏严的星级阈值。
+ * 目标与步数保持不变，只放宽评星分数，让完成目标后有更合理的星级回报。
+ * 有分数目标的关卡，3 星线仍保持在目标分之上；纯收集 / 破冰关则整体下调。
+ */
+const STAR_OVERRIDES = {
+  1: [1500, 2100, 2800],
+  2: [1700, 2300, 2950],
+  3: [1900, 2450, 3050],
+  4: [1800, 2400, 2950],
+  5: [1800, 2400, 2950],
+  6: [1750, 2350, 2900],
+  7: [1750, 2350, 2900],
+  8: [1700, 2250, 2800],
+  9: [1650, 2200, 2750],
+  10: [1650, 2200, 2750],
+  11: [1600, 2150, 2700],
+  12: [1600, 2150, 2700],
+  13: [1750, 2300, 2900],
+  14: [1550, 2000, 2400],
+  15: [1600, 2100, 2600],
+  16: [1500, 2000, 2500],
+  17: [1550, 2000, 2450],
+  18: [1500, 1950, 2400],
+  19: [1500, 1950, 2350],
+  20: [1450, 1900, 2400],
 };
 
 const ICE = {
@@ -102,7 +130,7 @@ const LEVELS = [
     hint: '条纹元素可以整行或整列清除，用来破冰最有效',
   },
   {
-    levelId: 11, name: '冰下藏金', types: 6, moves: 21, ice: 'corner8',
+    levelId: 11, name: '冰下藏金', types: 6, moves: 22, ice: 'corner8',
     goal: {
       type: 'combo',
       primary: { type: 'clear_ice', amount: 8 },
@@ -119,8 +147,8 @@ const LEVELS = [
     levelId: 13, name: '冷杉林', types: 6, moves: 22, ice: 'well10',
     goal: {
       type: 'combo',
-      primary: { type: 'clear_ice', amount: 10 },
-      secondary: { type: 'score', amount: 2200 },
+      primary: { type: 'clear_ice', amount: 9 },
+      secondary: { type: 'score', amount: 1900 },
     },
     hint: '分数与破冰都要顾及，连锁能同时推进两者',
   },
@@ -134,54 +162,54 @@ const LEVELS = [
     levelId: 15, name: '双生目标', types: 6, moves: 20, ice: 'rows8',
     goal: {
       type: 'combo',
-      primary: { type: 'score', amount: 2400 },
+      primary: { type: 'score', amount: 2100 },
       secondary: { type: 'clear_ice', amount: 8 },
     },
     hint: '步数只有二十步，每一步都要争取形成连锁',
   },
   {
-    levelId: 16, name: '步步为营', types: 6, moves: 20, ice: 'corner8', durability: 2,
+    levelId: 16, name: '步步为营', types: 6, moves: 21, ice: 'corner8', durability: 2,
     goal: {
       type: 'combo',
       primary: { type: 'collect', element: 1, amount: 18 },
-      secondary: { type: 'clear_ice', amount: 8 },
+      secondary: { type: 'clear_ice', amount: 7 },
     },
     hint: '冰块耐久翻倍，需要两次相邻消除才能敲开',
   },
   {
-    levelId: 17, name: '精算之路', types: 6, moves: 20, ice: 'ring8', durability: 2,
+    levelId: 17, name: '精算之路', types: 6, moves: 21, ice: 'ring8', durability: 2,
     goal: {
       type: 'combo',
-      primary: { type: 'score', amount: 2600 },
+      primary: { type: 'score', amount: 1900 },
       secondary: { type: 'collect', element: 2, amount: 16 },
     },
     hint: '彩虹元素与条纹交换，可以清掉同色的全部元素',
   },
   {
-    levelId: 18, name: '霜色黎明', types: 6, moves: 20, ice: 'diamond10', durability: 2,
+    levelId: 18, name: '霜色黎明', types: 6, moves: 21, ice: 'diamond10', durability: 2,
     goal: {
       type: 'combo',
-      primary: { type: 'clear_ice', amount: 10 },
+      primary: { type: 'clear_ice', amount: 9 },
       secondary: { type: 'collect', element: 0, amount: 15 },
     },
     hint: '先破中间的冰，棋盘的通路会顺畅很多',
   },
   // —— 19 至 20 关：综合运用道具与特殊元素组合 ——
   {
-    levelId: 19, name: '极限边缘', types: 6, moves: 19, ice: 'edge12', durability: 2,
+    levelId: 19, name: '极限边缘', types: 6, moves: 20, ice: 'edge12', durability: 2,
     goal: {
       type: 'combo',
-      primary: { type: 'score', amount: 2600 },
-      secondary: { type: 'clear_ice', amount: 12 },
+      primary: { type: 'score', amount: 1850 },
+      secondary: { type: 'clear_ice', amount: 9 },
     },
     hint: '道具不消耗步数，卡住的时候别硬撑',
   },
   {
-    levelId: 20, name: '终章·雪境', types: 6, moves: 18, ice: 'diamond10', durability: 2,
+    levelId: 20, name: '终章·雪境', types: 6, moves: 19, ice: 'diamond10', durability: 2,
     goal: {
       type: 'combo',
       primary: { type: 'clear_ice', amount: 10 },
-      secondary: { type: 'score', amount: 2400 },
+      secondary: { type: 'score', amount: 1800 },
     },
     hint: '最后一步之前，先算清剩余的冰与分数',
   },
@@ -202,7 +230,7 @@ function build(level) {
     },
     goal: level.goal,
     moves: level.moves,
-    starThresholds: STAR_TABLE[level.moves],
+    starThresholds: STAR_OVERRIDES[level.levelId] || STAR_TABLE[level.moves],
     disabledBoosters: level.disabledBoosters || [],
     tutorialHint: level.hint,
   };
@@ -216,10 +244,20 @@ for (const level of LEVELS) {
   writeFileSync(file, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }
 
-// 索引文件：关卡仓库在无法逐文件探测时可用它定位关卡范围
+// 索引文件：关卡仓库在无法逐文件探测时可用它定位关卡范围。
+// EX 关卡不由本脚本生成，保留旧索引中的 EX 编号，避免重新生成普通关时把它们丢掉。
+const indexPath = resolve(outDir, 'index.json');
+let exIds = [];
+try {
+  const previous = JSON.parse(readFileSync(indexPath, 'utf8'));
+  exIds = (previous.levels || []).filter((id) => Number(id) >= 101);
+} catch {
+  // 首次生成没有旧索引
+}
+const indexLevels = [...LEVELS.map((l) => l.levelId), ...exIds];
 writeFileSync(
-  resolve(outDir, 'index.json'),
-  JSON.stringify({ schemaVersion: 1, count: LEVELS.length, levels: LEVELS.map((l) => l.levelId) }, null, 2) + '\n',
+  indexPath,
+  JSON.stringify({ schemaVersion: 1, count: indexLevels.length, levels: indexLevels }, null, 2) + '\n',
   'utf8'
 );
 

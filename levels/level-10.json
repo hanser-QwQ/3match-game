@@ -48,9 +48,9 @@
   },
   "moves": 22,
   "starThresholds": [
-    1900,
-    2500,
-    3100
+    1650,
+    2200,
+    2750
   ],
   "disabledBoosters": [],
   "tutorialHint": "条纹元素可以整行或整列清除，用来破冰最有效"

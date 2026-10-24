@@ -52,14 +52,14 @@
     },
     "secondary": {
       "type": "clear_ice",
-      "amount": 8
+      "amount": 7
     }
   },
-  "moves": 20,
+  "moves": 21,
   "starThresholds": [
-    1780,
-    2320,
-    2860
+    1500,
+    2000,
+    2500
   ],
   "disabledBoosters": [],
   "tutorialHint": "冰块耐久翻倍，需要两次相邻消除才能敲开"

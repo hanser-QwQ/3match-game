@@ -12,13 +12,13 @@
   },
   "goal": {
     "type": "clear_ice",
-    "amount": 18
+    "amount": 16
   },
   "moves": 25,
   "starThresholds": [
-    3000,
-    4500,
-    6000
+    2500,
+    3700,
+    5000
   ],
   "disabledBoosters": [],
   "rules": {

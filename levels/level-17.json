@@ -47,7 +47,7 @@
     "type": "combo",
     "primary": {
       "type": "score",
-      "amount": 2600
+      "amount": 1900
     },
     "secondary": {
       "type": "collect",
@@ -55,11 +55,11 @@
       "amount": 16
     }
   },
-  "moves": 20,
+  "moves": 21,
   "starThresholds": [
-    1780,
-    2320,
-    2860
+    1550,
+    2000,
+    2450
   ],
   "disabledBoosters": [],
   "tutorialHint": "彩虹元素与条纹交换，可以清掉同色的全部元素"

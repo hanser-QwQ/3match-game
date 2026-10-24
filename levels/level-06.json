@@ -16,9 +16,9 @@
   },
   "moves": 23,
   "starThresholds": [
-    1950,
-    2590,
-    3190
+    1750,
+    2350,
+    2900
   ],
   "disabledBoosters": [],
   "tutorialHint": "连锁的倍率会一路涨到三倍，尽量制造连续消除"

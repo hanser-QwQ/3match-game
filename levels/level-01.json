@@ -15,9 +15,9 @@
   },
   "moves": 25,
   "starThresholds": [
+    1500,
     2100,
-    2775,
-    3450
+    2800
   ],
   "disabledBoosters": [],
   "tutorialHint": "交换相邻的两个元素，连成三个即可消除"

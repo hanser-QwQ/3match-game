@@ -54,11 +54,11 @@
       "amount": 14
     }
   },
-  "moves": 21,
+  "moves": 22,
   "starThresholds": [
-    1840,
-    2410,
-    3010
+    1600,
+    2150,
+    2700
   ],
   "disabledBoosters": [],
   "tutorialHint": "冰块与收集同时进行，注意角落里的冰"

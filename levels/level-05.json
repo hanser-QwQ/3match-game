@@ -16,9 +16,9 @@
   },
   "moves": 24,
   "starThresholds": [
-    2000,
-    2680,
-    3280
+    1800,
+    2400,
+    2950
   ],
   "disabledBoosters": [],
   "tutorialHint": "优先消除目标元素，边上留出的空位会带来连锁"

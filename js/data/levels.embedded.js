@@ -22,9 +22,9 @@ export const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
+      1500,
       2100,
-      2775,
-      3450
+      2800
     ],
     "disabledBoosters": [],
     "tutorialHint": "交换相邻的两个元素，连成三个即可消除"
@@ -46,9 +46,9 @@ export const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2100,
-      2775,
-      3450
+      1700,
+      2300,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "一次消除四个，会得到更强的条纹元素"
@@ -70,9 +70,9 @@ export const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2100,
-      2775,
-      3450
+      1900,
+      2450,
+      3050
     ],
     "disabledBoosters": [],
     "tutorialHint": "剩余的步数会在通关时折算成额外分数"
@@ -95,9 +95,9 @@ export const LEVELS = [
     },
     "moves": 24,
     "starThresholds": [
-      2000,
-      2680,
-      3280
+      1800,
+      2400,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "消除指定元素，累计到目标数量即可过关"
@@ -120,9 +120,9 @@ export const LEVELS = [
     },
     "moves": 24,
     "starThresholds": [
-      2000,
-      2680,
-      3280
+      1800,
+      2400,
+      2950
     ],
     "disabledBoosters": [],
     "tutorialHint": "优先消除目标元素，边上留出的空位会带来连锁"
@@ -145,9 +145,9 @@ export const LEVELS = [
     },
     "moves": 23,
     "starThresholds": [
-      1950,
-      2590,
-      3190
+      1750,
+      2350,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "连锁的倍率会一路涨到三倍，尽量制造连续消除"
@@ -170,9 +170,9 @@ export const LEVELS = [
     },
     "moves": 23,
     "starThresholds": [
-      1950,
-      2590,
-      3190
+      1750,
+      2350,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "元素种类变多，找准一处能连带的位置再动手"
@@ -202,9 +202,9 @@ export const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1700,
+      2250,
+      2800
     ],
     "disabledBoosters": [],
     "tutorialHint": "两个目标要同时完成，别只顾着堆分数"
@@ -251,9 +251,9 @@ export const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1650,
+      2200,
+      2750
     ],
     "disabledBoosters": [],
     "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"
@@ -308,9 +308,9 @@ export const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1650,
+      2200,
+      2750
     ],
     "disabledBoosters": [],
     "tutorialHint": "条纹元素可以整行或整列清除，用来破冰最有效"
@@ -333,9 +333,9 @@ export const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      2500,
-      3500,
-      4500
+      2000,
+      3000,
+      4000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -364,9 +364,9 @@ export const LEVELS = [
     },
     "moves": 22,
     "starThresholds": [
-      3000,
-      4200,
-      5500
+      2500,
+      3700,
+      4900
     ],
     "disabledBoosters": [],
     "rules": {
@@ -393,9 +393,9 @@ export const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      3000,
-      4200,
-      5500
+      2500,
+      3700,
+      4900
     ],
     "disabledBoosters": [],
     "rules": {
@@ -421,13 +421,13 @@ export const LEVELS = [
     },
     "goal": {
       "type": "clear_ice",
-      "amount": 18
+      "amount": 16
     },
     "moves": 25,
     "starThresholds": [
-      3000,
-      4500,
-      6000
+      2500,
+      3700,
+      5000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -450,13 +450,13 @@ export const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 3000
+      "amount": 2600
     },
     "moves": 22,
     "starThresholds": [
-      4000,
-      5500,
-      7000
+      2600,
+      3800,
+      5000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -525,11 +525,11 @@ export const LEVELS = [
         "amount": 14
       }
     },
-    "moves": 21,
+    "moves": 22,
     "starThresholds": [
-      1840,
-      2410,
-      3010
+      1600,
+      2150,
+      2700
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
@@ -592,9 +592,9 @@ export const LEVELS = [
     },
     "moves": 21,
     "starThresholds": [
-      1840,
-      2410,
-      3010
+      1600,
+      2150,
+      2700
     ],
     "disabledBoosters": [],
     "tutorialHint": "被困住的元素不能交换，先清掉它旁边的位置"
@@ -655,18 +655,18 @@ export const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "clear_ice",
-        "amount": 10
+        "amount": 9
       },
       "secondary": {
         "type": "score",
-        "amount": 2200
+        "amount": 1900
       }
     },
     "moves": 22,
     "starThresholds": [
-      1900,
-      2500,
-      3100
+      1750,
+      2300,
+      2900
     ],
     "disabledBoosters": [],
     "tutorialHint": "分数与破冰都要顾及，连锁能同时推进两者"
@@ -737,9 +737,9 @@ export const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1550,
+      2000,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "边缘的冰块更难触及，必要时用锤子敲开"
@@ -792,7 +792,7 @@ export const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2400
+        "amount": 2100
       },
       "secondary": {
         "type": "clear_ice",
@@ -801,9 +801,9 @@ export const LEVELS = [
     },
     "moves": 20,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1600,
+      2100,
+      2600
     ],
     "disabledBoosters": [],
     "tutorialHint": "步数只有二十步，每一步都要争取形成连锁"
@@ -862,14 +862,14 @@ export const LEVELS = [
       },
       "secondary": {
         "type": "clear_ice",
-        "amount": 8
+        "amount": 7
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1500,
+      2000,
+      2500
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块耐久翻倍，需要两次相邻消除才能敲开"
@@ -923,7 +923,7 @@ export const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2600
+        "amount": 1900
       },
       "secondary": {
         "type": "collect",
@@ -931,11 +931,11 @@ export const LEVELS = [
         "amount": 16
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1550,
+      2000,
+      2450
     ],
     "disabledBoosters": [],
     "tutorialHint": "彩虹元素与条纹交换，可以清掉同色的全部元素"
@@ -997,7 +997,7 @@ export const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "clear_ice",
-        "amount": 10
+        "amount": 9
       },
       "secondary": {
         "type": "collect",
@@ -1005,11 +1005,11 @@ export const LEVELS = [
         "amount": 15
       }
     },
-    "moves": 20,
+    "moves": 21,
     "starThresholds": [
-      1780,
-      2320,
-      2860
+      1500,
+      1950,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "先破中间的冰，棋盘的通路会顺畅很多"
@@ -1079,18 +1079,18 @@ export const LEVELS = [
       "type": "combo",
       "primary": {
         "type": "score",
-        "amount": 2600
+        "amount": 1850
       },
       "secondary": {
         "type": "clear_ice",
-        "amount": 12
+        "amount": 9
       }
     },
-    "moves": 19,
+    "moves": 20,
     "starThresholds": [
-      1720,
-      2230,
-      2740
+      1500,
+      1950,
+      2350
     ],
     "disabledBoosters": [],
     "tutorialHint": "道具不消耗步数，卡住的时候别硬撑"
@@ -1156,14 +1156,14 @@ export const LEVELS = [
       },
       "secondary": {
         "type": "score",
-        "amount": 2400
+        "amount": 1800
       }
     },
-    "moves": 18,
+    "moves": 19,
     "starThresholds": [
-      1650,
-      2140,
-      2620
+      1450,
+      1900,
+      2400
     ],
     "disabledBoosters": [],
     "tutorialHint": "最后一步之前，先算清剩余的冰与分数"

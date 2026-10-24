@@ -54,18 +54,18 @@
     "type": "combo",
     "primary": {
       "type": "clear_ice",
-      "amount": 10
+      "amount": 9
     },
     "secondary": {
       "type": "score",
-      "amount": 2200
+      "amount": 1900
     }
   },
   "moves": 22,
   "starThresholds": [
-    1900,
-    2500,
-    3100
+    1750,
+    2300,
+    2900
   ],
   "disabledBoosters": [],
   "tutorialHint": "分数与破冰都要顾及，连锁能同时推进两者"

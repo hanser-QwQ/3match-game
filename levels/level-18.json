@@ -55,7 +55,7 @@
     "type": "combo",
     "primary": {
       "type": "clear_ice",
-      "amount": 10
+      "amount": 9
     },
     "secondary": {
       "type": "collect",
@@ -63,11 +63,11 @@
       "amount": 15
     }
   },
-  "moves": 20,
+  "moves": 21,
   "starThresholds": [
-    1780,
-    2320,
-    2860
+    1500,
+    1950,
+    2400
   ],
   "disabledBoosters": [],
   "tutorialHint": "先破中间的冰，棋盘的通路会顺畅很多"

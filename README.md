@@ -34,6 +34,7 @@ A zero-dependency, offline-capable match-3 puzzle built with vanilla JavaScript 
 | 结算 | 达成目标后**不会强制结束**：可以继续消除把分数做高，也可以随时结算并领取剩余步数奖励 |
 | 道具 | 洗牌、锤子、加三步；每关三种道具共用 2 次使用机会 |
 | 关卡 | 20 关，逐关解锁，按分数评 1–3 星，只记录更高星级与更高分 |
+| 关卡开始 | 进入时弹窗显示通关目标、步数与 1/2/3 星分数线；EX 关额外显示追加机制 |
 
 计分：每个元素 10 分 × 连锁倍率，触发特殊元素额外 50 分；通关时每剩余一步 100 分。
 
@@ -83,7 +84,7 @@ js/presentation/            Canvas 渲染、输入、无障碍、场景、成绩
 levels/level-01..20.json    关卡数据（唯一数据源）
 dist/三消小径.html          单文件构建产物
 tests/domain.test.mjs       领域层单元测试
-tools/                      关卡生成与单文件打包脚本
+tools/                      关卡生成、平衡模拟与单文件打包脚本
 assets/screenshots/         README 截图
 ```
 

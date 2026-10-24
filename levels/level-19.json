@@ -63,18 +63,18 @@
     "type": "combo",
     "primary": {
       "type": "score",
-      "amount": 2600
+      "amount": 1850
     },
     "secondary": {
       "type": "clear_ice",
-      "amount": 12
+      "amount": 9
     }
   },
-  "moves": 19,
+  "moves": 20,
   "starThresholds": [
-    1720,
-    2230,
-    2740
+    1500,
+    1950,
+    2350
   ],
   "disabledBoosters": [],
   "tutorialHint": "道具不消耗步数，卡住的时候别硬撑"

@@ -15,9 +15,9 @@
   },
   "moves": 25,
   "starThresholds": [
-    2100,
-    2775,
-    3450
+    1700,
+    2300,
+    2950
   ],
   "disabledBoosters": [],
   "tutorialHint": "一次消除四个，会得到更强的条纹元素"

@@ -59,14 +59,14 @@
     },
     "secondary": {
       "type": "score",
-      "amount": 2400
+      "amount": 1800
     }
   },
-  "moves": 18,
+  "moves": 19,
   "starThresholds": [
-    1650,
-    2140,
-    2620
+    1450,
+    1900,
+    2400
   ],
   "disabledBoosters": [],
   "tutorialHint": "最后一步之前，先算清剩余的冰与分数"

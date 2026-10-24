@@ -23,9 +23,9 @@
   },
   "moves": 22,
   "starThresholds": [
-    1900,
-    2500,
-    3100
+    1700,
+    2250,
+    2800
   ],
   "disabledBoosters": [],
   "tutorialHint": "两个目标要同时完成，别只顾着堆分数"

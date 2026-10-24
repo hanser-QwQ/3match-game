@@ -16,9 +16,9 @@
   },
   "moves": 24,
   "starThresholds": [
-    2000,
-    2680,
-    3280
+    1800,
+    2400,
+    2950
   ],
   "disabledBoosters": [],
   "tutorialHint": "消除指定元素，累计到目标数量即可过关"
