@@ -317,6 +317,17 @@ export function planSpecialSwap(board, a, b, rng) {
     return { cells: seeds, combo: 'rainbow+normal' };
   }
 
+  /*
+   * EX-1 升阶：两个条纹交换不再清整行整列，而是合成一个彩虹。
+   * 这是该关稳定获得彩虹的路径：四连做条纹，两个条纹换在一起升阶。
+   * 返回 upgradeRainbow 由应用层执行“一个变彩虹、另一个降为普通元素”。
+   */
+  const stripeA = sa === SPECIAL.STRIPE_H || sa === SPECIAL.STRIPE_V;
+  const stripeB = sb === SPECIAL.STRIPE_H || sb === SPECIAL.STRIPE_V;
+  if (stripeA && stripeB && board.rules?.stripePairToRainbow) {
+    return { cells: [], combo: 'stripe+stripe->rainbow', upgradeRainbow: true };
+  }
+
   if (sa && sb) {
     // 条纹 + 条纹：整行与整列；炸弹 + 炸弹：两块 3×3 叠加；炸弹 + 条纹：3×3 加一整行
     return { cells: [{ r: a.r, c: a.c }, { r: b.r, c: b.c }], combo: `${sa}+${sb}` };

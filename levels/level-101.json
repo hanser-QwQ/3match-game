@@ -23,9 +23,7 @@
   "disabledBoosters": [],
   "rules": {
     "moveTimeLimit": 7,
-    "stripeThreshold": 5,
-    "rainbowThreshold": 6,
-    "reduceBombStructures": true
+    "stripePairToRainbow": true
   },
-  "tutorialHint": "三连即可消除，但需要 5 连才能生成条纹，6 连才能生成彩虹"
+  "tutorialHint": "两个条纹交换可以合成为彩虹，合成的彩虹会留在棋盘上"
 }

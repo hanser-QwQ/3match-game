@@ -10,7 +10,7 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { BOOSTERS, SESSION_STATE, SCENE, SCORE } from '../core/constants.js';
+import { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL } from '../core/constants.js';
 import { Board } from '../domain/board.js';
 import { createBoard } from '../domain/boardFactory.js';
 import { isAdjacent, isValidSwap, planSpecialSwap } from '../domain/matchEngine.js';
@@ -65,8 +65,52 @@ export class GameController {
     if (snap && (!this.levels.get(snap.levelId) || this.levels.get(snap.levelId).hidden)) {
       this.save.interruptedSession = null;
     }
+    this.recalculateStars();
     this.applySettings();
     return this.save;
+  }
+
+  /**
+   * 星级阈值调整后的存档修复。
+   *
+   * 用玩家的历史最高分按当前阈值重新判定星级，只升不降：
+   * - 本轮调整都是降低难度，已通关的玩家不应因为旧阈值而少星；
+   * - 未通关的关卡不动；
+   * - 星级阈值非法时跳过该关。
+   */
+  recalculateStars() {
+    let changed = false;
+    const judge = (score, level) => {
+      const stars = judgeStars(score, level.starThresholds);
+      return stars < 0 ? null : Math.max(1, stars);
+    };
+
+    for (const [id, p] of Object.entries(this.save.progress || {})) {
+      if (!p?.cleared) continue;
+      const level = this.levels.get(id);
+      if (!level?.valid || !Array.isArray(level.starThresholds)) continue;
+      const earned = judge(Math.max(0, Number(p.highScore) || 0), level);
+      if (earned !== null && earned > (Number(p.stars) || 0)) {
+        p.stars = earned;
+        changed = true;
+      }
+    }
+
+    for (const item of this.save.localBest || []) {
+      const level = this.levels.get(item.levelId);
+      if (!level?.valid || !Array.isArray(level.starThresholds)) continue;
+      const progress = this.save.progress?.[String(item.levelId)];
+      const score = Math.max(0, Number(item.score) || 0, Number(progress?.highScore) || 0);
+      if (!score) continue;
+      const earned = judge(score, level);
+      if (earned !== null && earned > (Number(item.stars) || 0)) {
+        item.stars = earned;
+        changed = true;
+      }
+    }
+
+    if (changed) this.storage.write(this.save);
+    return changed;
   }
 
   /**
@@ -411,6 +455,23 @@ export class GameController {
     this.setBusy(true);
     try {
       const effect = planSpecialSwap(s.board, from, to, this.rng);
+      if (effect?.upgradeRainbow) {
+        // EX-1 升阶：两个条纹合成一个彩虹，另一个降为普通元素
+        this.audio.play('special');
+        await this.renderer?.playSpecialSwap(from, to, effect.combo);
+        s.board.swap(from, to);
+        s.board.setType(to.r, to.c, s.board.typeAt(to.r, to.c), SPECIAL.RAINBOW);
+        s.board.setType(from.r, from.c, s.board.typeAt(from.r, from.c));
+        s.spendMove();
+        s.pendingFreeze = true;
+        this.renderer?.syncBoard(s.board);
+        this.toast('两个条纹合成为彩虹', 'good');
+        this.emitSession();
+        // 降为普通元素后如果顺势形成了连线，正常结算掉，避免棋盘上留下现成三连
+        await this.runCascade({ preferred: [from, to] });
+        await this.afterMove();
+        return { ok: true };
+      }
       if (effect) {
         this.audio.play('special');
         await this.renderer.playSpecialSwap(from, to, effect.combo);

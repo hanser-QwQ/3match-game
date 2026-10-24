@@ -115,6 +115,17 @@ export function resolveCascade(board, options = {}) {
       board.recordSpecialGenerated(plan.special);
       // EX-5 节律（保留规则）：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
       if (specialCycle) board.applySpecialCreationRule(plan.r, plan.c);
+
+      /*
+       * 特殊方块落点会被排除在消除范围之外，但它仍然属于本次匹配。
+       * 如果只按 clearMap 统计相邻冰块，落点旁边的冰块就会漏掉一次削减。
+       * 这里补记落点四邻的冰块，保证“在冰块旁边生成特殊方块”也能正常破冰。
+       */
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const rr = plan.r + dr;
+        const cc = plan.c + dc;
+        if (board.inside(rr, cc) && board.iceAt(rr, cc) > 0) iceHits.add(key(rr, cc));
+      }
     }
     specialsCreated += plans.length;
 

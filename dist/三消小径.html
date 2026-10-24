@@ -1390,7 +1390,7 @@ body {
         <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.5.2</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.6.0</button>
     </div>
   </section>
 
@@ -3177,6 +3177,17 @@ function planSpecialSwap(board, a, b, rng) {
     return { cells: seeds, combo: 'rainbow+normal' };
   }
 
+  /*
+   * EX-1 升阶：两个条纹交换不再清整行整列，而是合成一个彩虹。
+   * 这是该关稳定获得彩虹的路径：四连做条纹，两个条纹换在一起升阶。
+   * 返回 upgradeRainbow 由应用层执行“一个变彩虹、另一个降为普通元素”。
+   */
+  const stripeA = sa === SPECIAL.STRIPE_H || sa === SPECIAL.STRIPE_V;
+  const stripeB = sb === SPECIAL.STRIPE_H || sb === SPECIAL.STRIPE_V;
+  if (stripeA && stripeB && board.rules?.stripePairToRainbow) {
+    return { cells: [], combo: 'stripe+stripe->rainbow', upgradeRainbow: true };
+  }
+
   if (sa && sb) {
     // 条纹 + 条纹：整行与整列；炸弹 + 炸弹：两块 3×3 叠加；炸弹 + 条纹：3×3 加一整行
     return { cells: [{ r: a.r, c: a.c }, { r: b.r, c: b.c }], combo: `${sa}+${sb}` };
@@ -3652,6 +3663,17 @@ function resolveCascade(board, options = {}) {
       board.recordSpecialGenerated(plan.special);
       // EX-5 节律（保留规则）：如果该类型本轮已经用过，新生成的方块一出生就是冰冻状态
       if (specialCycle) board.applySpecialCreationRule(plan.r, plan.c);
+
+      /*
+       * 特殊方块落点会被排除在消除范围之外，但它仍然属于本次匹配。
+       * 如果只按 clearMap 统计相邻冰块，落点旁边的冰块就会漏掉一次削减。
+       * 这里补记落点四邻的冰块，保证“在冰块旁边生成特殊方块”也能正常破冰。
+       */
+      for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const rr = plan.r + dr;
+        const cc = plan.c + dc;
+        if (board.inside(rr, cc) && board.iceAt(rr, cc) > 0) iceHits.add(key(rr, cc));
+      }
     }
     specialsCreated += plans.length;
 
@@ -4133,7 +4155,7 @@ __modules["js/application/gameController.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { BOOSTERS, SESSION_STATE, SCENE, SCORE } = __req("js/core/constants.js");
+const { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL } = __req("js/core/constants.js");
 const { Board } = __req("js/domain/board.js");
 const { createBoard } = __req("js/domain/boardFactory.js");
 const { isAdjacent, isValidSwap, planSpecialSwap } = __req("js/domain/matchEngine.js");
@@ -4188,8 +4210,52 @@ class GameController {
     if (snap && (!this.levels.get(snap.levelId) || this.levels.get(snap.levelId).hidden)) {
       this.save.interruptedSession = null;
     }
+    this.recalculateStars();
     this.applySettings();
     return this.save;
+  }
+
+  /**
+   * 星级阈值调整后的存档修复。
+   *
+   * 用玩家的历史最高分按当前阈值重新判定星级，只升不降：
+   * - 本轮调整都是降低难度，已通关的玩家不应因为旧阈值而少星；
+   * - 未通关的关卡不动；
+   * - 星级阈值非法时跳过该关。
+   */
+  recalculateStars() {
+    let changed = false;
+    const judge = (score, level) => {
+      const stars = judgeStars(score, level.starThresholds);
+      return stars < 0 ? null : Math.max(1, stars);
+    };
+
+    for (const [id, p] of Object.entries(this.save.progress || {})) {
+      if (!p?.cleared) continue;
+      const level = this.levels.get(id);
+      if (!level?.valid || !Array.isArray(level.starThresholds)) continue;
+      const earned = judge(Math.max(0, Number(p.highScore) || 0), level);
+      if (earned !== null && earned > (Number(p.stars) || 0)) {
+        p.stars = earned;
+        changed = true;
+      }
+    }
+
+    for (const item of this.save.localBest || []) {
+      const level = this.levels.get(item.levelId);
+      if (!level?.valid || !Array.isArray(level.starThresholds)) continue;
+      const progress = this.save.progress?.[String(item.levelId)];
+      const score = Math.max(0, Number(item.score) || 0, Number(progress?.highScore) || 0);
+      if (!score) continue;
+      const earned = judge(score, level);
+      if (earned !== null && earned > (Number(item.stars) || 0)) {
+        item.stars = earned;
+        changed = true;
+      }
+    }
+
+    if (changed) this.storage.write(this.save);
+    return changed;
   }
 
   /**
@@ -4534,6 +4600,23 @@ class GameController {
     this.setBusy(true);
     try {
       const effect = planSpecialSwap(s.board, from, to, this.rng);
+      if (effect?.upgradeRainbow) {
+        // EX-1 升阶：两个条纹合成一个彩虹，另一个降为普通元素
+        this.audio.play('special');
+        await this.renderer?.playSpecialSwap(from, to, effect.combo);
+        s.board.swap(from, to);
+        s.board.setType(to.r, to.c, s.board.typeAt(to.r, to.c), SPECIAL.RAINBOW);
+        s.board.setType(from.r, from.c, s.board.typeAt(from.r, from.c));
+        s.spendMove();
+        s.pendingFreeze = true;
+        this.renderer?.syncBoard(s.board);
+        this.toast('两个条纹合成为彩虹', 'good');
+        this.emitSession();
+        // 降为普通元素后如果顺势形成了连线，正常结算掉，避免棋盘上留下现成三连
+        await this.runCascade({ preferred: [from, to] });
+        await this.afterMove();
+        return { ok: true };
+      }
       if (effect) {
         this.audio.play('special');
         await this.renderer.playSpecialSwap(from, to, effect.combo);
@@ -6522,13 +6605,22 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.5.2';
+const APP_VERSION = '1.6.0';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.6.0',
+    date: '2026-10-24',
+    notes: [
+      'EX-1 重做为“两个条纹交换合成彩虹”：合成的彩虹会留在棋盘上，可继续用于清除同色元素',
+      '修复在冰块旁边生成特殊方块时，冰块没有削减的问题',
+      '按历史最高分重新判定星级，已通关的关卡不会因本轮难度下调而少星',
+    ],
+  },
   {
     version: '1.5.2',
     date: '2026-10-24',
@@ -8049,11 +8141,9 @@ const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "stripeThreshold": 5,
-      "rainbowThreshold": 6,
-      "reduceBombStructures": true
+      "stripePairToRainbow": true
     },
-    "tutorialHint": "三连即可消除，但需要 5 连才能生成条纹，6 连才能生成彩虹"
+    "tutorialHint": "两个条纹交换可以合成为彩虹，合成的彩虹会留在棋盘上"
   },
   {
     "schemaVersion": 1,

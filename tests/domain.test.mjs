@@ -249,6 +249,21 @@ test('冰块：相邻消除削减耐久，耐久归零后冰块消失', () => {
   assert.equal(board.iceAt(0, 3), 0);
 });
 
+test('冰块：特殊方块落点旁边的冰块也会削减耐久', () => {
+  const board = makeBoard([
+    'BCDEA',
+    'CDEAB',
+    'AAAAB',
+    'DEABC',
+  ]);
+  // 只与四连的特殊方块落点 (2,2) 相邻，不与其它被消除格相邻
+  board.setIce(1, 2, 1);
+  const res = resolveCascade(board, { rng: rng(21) });
+  assert.ok(res.specialsCreated >= 1, '四连应生成特殊方块');
+  assert.ok(res.iceCleared >= 1, '落点旁边的冰块应被削减');
+  assert.equal(board.iceAt(1, 2), 0);
+});
+
 test('死局检测：识别无可行交换的棋盘', () => {
   const dead = makeBoard([
     'ABCDEF',
@@ -357,6 +372,88 @@ test('EX-4：双层冰需要两次相邻消除才会消失', () => {
   const res = resolveCascade(board, { rng: rng(9) });
   assert.equal(res.iceCleared, 0, '第一次相邻消除只削减一层冰，不计入清除');
   assert.equal(board.iceAt(0, 3), 1, '双层冰应还剩一层');
+});
+
+test('EX-1 升阶：两个条纹交换合成为彩虹', () => {
+  const board = new Board(4, 4, 5);
+  board.setType(1, 1, 0, SPECIAL.STRIPE_H);
+  board.setType(1, 2, 1, SPECIAL.STRIPE_V);
+  board.rules = { stripePairToRainbow: true };
+
+  const upgrade = planSpecialSwap(board, { r: 1, c: 1 }, { r: 1, c: 2 }, null);
+  assert.equal(upgrade.upgradeRainbow, true, '开启规则时应返回彩虹升阶');
+  assert.equal(upgrade.combo, 'stripe+stripe->rainbow');
+
+  // 没有该规则时仍走普通的条纹 + 条纹组合
+  board.rules = {};
+  const normal = planSpecialSwap(board, { r: 1, c: 1 }, { r: 1, c: 2 }, null);
+  assert.equal(normal.upgradeRainbow, undefined);
+  assert.equal(normal.combo, 'stripe_h+stripe_v');
+});
+
+test('EX-1 升阶：交换两个条纹后，一个变彩虹、另一个降为普通元素', async () => {
+  const level = {
+    levelId: 101,
+    name: 'EX-1 升阶',
+    isEx: true,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 100 },
+    board: { rows: 8, cols: 8, elementTypes: 5, iceCells: [], blockedCells: [] },
+    rules: { stripePairToRainbow: true },
+    disabledBoosters: [],
+  };
+  const renderer = {
+    setBoard() {},
+    setHint() {},
+    setInputLocked() {},
+    setArmedTarget() {},
+    syncBoard() {},
+    async playSpecialSwap() {},
+    async playSwap() {},
+    async playStep() {},
+    async playReshuffle() {},
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: (id) => (Number(id) === 101 ? level : null), playable: () => [level] },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer,
+    tutorial: null,
+    rng: new RandomSource(7),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    interruptedSession: null,
+    localBest: [],
+    player: { totalScore: 0 },
+  };
+
+  assert.equal(controller.startLevel(101, { resume: false }), true);
+  const s = controller.session;
+  const keep = findAnyValidMove(s.board);
+  const used = new Set(keep ? [`${keep.a.r},${keep.a.c}`, `${keep.b.r},${keep.b.c}`] : []);
+  const pairs = [
+    [{ r: 7, c: 6 }, { r: 7, c: 7 }],
+    [{ r: 0, c: 0 }, { r: 0, c: 1 }],
+    [{ r: 7, c: 0 }, { r: 7, c: 1 }],
+    [{ r: 0, c: 6 }, { r: 0, c: 7 }],
+  ];
+  const [a, b] = pairs.find(([p, q]) => !used.has(`${p.r},${p.c}`) && !used.has(`${q.r},${q.c}`)) || pairs[0];
+  s.board.setType(a.r, a.c, 0, SPECIAL.STRIPE_H);
+  s.board.setType(b.r, b.c, 1, SPECIAL.STRIPE_V);
+
+  const res = await controller.handleSwap(a, b);
+  assert.equal(res.ok, true);
+  assert.equal(s.board.specialAt(b.r, b.c), SPECIAL.RAINBOW, '目标格应变成彩虹');
+  assert.equal(s.board.specialAt(a.r, a.c), null, '另一个条纹应降为普通元素');
+  assert.equal(s.movesLeft, 19, '合成彩虹消耗一步');
+  assert.equal(s.turnCount, 1, '合成应计入一次操作');
 });
 
 test('EX-5 限量：特殊方块按类型配额生成，配额用完后不再生成', () => {
@@ -642,6 +739,40 @@ test('续玩：加三步后的剩余步数与总步数都不会被截回初始�
   assert.equal(controller.session.movesLeft, 23, '续玩后剩余步数应保留加三步的加成');
   assert.equal(controller.session.movesTotal, 23, '续玩后总步数应保留加三步的加成');
   assert.equal(controller.session.boosterUsage.addMoves, 1, '道具使用次数也应被恢复');
+});
+
+test('存档迁移：按历史最高分重算星级，只升不降', () => {
+  const levelMap = new Map([
+    [1, { levelId: 1, valid: true, starThresholds: [1500, 2100, 2800] }],
+    [2, { levelId: 2, valid: true, starThresholds: [2000, 3000, 4000] }],
+  ]);
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: (id) => levelMap.get(Number(id)) || null, playable: () => [...levelMap.values()] },
+    audio: { setEnabled() {}, setVolume() {} },
+    renderer: null,
+    tutorial: null,
+    rng: null,
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {
+      1: { cleared: true, stars: 1, highScore: 2200 },
+      2: { cleared: true, stars: 3, highScore: 1000 },
+      3: { cleared: false, stars: 3, highScore: 9999 },
+    },
+    localBest: [{ levelId: 1, score: 2200, stars: 1 }],
+  };
+
+  assert.equal(controller.recalculateStars(), true);
+  assert.equal(controller.save.progress[1].stars, 2, '2200 分按新阈值应升到 2 星');
+  assert.equal(controller.save.progress[2].stars, 3, '旧星级更高时保留 3 星');
+  assert.equal(controller.save.progress[3].stars, 3, '未通关关卡不参与重算');
+  assert.equal(controller.save.localBest[0].stars, 2, '本地成绩的星级也应同步');
+
+  assert.equal(controller.recalculateStars(), false, '第二次重算不应再产生变化');
 });
 
 test('EX 计时：进入关卡先待开始，第一次操作后才启动，重开清除旧暂停状态', () => {
