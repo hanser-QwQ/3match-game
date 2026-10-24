@@ -834,6 +834,31 @@ body {
 .overlay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
 .overlay-row .btn { font-size: 14px; }
 
+.ex-intro-card { max-width: 350px; }
+.ex-intro-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--warm);
+}
+.ex-intro-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink-2);
+  text-align: left;
+}
+.ex-intro-timer {
+  margin: 0 0 18px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  text-align: left;
+}
+
 .share-card { max-width: 380px; }
 
 .share-preview {
@@ -1304,7 +1329,7 @@ body {
         <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.5.0</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.5.1</button>
     </div>
   </section>
 
@@ -1401,6 +1426,17 @@ body {
         <button class="btn btn-ghost" id="btn-quit">返回关卡</button>
       </div>
       <button class="btn btn-ghost btn-block" id="btn-pause-home">返回首页</button>
+    </div>
+  </div>
+
+  <!-- ============================ EX 关追加机制弹窗 ============================ -->
+  <div id="ex-intro" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ex-intro-title">
+    <div class="overlay-card ex-intro-card">
+      <p class="ex-intro-kicker">EX 关卡追加机制</p>
+      <h2 id="ex-intro-title">EX-1</h2>
+      <p class="ex-intro-text" id="ex-intro-text"></p>
+      <p class="ex-intro-timer" id="ex-intro-timer"></p>
+      <button class="btn btn-primary" id="btn-ex-start">知道了，开始挑战</button>
     </div>
   </div>
 
@@ -4041,12 +4077,18 @@ class GameController {
     this.save = createDefaultSave();
     this.session = null;
     this.busy = false;
+    // EX 追加机制弹窗打开时锁住棋盘输入（键盘路径也要拦）
+    this.introOpen = false;
     this.boosterArmed = null;
     this.storageDegraded = false;
     this.sessionCounter = 0;
     this._moveTimer = null;
     this._moveRemaining = 0;
     this._moveLastTick = 0;
+    // 首次操作（交换或道具）完成后才启动单步计时，避免进入/重开时计时器空转
+    this._moveTimerStarted = false;
+    this._pausedTimer = false;
+    this.pendingPause = false;
   }
 
   async boot() {
@@ -4197,10 +4239,12 @@ class GameController {
 
     this.session = new GameSession({ level, board, resumed });
     this.sessionCounter += 1;
+    this.introOpen = false;
     this.boosterArmed = null;
     this.renderer?.setBoard(board);
     this.renderer?.setHint(this.suggestMove());
-    this._resetMoveTimer();
+    // 进入 / 续玩 / 重开：计时器先停在满时间，等玩家完成第一次操作后再启动
+    this._prepareMoveTimer();
     this.navigate(SCENE.GAME);
     this.emitSession();
     return true;
@@ -4272,6 +4316,8 @@ class GameController {
         this.emitSession();
       }, 12000);
       this._stopMoveTimer();
+      // 立即刷新一次，让道具按钮在结算期间马上置灰，避免“点了没反应”
+      this.emitSession();
     } else {
       clearTimeout(this._busyTimer);
       if (this.pendingPause) {
@@ -4279,6 +4325,8 @@ class GameController {
         this.pause();
       } else {
         this._startMoveTimer();
+        // 解锁后刷新一次，让道具按钮从“结算中”恢复为可点击
+        this.emitSession();
       }
     }
   }
@@ -4291,6 +4339,8 @@ class GameController {
   _startMoveTimer() {
     const limit = this._moveTimeLimitMs();
     if (!limit) return;
+    // 首次操作之前不计时，避免进入关卡或重开时计时器先跑起来
+    if (!this._moveTimerStarted) return;
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy || this._pausedTimer) return;
     this._stopMoveTimer();
@@ -4318,9 +4368,23 @@ class GameController {
 
   _resetMoveTimer() {
     this._stopMoveTimer();
+    this._moveTimerStarted = true;
+    this._pausedTimer = false;
     const limit = this._moveTimeLimitMs();
     this._moveRemaining = limit;
     this._startMoveTimer();
+  }
+
+  /**
+   * 进入 / 续玩 / 重开时的计时器状态：停在满时间，但不启动。
+   * 第一次操作完成后再由 _resetMoveTimer() 正式开跑。
+   */
+  _prepareMoveTimer() {
+    this._stopMoveTimer();
+    this._moveTimerStarted = false;
+    this._pausedTimer = false;
+    this.pendingPause = false;
+    this._moveRemaining = this._moveTimeLimitMs();
   }
 
   _tickMoveTimer() {
@@ -4364,13 +4428,11 @@ class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false, error: 'STATE_MISMATCH' };
     if (!from || !to || !isAdjacent(from, to)) return { ok: false, error: 'INVALID_COORD' };
-    this._stopMoveTimer();
 
     // EX-5 节律：已使用的特殊方块被冻住，禁止移动且无提示
     if (s.board.rules?.specialCycle) {
       const frozen = (r, c) => s.board.specialAt(r, c) && s.board.isSpecialFrozen(r, c);
       if (frozen(from.r, from.c) || frozen(to.r, to.c)) {
-        this._startMoveTimer();
         return { ok: false, error: 'FROZEN_SPECIAL' };
       }
     }
@@ -4380,6 +4442,8 @@ class GameController {
       return { ok: false, error: 'BLOCKED' };
     }
 
+    // 只有真正会执行的交换才暂停计时，非法点击不打断思考时间
+    this._stopMoveTimer();
     this.setBusy(true);
     try {
       const effect = planSpecialSwap(s.board, from, to, this.rng);
@@ -4465,9 +4529,10 @@ class GameController {
       reshuffle(s.board, this.rng);
       await this.renderer.playReshuffle(s.board);
     }
+    // 先重置并启动下一次思考的计时，再落盘与刷新，界面能立刻显示满时间
+    this._resetMoveTimer();
     this.saveSession();
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
-    this._resetMoveTimer();
   }
 
   /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
@@ -4689,7 +4754,7 @@ class GameController {
 
   armBooster(id) {
     const s = this.session;
-    if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false };
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
@@ -4753,6 +4818,8 @@ class GameController {
         await this.runCascade({ initialCells: [target] });
         await this.afterMove();
       }
+      // 使用道具后重置思考时间，避免刚用完道具就被计时器逼着走
+      this._resetMoveTimer();
       this.renderer?.setHint(null);
       this.emitSession();
       return { ok: true };
@@ -4799,13 +4866,15 @@ class GameController {
         usedTotal,
         limit,
         disabled: (s.level.disabledBoosters || []).includes(def.id),
-        available: check.ok,
+        // 结算动画期间也置灰，避免玩家点了却没有反应
+        available: check.ok && !this.busy,
         armed: this.boosterArmed === def.id,
         reason: check.message || '',
       };
     });
     return {
       scene: SCENE.GAME,
+      sessionId: this.sessionCounter,
       level: s.level,
       levelId: s.level.levelId,
       levelName: s.level.name,
@@ -4827,7 +4896,11 @@ class GameController {
       save: this.save,
       chainBest: s.chainBest,
       moveTimer: this._moveTimeLimitMs()
-        ? { limit: this._moveTimeLimitMs(), remaining: Math.max(0, Math.round(this._moveRemaining)) }
+        ? {
+          limit: this._moveTimeLimitMs(),
+          remaining: Math.max(0, Math.round(this._moveRemaining)),
+          started: this._moveTimerStarted,
+        }
         : null,
     };
   }
@@ -5979,7 +6052,7 @@ class InputController {
 
   get locked() {
     const s = this.controller.session;
-    return this.controller.busy || !s || s.state !== 'in_progress';
+    return this.controller.busy || this.controller.introOpen || !s || s.state !== 'in_progress';
   }
 
   clearSelection() {
@@ -5995,6 +6068,8 @@ class InputController {
 
     const session = this.controller.session;
     if (!session || session.state !== 'in_progress') return;
+    // EX 追加机制弹窗打开时，弹窗会挡住画布；这里再兜底一次
+    if (this.controller.introOpen) return;
 
     /*
      * 连锁结算动画期间只更新选中格，不消费这次点击。
@@ -6072,7 +6147,7 @@ class InputController {
       return;
     }
 
-    if (s.state !== 'in_progress' || this.controller.busy) return;
+    if (s.state !== 'in_progress' || this.controller.busy || this.controller.introOpen) return;
 
     const cursor = this.renderer.cursor || { r: 0, c: 0 };
     const moves = {
@@ -6360,13 +6435,23 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.5.1';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.5.1',
+    date: '2026-10-24',
+    notes: [
+      'EX 关进入时会弹出追加机制说明，首次进入、续玩和重开都能看到本关的特殊规则',
+      'EX 关单步计时改为首次操作后启动，之后每次操作结束重新计时，使用道具也会重置时间',
+      '修复重新开始 EX 关后计时器有时不启动的问题',
+      '优化 EX 关道具按钮的响应，结算动画期间不再出现点击没有反应的情况',
+    ],
+  },
   {
     version: '1.5.0',
     date: '2026-10-23',
@@ -6507,6 +6592,10 @@ class SceneManager {
     this.current = null;
     this.lastResult = null;
     this.lastScore = -1;
+    // 记录已经弹过追加机制说明的会话，避免同一局重复弹出
+    this.exIntroSessionId = null;
+    // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
+    this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
     this.tutorialStep = null;
     // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
@@ -6560,6 +6649,11 @@ class SceneManager {
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
+      exIntro: $('ex-intro'),
+      exIntroTitle: $('ex-intro-title'),
+      exIntroText: $('ex-intro-text'),
+      exIntroTimer: $('ex-intro-timer'),
+      btnExStart: $('btn-ex-start'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -6635,6 +6729,12 @@ class SceneManager {
     document.getElementById('btn-resume').addEventListener('click', () => {
       this.audio.play('button');
       c.resume();
+    });
+
+    this.el.btnExStart?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.hideExIntro();
+      this.el.btnExStart.blur();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -6918,6 +7018,7 @@ class SceneManager {
       } else s.classList.remove('active');
     });
     this.current = scene;
+    if (scene !== SCENE.GAME) this.hideExIntro();
 
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
@@ -6937,7 +7038,27 @@ class SceneManager {
     }
   }
 
+  /** EX 关卡进入时的追加机制说明 */
+  showExIntro(level) {
+    if (!this.el.exIntro || !level) return;
+    this.controller.introOpen = true;
+    this.el.exIntroTitle.textContent = level.name || 'EX 关卡';
+    this.el.exIntroText.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
+    const limit = level.rules?.moveTimeLimit;
+    this.el.exIntroTimer.textContent = limit
+      ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
+      : '本关没有单步时间限制。';
+    this.el.exIntro.classList.remove('hidden');
+    this.el.btnExStart?.focus({ preventScroll: true });
+  }
+
+  hideExIntro() {
+    this.controller.introOpen = false;
+    this.el.exIntro?.classList.add('hidden');
+  }
+
   showPause() {
+    this.hideExIntro();
     this.el.pause.classList.remove('hidden');
     this.el.tutorial.classList.add('hidden');
   }
@@ -6980,6 +7101,12 @@ class SceneManager {
     if (!vm || !vm.board) return;
     if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
 
+    // 每次进入 EX 关（首次进入 / 续玩 / 重开）弹一次追加机制说明
+    if (vm.level?.isEx && this.exIntroSessionId !== vm.sessionId) {
+      this.exIntroSessionId = vm.sessionId;
+      this.showExIntro(vm.level);
+    }
+
     this.el.levelName.textContent = vm.levelId >= 100
       ? vm.levelName
       : `第 ${vm.levelId} 关 · ${vm.levelName}`;
@@ -7017,25 +7144,42 @@ class SceneManager {
       this.el.goalTasks.appendChild(chip);
     }
 
-    this.el.boosterBar.textContent = '';
+    /*
+     * 道具按钮只创建一次，之后原地更新文本与禁用状态。
+     * EX 关的计时器每 100ms 触发一次 emitSession，如果每次都重建按钮，
+     * 玩家按下与松开之间按钮被替换，click 事件就会丢失，表现为“点不动”。
+     */
+    const seen = new Set();
     for (const b of vm.boosters) {
-      const btn = document.createElement('button');
-      btn.className = 'booster' + (b.armed ? ' armed' : '');
-      btn.dataset.booster = b.id;
+      seen.add(b.id);
+      let btn = this.boosterButtons.get(b.id);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.className = 'booster';
+        btn.dataset.booster = b.id;
+        const count = document.createElement('span');
+        count.className = 'b-count';
+        const name = document.createElement('span');
+        name.className = 'b-name';
+        name.textContent = b.name;
+        const limit = document.createElement('span');
+        limit.className = 'b-limit';
+        btn.append(count, name, limit);
+        this.boosterButtons.set(b.id, btn);
+        this.el.boosterBar.appendChild(btn);
+      }
+      btn.classList.toggle('armed', Boolean(b.armed));
       btn.disabled = !b.available && !b.armed;
       btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
-      const count = document.createElement('span');
-      count.className = 'b-count';
       // 三种道具共用次数池，三张卡显示同一个剩余次数
-      count.textContent = String(b.count);
-      const name = document.createElement('span');
-      name.className = 'b-name';
-      name.textContent = b.name;
-      const limit = document.createElement('span');
-      limit.className = 'b-limit';
-      limit.textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
-      btn.append(count, name, limit);
-      this.el.boosterBar.appendChild(btn);
+      btn.querySelector('.b-count').textContent = String(b.count);
+      btn.querySelector('.b-limit').textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
+    }
+    for (const [id, btn] of this.boosterButtons) {
+      if (!seen.has(id)) {
+        btn.remove();
+        this.boosterButtons.delete(id);
+      }
     }
 
     this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
@@ -7045,11 +7189,13 @@ class SceneManager {
       const hasTimer = Boolean(vm.moveTimer);
       this.el.moveTimer.classList.toggle('hidden', !hasTimer);
       if (hasTimer) {
+        const started = vm.moveTimer.started !== false;
         const pct = vm.moveTimer.limit > 0 ? (vm.moveTimer.remaining / vm.moveTimer.limit) * 100 : 0;
-        const secs = (vm.moveTimer.remaining / 1000).toFixed(1);
         this.el.moveTimerFill.style.width = `${Math.max(0, pct)}%`;
-        this.el.moveTimerFill.classList.toggle('low', pct <= 30);
-        this.el.moveTimerText.textContent = `${secs}s`;
+        this.el.moveTimerFill.classList.toggle('low', started && pct <= 30);
+        this.el.moveTimerText.textContent = started
+          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s`
+          : '待开始';
       }
     }
 

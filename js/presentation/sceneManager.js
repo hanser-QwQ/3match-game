@@ -24,6 +24,10 @@ export class SceneManager {
     this.current = null;
     this.lastResult = null;
     this.lastScore = -1;
+    // 记录已经弹过追加机制说明的会话，避免同一局重复弹出
+    this.exIntroSessionId = null;
+    // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
+    this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
     this.tutorialStep = null;
     // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
@@ -77,6 +81,11 @@ export class SceneManager {
       resultRow: document.querySelector('.result-row'),
       resultCard: document.querySelector('.result-card'),
       pause: $('pause-overlay'),
+      exIntro: $('ex-intro'),
+      exIntroTitle: $('ex-intro-title'),
+      exIntroText: $('ex-intro-text'),
+      exIntroTimer: $('ex-intro-timer'),
+      btnExStart: $('btn-ex-start'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -152,6 +161,12 @@ export class SceneManager {
     document.getElementById('btn-resume').addEventListener('click', () => {
       this.audio.play('button');
       c.resume();
+    });
+
+    this.el.btnExStart?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.hideExIntro();
+      this.el.btnExStart.blur();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -435,6 +450,7 @@ export class SceneManager {
       } else s.classList.remove('active');
     });
     this.current = scene;
+    if (scene !== SCENE.GAME) this.hideExIntro();
 
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.RANK) this.renderRank();
@@ -454,7 +470,27 @@ export class SceneManager {
     }
   }
 
+  /** EX 关卡进入时的追加机制说明 */
+  showExIntro(level) {
+    if (!this.el.exIntro || !level) return;
+    this.controller.introOpen = true;
+    this.el.exIntroTitle.textContent = level.name || 'EX 关卡';
+    this.el.exIntroText.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
+    const limit = level.rules?.moveTimeLimit;
+    this.el.exIntroTimer.textContent = limit
+      ? `每步限时 ${limit} 秒。首次操作不限时，之后每次操作结束会重新计时；使用道具也会重置时间。`
+      : '本关没有单步时间限制。';
+    this.el.exIntro.classList.remove('hidden');
+    this.el.btnExStart?.focus({ preventScroll: true });
+  }
+
+  hideExIntro() {
+    this.controller.introOpen = false;
+    this.el.exIntro?.classList.add('hidden');
+  }
+
   showPause() {
+    this.hideExIntro();
     this.el.pause.classList.remove('hidden');
     this.el.tutorial.classList.add('hidden');
   }
@@ -497,6 +533,12 @@ export class SceneManager {
     if (!vm || !vm.board) return;
     if (this.current !== SCENE.GAME && this.current !== SCENE.RESULT) return;
 
+    // 每次进入 EX 关（首次进入 / 续玩 / 重开）弹一次追加机制说明
+    if (vm.level?.isEx && this.exIntroSessionId !== vm.sessionId) {
+      this.exIntroSessionId = vm.sessionId;
+      this.showExIntro(vm.level);
+    }
+
     this.el.levelName.textContent = vm.levelId >= 100
       ? vm.levelName
       : `第 ${vm.levelId} 关 · ${vm.levelName}`;
@@ -534,25 +576,42 @@ export class SceneManager {
       this.el.goalTasks.appendChild(chip);
     }
 
-    this.el.boosterBar.textContent = '';
+    /*
+     * 道具按钮只创建一次，之后原地更新文本与禁用状态。
+     * EX 关的计时器每 100ms 触发一次 emitSession，如果每次都重建按钮，
+     * 玩家按下与松开之间按钮被替换，click 事件就会丢失，表现为“点不动”。
+     */
+    const seen = new Set();
     for (const b of vm.boosters) {
-      const btn = document.createElement('button');
-      btn.className = 'booster' + (b.armed ? ' armed' : '');
-      btn.dataset.booster = b.id;
+      seen.add(b.id);
+      let btn = this.boosterButtons.get(b.id);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.className = 'booster';
+        btn.dataset.booster = b.id;
+        const count = document.createElement('span');
+        count.className = 'b-count';
+        const name = document.createElement('span');
+        name.className = 'b-name';
+        name.textContent = b.name;
+        const limit = document.createElement('span');
+        limit.className = 'b-limit';
+        btn.append(count, name, limit);
+        this.boosterButtons.set(b.id, btn);
+        this.el.boosterBar.appendChild(btn);
+      }
+      btn.classList.toggle('armed', Boolean(b.armed));
       btn.disabled = !b.available && !b.armed;
       btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
-      const count = document.createElement('span');
-      count.className = 'b-count';
       // 三种道具共用次数池，三张卡显示同一个剩余次数
-      count.textContent = String(b.count);
-      const name = document.createElement('span');
-      name.className = 'b-name';
-      name.textContent = b.name;
-      const limit = document.createElement('span');
-      limit.className = 'b-limit';
-      limit.textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
-      btn.append(count, name, limit);
-      this.el.boosterBar.appendChild(btn);
+      btn.querySelector('.b-count').textContent = String(b.count);
+      btn.querySelector('.b-limit').textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
+    }
+    for (const [id, btn] of this.boosterButtons) {
+      if (!seen.has(id)) {
+        btn.remove();
+        this.boosterButtons.delete(id);
+      }
     }
 
     this.el.saveNote.classList.toggle('hidden', !vm.storageDegraded);
@@ -562,11 +621,13 @@ export class SceneManager {
       const hasTimer = Boolean(vm.moveTimer);
       this.el.moveTimer.classList.toggle('hidden', !hasTimer);
       if (hasTimer) {
+        const started = vm.moveTimer.started !== false;
         const pct = vm.moveTimer.limit > 0 ? (vm.moveTimer.remaining / vm.moveTimer.limit) * 100 : 0;
-        const secs = (vm.moveTimer.remaining / 1000).toFixed(1);
         this.el.moveTimerFill.style.width = `${Math.max(0, pct)}%`;
-        this.el.moveTimerFill.classList.toggle('low', pct <= 30);
-        this.el.moveTimerText.textContent = `${secs}s`;
+        this.el.moveTimerFill.classList.toggle('low', started && pct <= 30);
+        this.el.moveTimerText.textContent = started
+          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s`
+          : '待开始';
       }
     }
 

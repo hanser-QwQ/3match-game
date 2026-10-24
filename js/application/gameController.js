@@ -41,12 +41,18 @@ export class GameController {
     this.save = createDefaultSave();
     this.session = null;
     this.busy = false;
+    // EX 追加机制弹窗打开时锁住棋盘输入（键盘路径也要拦）
+    this.introOpen = false;
     this.boosterArmed = null;
     this.storageDegraded = false;
     this.sessionCounter = 0;
     this._moveTimer = null;
     this._moveRemaining = 0;
     this._moveLastTick = 0;
+    // 首次操作（交换或道具）完成后才启动单步计时，避免进入/重开时计时器空转
+    this._moveTimerStarted = false;
+    this._pausedTimer = false;
+    this.pendingPause = false;
   }
 
   async boot() {
@@ -197,10 +203,12 @@ export class GameController {
 
     this.session = new GameSession({ level, board, resumed });
     this.sessionCounter += 1;
+    this.introOpen = false;
     this.boosterArmed = null;
     this.renderer?.setBoard(board);
     this.renderer?.setHint(this.suggestMove());
-    this._resetMoveTimer();
+    // 进入 / 续玩 / 重开：计时器先停在满时间，等玩家完成第一次操作后再启动
+    this._prepareMoveTimer();
     this.navigate(SCENE.GAME);
     this.emitSession();
     return true;
@@ -272,6 +280,8 @@ export class GameController {
         this.emitSession();
       }, 12000);
       this._stopMoveTimer();
+      // 立即刷新一次，让道具按钮在结算期间马上置灰，避免“点了没反应”
+      this.emitSession();
     } else {
       clearTimeout(this._busyTimer);
       if (this.pendingPause) {
@@ -279,6 +289,8 @@ export class GameController {
         this.pause();
       } else {
         this._startMoveTimer();
+        // 解锁后刷新一次，让道具按钮从“结算中”恢复为可点击
+        this.emitSession();
       }
     }
   }
@@ -291,6 +303,8 @@ export class GameController {
   _startMoveTimer() {
     const limit = this._moveTimeLimitMs();
     if (!limit) return;
+    // 首次操作之前不计时，避免进入关卡或重开时计时器先跑起来
+    if (!this._moveTimerStarted) return;
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy || this._pausedTimer) return;
     this._stopMoveTimer();
@@ -318,9 +332,23 @@ export class GameController {
 
   _resetMoveTimer() {
     this._stopMoveTimer();
+    this._moveTimerStarted = true;
+    this._pausedTimer = false;
     const limit = this._moveTimeLimitMs();
     this._moveRemaining = limit;
     this._startMoveTimer();
+  }
+
+  /**
+   * 进入 / 续玩 / 重开时的计时器状态：停在满时间，但不启动。
+   * 第一次操作完成后再由 _resetMoveTimer() 正式开跑。
+   */
+  _prepareMoveTimer() {
+    this._stopMoveTimer();
+    this._moveTimerStarted = false;
+    this._pausedTimer = false;
+    this.pendingPause = false;
+    this._moveRemaining = this._moveTimeLimitMs();
   }
 
   _tickMoveTimer() {
@@ -364,13 +392,11 @@ export class GameController {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false, error: 'STATE_MISMATCH' };
     if (!from || !to || !isAdjacent(from, to)) return { ok: false, error: 'INVALID_COORD' };
-    this._stopMoveTimer();
 
     // EX-5 节律：已使用的特殊方块被冻住，禁止移动且无提示
     if (s.board.rules?.specialCycle) {
       const frozen = (r, c) => s.board.specialAt(r, c) && s.board.isSpecialFrozen(r, c);
       if (frozen(from.r, from.c) || frozen(to.r, to.c)) {
-        this._startMoveTimer();
         return { ok: false, error: 'FROZEN_SPECIAL' };
       }
     }
@@ -380,6 +406,8 @@ export class GameController {
       return { ok: false, error: 'BLOCKED' };
     }
 
+    // 只有真正会执行的交换才暂停计时，非法点击不打断思考时间
+    this._stopMoveTimer();
     this.setBusy(true);
     try {
       const effect = planSpecialSwap(s.board, from, to, this.rng);
@@ -465,9 +493,10 @@ export class GameController {
       reshuffle(s.board, this.rng);
       await this.renderer.playReshuffle(s.board);
     }
+    // 先重置并启动下一次思考的计时，再落盘与刷新，界面能立刻显示满时间
+    this._resetMoveTimer();
     this.saveSession();
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
-    this._resetMoveTimer();
   }
 
   /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
@@ -689,7 +718,7 @@ export class GameController {
 
   armBooster(id) {
     const s = this.session;
-    if (!s || s.state !== SESSION_STATE.IN_PROGRESS) return { ok: false };
+    if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
@@ -753,6 +782,8 @@ export class GameController {
         await this.runCascade({ initialCells: [target] });
         await this.afterMove();
       }
+      // 使用道具后重置思考时间，避免刚用完道具就被计时器逼着走
+      this._resetMoveTimer();
       this.renderer?.setHint(null);
       this.emitSession();
       return { ok: true };
@@ -799,13 +830,15 @@ export class GameController {
         usedTotal,
         limit,
         disabled: (s.level.disabledBoosters || []).includes(def.id),
-        available: check.ok,
+        // 结算动画期间也置灰，避免玩家点了却没有反应
+        available: check.ok && !this.busy,
         armed: this.boosterArmed === def.id,
         reason: check.message || '',
       };
     });
     return {
       scene: SCENE.GAME,
+      sessionId: this.sessionCounter,
       level: s.level,
       levelId: s.level.levelId,
       levelName: s.level.name,
@@ -827,7 +860,11 @@ export class GameController {
       save: this.save,
       chainBest: s.chainBest,
       moveTimer: this._moveTimeLimitMs()
-        ? { limit: this._moveTimeLimitMs(), remaining: Math.max(0, Math.round(this._moveRemaining)) }
+        ? {
+          limit: this._moveTimeLimitMs(),
+          remaining: Math.max(0, Math.round(this._moveRemaining)),
+          started: this._moveTimerStarted,
+        }
         : null,
     };
   }

@@ -40,7 +40,7 @@ export class InputController {
 
   get locked() {
     const s = this.controller.session;
-    return this.controller.busy || !s || s.state !== 'in_progress';
+    return this.controller.busy || this.controller.introOpen || !s || s.state !== 'in_progress';
   }
 
   clearSelection() {
@@ -56,6 +56,8 @@ export class InputController {
 
     const session = this.controller.session;
     if (!session || session.state !== 'in_progress') return;
+    // EX 追加机制弹窗打开时，弹窗会挡住画布；这里再兜底一次
+    if (this.controller.introOpen) return;
 
     /*
      * 连锁结算动画期间只更新选中格，不消费这次点击。
@@ -133,7 +135,7 @@ export class InputController {
       return;
     }
 
-    if (s.state !== 'in_progress' || this.controller.busy) return;
+    if (s.state !== 'in_progress' || this.controller.busy || this.controller.introOpen) return;
 
     const cursor = this.renderer.cursor || { r: 0, c: 0 };
     const moves = {

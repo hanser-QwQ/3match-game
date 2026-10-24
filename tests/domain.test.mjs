@@ -607,6 +607,73 @@ test('续玩：加三步后的剩余步数与总步数都不会被截回初始�
   assert.equal(controller.session.boosterUsage.addMoves, 1, '道具使用次数也应被恢复');
 });
 
+test('EX 计时：进入关卡先待开始，第一次操作后才启动，重开清除旧暂停状态', () => {
+  const level = {
+    levelId: 101,
+    name: 'EX-1 升阶',
+    isEx: true,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 100 },
+    board: { rows: 8, cols: 8, elementTypes: 6, iceCells: [], blockedCells: [] },
+    rules: { moveTimeLimit: 1 },
+    disabledBoosters: [],
+    tutorialHint: '测试提示',
+  };
+  const renderer = {
+    setBoard() {},
+    setHint() {},
+    setInputLocked() {},
+    setArmedTarget() {},
+    async playSwap() {},
+    async playSpecialSwap() {},
+    async playStep() {},
+    async playReshuffle() {},
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: (id) => (Number(id) === 101 ? level : null), playable: () => [level] },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer,
+    tutorial: null,
+    rng: new RandomSource(1),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    interruptedSession: null,
+    localBest: [],
+    player: { totalScore: 0 },
+  };
+
+  controller.startLevel(101, { resume: false });
+  assert.equal(controller._moveTimerStarted, false, '进入关卡时计时器应处于待开始状态');
+  assert.equal(controller._moveTimer, null, '进入关卡时不应启动计时器');
+  assert.equal(controller._moveRemaining, 1000, '待开始时显示满时间');
+
+  // 结算期间道具按钮应置灰，避免玩家点了没有反应
+  controller.busy = true;
+  assert.equal(controller.viewModel().boosters.every((b) => !b.available), true, '结算期间道具应不可用');
+  controller.busy = false;
+
+  // 模拟旧状态残留：暂停后再重开
+  controller._pausedTimer = true;
+  controller.startLevel(101, { resume: false });
+  assert.equal(controller._pausedTimer, false, '重开应清除旧的暂停状态');
+  assert.equal(controller._moveTimerStarted, false, '重开后仍应等待第一次操作');
+  assert.equal(controller._moveTimer, null, '重开后计时器不应空转');
+
+  // 模拟第一次操作完成
+  controller._resetMoveTimer();
+  assert.equal(controller._moveTimerStarted, true, '第一次操作后计时器应启动');
+  assert.notEqual(controller._moveTimer, null, '第一次操作后应有计时器在跑');
+  controller._stopMoveTimer();
+});
+
 test('存档：旧版 boosters 库存字段被丢弃，默认存档不再包含库存', () => {
   const save = createDefaultSave();
   assert.equal('boosters' in save, false, '默认存档不再包含道具库存');

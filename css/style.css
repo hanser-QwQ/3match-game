@@ -824,6 +824,31 @@ body {
 .overlay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
 .overlay-row .btn { font-size: 14px; }
 
+.ex-intro-card { max-width: 350px; }
+.ex-intro-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--warm);
+}
+.ex-intro-text {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink-2);
+  text-align: left;
+}
+.ex-intro-timer {
+  margin: 0 0 18px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-3);
+  text-align: left;
+}
+
 .share-card { max-width: 380px; }
 
 .share-preview {
