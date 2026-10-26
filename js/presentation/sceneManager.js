@@ -753,7 +753,9 @@ export class SceneManager {
 
       btn.append(no, stars);
       if (lv.valid && lv.unlocked) {
-        btn.title = `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
+        btn.title = lv.isEx
+          ? `${lv.name}：${lv.goal}`
+          : `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
       }
       this.el.levelGrid.appendChild(btn);
     }

@@ -11,9 +11,16 @@
 import { SCORE, chainMultiplier } from '../core/constants.js';
 
 /** 单段连锁得分 */
-export function scoreCascadeStep({ clearedCount = 0, chainIndex = 1, specialTriggered = 0 } = {}) {
-  const multiplier = chainMultiplier(chainIndex);
-  const base = Math.round(clearedCount * SCORE.PER_TILE * multiplier);
+export function scoreCascadeStep({
+  clearedCount = 0,
+  chainIndex = 1,
+  specialTriggered = 0,
+  maxMultiplier,
+  baseMultiplier = 1,
+} = {}) {
+  const multiplier = chainMultiplier(chainIndex, maxMultiplier);
+  const scale = Number.isFinite(baseMultiplier) && baseMultiplier > 0 ? baseMultiplier : 1;
+  const base = Math.round(clearedCount * SCORE.PER_TILE * multiplier * scale);
   return base + specialTriggered * SCORE.SPECIAL_BONUS;
 }
 

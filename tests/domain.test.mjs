@@ -15,7 +15,7 @@ import { scoreCascadeStep, scoreClearBonus, judgeStars, settleScore } from '../j
 import { goalTasks } from '../js/domain/goals.js';
 import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
-import { SPECIAL } from '../js/core/constants.js';
+import { SPECIAL, chainMultiplier } from '../js/core/constants.js';
 import { LevelRepository } from '../js/infrastructure/levelRepository.js';
 import { GameController } from '../js/application/gameController.js';
 import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '../js/domain/boosterService.js';
@@ -455,6 +455,238 @@ test('EX-1 升阶：交换两个条纹后，一个变彩虹、另一个降为普
   assert.equal(s.board.specialAt(a.r, a.c), null, '另一个条纹应降为普通元素');
   assert.equal(s.movesLeft, 19, '合成彩虹消耗一步');
   assert.equal(s.turnCount, 1, '合成应计入一次操作');
+});
+
+test('EX-7 雷暴：四连强制生成炸弹，炸弹半径可扩大', () => {
+  const board = makeBoard([
+    'AAAAB',
+    'CDEFC',
+    'DEFCD',
+    'EFDCE',
+  ]);
+  const matches = findMatches(board);
+  const normal = planSpecials(board, matches, [], null);
+  assert.equal(normal[0].special, SPECIAL.STRIPE_H);
+
+  board.rules = { forceBombOnMatch: true, bombRadius: 3 };
+  const forced = planSpecials(board, matches, [], null);
+  assert.equal(forced[0].special, SPECIAL.BOMB);
+
+  const blastBoard = new Board(8, 8, 6);
+  blastBoard.rules = { bombRadius: 3 };
+  const blast = blastCells(blastBoard, 4, 4, SPECIAL.BOMB, null);
+  assert.equal(blast.length, 24, '半径 3 的菱形去掉中心应覆盖 24 格');
+  const keys = new Set(blast.map((cell) => `${cell.r},${cell.c}`));
+  assert.ok(keys.has('4,1'));
+  assert.equal(keys.has('4,0'), false);
+});
+
+test('EX-7 雷暴：一颗炸弹会连锁引爆全场炸弹', () => {
+  const board = new Board(8, 8, 6);
+  board.setType(1, 1, 0, SPECIAL.BOMB);
+  board.setType(6, 6, 1, SPECIAL.BOMB);
+  board.rules = { bombChainAll: true, bombRadius: 3, bombBonus: 100 };
+  const res = resolveCascade(board, { initialCells: [{ r: 1, c: 1 }], rng: rng(3) });
+  assert.ok(res.sequence[0].triggered.length >= 2, '两颗炸弹都应被引爆');
+  assert.ok(res.sequence[0].score >= 200, '两颗炸弹的额外加分应计入');
+});
+
+test('EX-9 禁术：不再生成特殊方块，基础分翻倍', () => {
+  const board = makeBoard([
+    'AAAAB',
+    'CDEFC',
+    'DEFCD',
+    'EFDCE',
+  ]);
+  board.rules = { noSpecials: true };
+  assert.deepEqual(planSpecials(board, findMatches(board), [], null), []);
+
+  const plain = makeBoard(['AAAB', 'CDEF', 'DEFC', 'EFCD']);
+  const normal = resolveCascade(plain, { rng: rng(5) });
+  assert.equal(normal.sequence[0].score, 30);
+
+  const doubled = makeBoard(['AAAB', 'CDEF', 'DEFC', 'EFCD']);
+  doubled.rules = { baseScoreMultiplier: 2 };
+  const boosted = resolveCascade(doubled, { rng: rng(5) });
+  assert.equal(boosted.sequence[0].score, 60);
+});
+
+test('EX-10 祭典：连锁倍率上限可提升到 5 倍', () => {
+  assert.equal(chainMultiplier(1), 1);
+  assert.equal(chainMultiplier(9), 3);
+  assert.equal(chainMultiplier(7, 5), 4);
+  assert.equal(chainMultiplier(9, 5), 5);
+});
+
+test('EX-6 回响：生成特殊方块返还步数，单次最多 2 步', () => {
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: () => null, list: () => [], playable: () => [] },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer: null,
+    tutorial: null,
+    rng: null,
+    navigate() {},
+    toast() {},
+  });
+  controller.session = {
+    level: { rules: { refundMoveOnSpecial: 1 } },
+    movesLeft: 5,
+    movesTotal: 10,
+  };
+  controller.toast = () => {};
+  controller.emitSession = () => {};
+
+  assert.equal(controller.applySpecialMoveRefund({ specialsCreated: 1 }), 1);
+  assert.equal(controller.session.movesLeft, 6);
+  assert.equal(controller.applySpecialMoveRefund({ specialsCreated: 3 }), 2);
+  assert.equal(controller.session.movesLeft, 8);
+  assert.equal(controller.applySpecialMoveRefund({ specialsCreated: 0 }), 0);
+  assert.equal(controller.session.movesLeft, 8);
+});
+
+test('EX-8 霜潮：每 4 步冻结一个 2×2 区域', async () => {
+  const level = {
+    levelId: 108,
+    name: 'EX-8 霜潮',
+    isEx: true,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 2400 },
+    board: { rows: 8, cols: 8, elementTypes: 6, iceCells: [], blockedCells: [] },
+    rules: { freezeAreaEveryNMoves: 5, freezeAreaSize: 2, freezeAreaCells: 2, freezeAreaMaxIce: 8 },
+    disabledBoosters: [],
+    starThresholds: [2400, 3600, 4800],
+  };
+  const renderer = {
+    setBoard() {},
+    setHint() {},
+    setInputLocked() {},
+    setArmedTarget() {},
+    syncBoard() {},
+    async playFreeze() {},
+    async playStep() {},
+    async playSwap() {},
+    async playSpecialSwap() {},
+    async playReshuffle() {},
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => (Number(id) === 108 ? level : null),
+      list: () => [level],
+      playable: () => [level],
+    },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer,
+    tutorial: null,
+    rng: new RandomSource(11),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    tutorialDone: false,
+    interruptedSession: null,
+    localBest: [],
+    achievements: {},
+    player: { nickname: 'T', totalScore: 0 },
+  };
+
+  assert.equal(controller.startLevel(108, { resume: false }), true);
+  const s = controller.session;
+  s.turnCount = 5;
+  await controller.applyFreezeRule();
+
+  assert.equal(s.board.countIce(), 2, '一次应冻结 2 格');
+  // 达到上限后不再继续加冰
+  s.board.eachCell((r, c) => s.board.setIce(r, c, 0));
+  for (let r = 0; r < 2; r += 1) {
+    for (let c = 0; c < 4; c += 1) s.board.setIce(r, c, 1);
+  }
+  assert.equal(s.board.countIce(), 8);
+  await controller.applyFreezeRule();
+  assert.equal(s.board.countIce(), 8, '场上冰格达到上限后不应继续结霜');
+  let maxInArea = 0;
+  for (let r = 0; r + 2 <= s.board.rows; r += 1) {
+    for (let c = 0; c + 2 <= s.board.cols; c += 1) {
+      let n = 0;
+      for (let rr = r; rr < r + 2; rr += 1) {
+        for (let cc = c; cc < c + 2; cc += 1) if (s.board.iceAt(rr, cc) > 0) n += 1;
+      }
+      maxInArea = Math.max(maxInArea, n);
+    }
+  }
+  assert.ok(maxInArea >= 2, '冰块应聚集在 2×2 区域内');
+});
+
+test('EX-10 祭典：每 4 步赠予一个特殊方块', async () => {
+  const level = {
+    levelId: 110,
+    name: 'EX-10 祭典',
+    isEx: true,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 3000 },
+    board: { rows: 8, cols: 8, elementTypes: 6, iceCells: [], blockedCells: [] },
+    rules: { giftSpecialEveryNMoves: 4 },
+    disabledBoosters: [],
+    starThresholds: [3000, 4200, 5400],
+  };
+  const renderer = {
+    setBoard() {},
+    setHint() {},
+    setInputLocked() {},
+    setArmedTarget() {},
+    syncBoard() {},
+    async playSpecialSwap() {},
+    async playStep() {},
+    async playSwap() {},
+    async playReshuffle() {},
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => (Number(id) === 110 ? level : null),
+      list: () => [level],
+      playable: () => [level],
+    },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer,
+    tutorial: null,
+    rng: new RandomSource(13),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    tutorialDone: false,
+    interruptedSession: null,
+    localBest: [],
+    achievements: {},
+    player: { nickname: 'T', totalScore: 0 },
+  };
+
+  assert.equal(controller.startLevel(110, { resume: false }), true);
+  const s = controller.session;
+  const countSpecials = () => {
+    let n = 0;
+    s.board.eachCell((r, c) => {
+      if (s.board.specialAt(r, c)) n += 1;
+    });
+    return n;
+  };
+  assert.equal(countSpecials(), 0);
+  s.turnCount = 4;
+  await controller.applyGiftRule();
+  assert.equal(countSpecials(), 1, '祭典应赠予一个特殊方块');
 });
 
 test('EX-5 限量：特殊方块按类型配额生成，配额用完后不再生成', () => {

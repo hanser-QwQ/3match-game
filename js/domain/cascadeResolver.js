@@ -64,6 +64,7 @@ export function resolveCascade(board, options = {}) {
 
     // 特殊元素连锁引爆：被卷入清除范围的特殊元素依次触发
     const triggered = new Set();
+    let bombsTriggered = 0;
     const queue = [...clearMap.values()];
     while (queue.length) {
       const cell = queue.pop();
@@ -74,6 +75,7 @@ export function resolveCascade(board, options = {}) {
       // EX-5 节律：已被冻住的特殊方块本轮不能再触发
       if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
+      if (special === SPECIAL.BOMB) bombsTriggered += 1;
       // EX-5：记录“这一类特殊方块本轮已经用过”，随后它照常被消除
       if (specialCycle) board.markSpecialUsed(special);
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
@@ -88,6 +90,21 @@ export function resolveCascade(board, options = {}) {
         if (exclude.has(tk) || clearMap.has(tk)) continue;
         clearMap.set(tk, target);
         queue.push(target);
+      }
+
+      /*
+       * EX-7 雷暴：任意炸弹引爆时，把场上其余炸弹一并卷入连锁。
+       * 这样玩家不需要把炸弹一个个换着引爆，一颗炸弹就能点燃全场。
+       */
+      if (special === SPECIAL.BOMB && board.rules?.bombChainAll) {
+        board.eachCell((rr, cc) => {
+          if (board.specialAt(rr, cc) !== SPECIAL.BOMB) return;
+          if (board.iceAt(rr, cc) > 0 || board.typeAt(rr, cc) < 0 || board.isSpecialFrozen(rr, cc)) return;
+          const bk = key(rr, cc);
+          if (exclude.has(bk) || clearMap.has(bk)) return;
+          clearMap.set(bk, { r: rr, c: cc });
+          queue.push({ r: rr, c: cc });
+        });
       }
     }
 
@@ -144,8 +161,14 @@ export function resolveCascade(board, options = {}) {
     const clearedCount = cleared.length;
     if (!clearedCount && !iceClearedStep) break;
 
-    const multiplier = chainMultiplier(index);
-    const stepScore = Math.round(clearedCount * SCORE.PER_TILE * multiplier) + triggered.size * SCORE.SPECIAL_BONUS;
+    const maxMultiplier = Number(board.rules?.maxChainMultiplier);
+    const multiplier = chainMultiplier(index, Number.isFinite(maxMultiplier) ? maxMultiplier : undefined);
+    const baseMultiplier = Number(board.rules?.baseScoreMultiplier);
+    const bombBonus = Number(board.rules?.bombBonus);
+    const stepScore = Math.round(
+      clearedCount * SCORE.PER_TILE * multiplier * (Number.isFinite(baseMultiplier) && baseMultiplier > 0 ? baseMultiplier : 1)
+    ) + triggered.size * SCORE.SPECIAL_BONUS
+      + (Number.isFinite(bombBonus) && bombBonus > 0 ? bombsTriggered * bombBonus : 0);
     totalScore += stepScore;
 
     const boardAfterClear = board.clone();

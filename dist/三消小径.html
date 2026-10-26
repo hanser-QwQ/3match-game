@@ -1560,7 +1560,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.6.0</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.0</button>
     </div>
   </section>
 
@@ -1589,7 +1589,7 @@ body {
     <header class="topbar">
       <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
       <h2>成就</h2>
-      <span class="topbar-meta" id="achievements-meta">0 / 13</span>
+      <span class="topbar-meta" id="achievements-meta">0 / 14</span>
     </header>
     <div class="scroll-area">
       <div class="achievement-summary">
@@ -1976,8 +1976,9 @@ const GOAL = {
 };
 
 /** 连锁倍率：第 s 段 1 + 0.5 × (s − 1)，封顶 3 倍 */
-function chainMultiplier(chainIndex) {
-  return Math.min(1 + 0.5 * (chainIndex - 1), SCORE.MAX_MULTIPLIER);
+function chainMultiplier(chainIndex, maxMultiplier = SCORE.MAX_MULTIPLIER) {
+  const cap = Number.isFinite(maxMultiplier) && maxMultiplier >= 1 ? maxMultiplier : SCORE.MAX_MULTIPLIER;
+  return Math.min(1 + 0.5 * (chainIndex - 1), cap);
 }
 
 exports.ROWS = ROWS;
@@ -3261,10 +3262,13 @@ function groupMatches(matches) {
 function planSpecials(board, matches, preferred = [], rng = null) {
   if (!matches.length) return [];
   const rules = board?.rules || {};
+  // EX-9 禁术：不再生成任何新的特殊方块
+  if (rules.noSpecials) return [];
   const minLen = minMatchLength(board);
   const stripeThreshold = Number.isInteger(rules.stripeThreshold) ? rules.stripeThreshold : minLen + 1;
   const rainbowThreshold = Number.isInteger(rules.rainbowThreshold) ? rules.rainbowThreshold : minLen + 2;
   const bombBoost = Boolean(rules.bombChanceBoost) && rng;
+  const forceBomb = Boolean(rules.forceBombOnMatch);
   const preferredKeys = new Set(preferred.map((p) => key(p.r, p.c)));
   const plans = [];
 
@@ -3272,10 +3276,13 @@ function planSpecials(board, matches, preferred = [], rng = null) {
     let special = null;
     if (group.hasRow && group.hasCol) {
       special = SPECIAL.BOMB;
+    } else if (forceBomb && group.maxLen >= 4) {
+      // EX-7 雷暴：四连及以上只出炸弹，不再生成条纹 / 彩虹
+      special = SPECIAL.BOMB;
     } else if (group.maxLen >= rainbowThreshold) {
       special = SPECIAL.RAINBOW;
       // EX-3：五连有概率变成炸弹（炸弹生成概率提升）
-      if (bombBoost && !group.hasRow && !group.hasCol && rng.float() < 0.5) {
+      if (bombBoost && !group.hasRow && !group.hasCol && rng.next() < 0.5) {
         special = SPECIAL.BOMB;
       }
     } else if (group.maxLen >= stripeThreshold) {
@@ -3450,13 +3457,16 @@ function blastCells(board, r, c, special, rng = null) {
       for (let rr = 0; rr < board.rows; rr += 1) if (rr !== r) push(rr, c);
       break;
     case SPECIAL.BOMB: {
-      // EX-3 炸弹范围缩小为周围 4 格（正交邻居），否则用默认菱形 13 格
+      // EX-3 炸弹范围缩小为周围 4 格（正交邻居）；否则按 bombRadius 画菱形
       const smallBomb = rules.bombRange === 4;
       if (smallBomb) {
         for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) push(r + dr, c + dc);
       } else {
-        for (let dr = -2; dr <= 2; dr += 1) {
-          const span = 2 - Math.abs(dr);
+        const radius = Number.isFinite(rules.bombRadius)
+          ? Math.max(1, Math.min(4, Math.floor(rules.bombRadius)))
+          : 2;
+        for (let dr = -radius; dr <= radius; dr += 1) {
+          const span = radius - Math.abs(dr);
           for (let dc = -span; dc <= span; dc += 1) {
             if (dr === 0 && dc === 0) continue;
             push(r + dr, c + dc);
@@ -3827,6 +3837,7 @@ function resolveCascade(board, options = {}) {
 
     // 特殊元素连锁引爆：被卷入清除范围的特殊元素依次触发
     const triggered = new Set();
+    let bombsTriggered = 0;
     const queue = [...clearMap.values()];
     while (queue.length) {
       const cell = queue.pop();
@@ -3837,6 +3848,7 @@ function resolveCascade(board, options = {}) {
       // EX-5 节律：已被冻住的特殊方块本轮不能再触发
       if (specialCycle && board.isSpecialFrozen(cell.r, cell.c)) continue;
       triggered.add(k);
+      if (special === SPECIAL.BOMB) bombsTriggered += 1;
       // EX-5：记录“这一类特殊方块本轮已经用过”，随后它照常被消除
       if (specialCycle) board.markSpecialUsed(special);
       for (const target of blastCells(board, cell.r, cell.c, special, rng)) {
@@ -3851,6 +3863,21 @@ function resolveCascade(board, options = {}) {
         if (exclude.has(tk) || clearMap.has(tk)) continue;
         clearMap.set(tk, target);
         queue.push(target);
+      }
+
+      /*
+       * EX-7 雷暴：任意炸弹引爆时，把场上其余炸弹一并卷入连锁。
+       * 这样玩家不需要把炸弹一个个换着引爆，一颗炸弹就能点燃全场。
+       */
+      if (special === SPECIAL.BOMB && board.rules?.bombChainAll) {
+        board.eachCell((rr, cc) => {
+          if (board.specialAt(rr, cc) !== SPECIAL.BOMB) return;
+          if (board.iceAt(rr, cc) > 0 || board.typeAt(rr, cc) < 0 || board.isSpecialFrozen(rr, cc)) return;
+          const bk = key(rr, cc);
+          if (exclude.has(bk) || clearMap.has(bk)) return;
+          clearMap.set(bk, { r: rr, c: cc });
+          queue.push({ r: rr, c: cc });
+        });
       }
     }
 
@@ -3907,8 +3934,14 @@ function resolveCascade(board, options = {}) {
     const clearedCount = cleared.length;
     if (!clearedCount && !iceClearedStep) break;
 
-    const multiplier = chainMultiplier(index);
-    const stepScore = Math.round(clearedCount * SCORE.PER_TILE * multiplier) + triggered.size * SCORE.SPECIAL_BONUS;
+    const maxMultiplier = Number(board.rules?.maxChainMultiplier);
+    const multiplier = chainMultiplier(index, Number.isFinite(maxMultiplier) ? maxMultiplier : undefined);
+    const baseMultiplier = Number(board.rules?.baseScoreMultiplier);
+    const bombBonus = Number(board.rules?.bombBonus);
+    const stepScore = Math.round(
+      clearedCount * SCORE.PER_TILE * multiplier * (Number.isFinite(baseMultiplier) && baseMultiplier > 0 ? baseMultiplier : 1)
+    ) + triggered.size * SCORE.SPECIAL_BONUS
+      + (Number.isFinite(bombBonus) && bombBonus > 0 ? bombsTriggered * bombBonus : 0);
     totalScore += stepScore;
 
     const boardAfterClear = board.clone();
@@ -3979,9 +4012,16 @@ __modules["js/domain/scorer.js"] = function (exports, __req) {
 const { SCORE, chainMultiplier } = __req("js/core/constants.js");
 
 /** 单段连锁得分 */
-function scoreCascadeStep({ clearedCount = 0, chainIndex = 1, specialTriggered = 0 } = {}) {
-  const multiplier = chainMultiplier(chainIndex);
-  const base = Math.round(clearedCount * SCORE.PER_TILE * multiplier);
+function scoreCascadeStep({
+  clearedCount = 0,
+  chainIndex = 1,
+  specialTriggered = 0,
+  maxMultiplier,
+  baseMultiplier = 1,
+} = {}) {
+  const multiplier = chainMultiplier(chainIndex, maxMultiplier);
+  const scale = Number.isFinite(baseMultiplier) && baseMultiplier > 0 ? baseMultiplier : 1;
+  const base = Math.round(clearedCount * SCORE.PER_TILE * multiplier * scale);
   return base + specialTriggered * SCORE.SPECIAL_BONUS;
 }
 
@@ -4254,11 +4294,20 @@ const ACHIEVEMENTS = [
   {
     id: 'all_ex',
     name: '升阶大师',
-    desc: '通关全部 5 个 EX 关卡',
+    desc: '通关 5 个 EX 关卡',
     icon: 'crown',
     tier: 'gold',
     metric: 'clearedExCount',
     target: 5,
+  },
+  {
+    id: 'all_ex_10',
+    name: '十重试炼',
+    desc: '通关全部 10 个 EX 关卡',
+    icon: 'gem',
+    tier: 'platinum',
+    metric: 'clearedExCount',
+    target: 10,
   },
   {
     id: 'first_3star',
@@ -5056,7 +5105,8 @@ class GameController {
         this.toast('两个条纹合成为彩虹', 'good');
         this.emitSession();
         // 降为普通元素后如果顺势形成了连线，正常结算掉，避免棋盘上留下现成三连
-        await this.runCascade({ preferred: [from, to] });
+        const upgraded = await this.runCascade({ preferred: [from, to] });
+        this.applySpecialMoveRefund(upgraded);
         await this.afterMove();
         return { ok: true };
       }
@@ -5064,8 +5114,10 @@ class GameController {
         this.audio.play('special');
         await this.renderer.playSpecialSwap(from, to, effect.combo);
         s.spendMove();
+        s.pendingFreeze = true;
         this.emitSession();
-        await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
+        const result = await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
+        this.applySpecialMoveRefund(result);
       } else {
         /*
          * 任何相邻交换都会真正执行并消耗一步，不再预先判定"能否形成三连"。
@@ -5079,6 +5131,7 @@ class GameController {
         s.pendingFreeze = true;
         this.emitSession();
         const result = await this.runCascade({ preferred: [from, to] });
+        this.applySpecialMoveRefund(result);
         if (!result.sequence.length) {
           // 没有连锁产生：给一个轻微的低音提示，画面保持交换后的状态
           this.audio.play('dud');
@@ -5111,6 +5164,26 @@ class GameController {
     return result;
   }
 
+  /**
+   * EX-6 回响：本次操作生成特殊方块时返还步数。
+   * 单次最多按 2 个特殊方块计算，避免一次超大连锁无限续步。
+   */
+  applySpecialMoveRefund(result) {
+    const s = this.session;
+    if (!s) return 0;
+    const rule = Number(s.level.rules?.refundMoveOnSpecial);
+    if (!Number.isFinite(rule) || rule <= 0 || !result?.specialsCreated) return 0;
+
+    const perSpecial = Math.max(1, Math.min(2, Math.floor(rule)));
+    const count = Math.min(2, result.specialsCreated);
+    const gain = count * perSpecial;
+    s.movesLeft += gain;
+    s.movesTotal = Math.max(s.movesTotal, s.movesLeft);
+    this.toast(`特殊方块回响：返还 ${gain} 步`, 'good');
+    this.emitSession();
+    return gain;
+  }
+
   async afterMove() {
     const s = this.session;
     if (!s) return;
@@ -5121,6 +5194,7 @@ class GameController {
       s.turnCount += 1;
       await this.applyFreezeRule();
     }
+    await this.applyGiftRule();
 
     // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
     // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
@@ -5148,34 +5222,131 @@ class GameController {
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
   }
 
-  /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
+  /** EX-2：每走 N 步随机冰冻 1~4 个空格；EX-8：每 N 步冻结一个区域 */
   async applyFreezeRule() {
     const s = this.session;
     const rules = s.level.rules || {};
-    const n = rules.freezeEveryNMoves;
-    if (!n || s.turnCount % n !== 0) return;
+    const randomN = rules.freezeEveryNMoves;
+    const areaN = rules.freezeAreaEveryNMoves;
+
+    if (randomN && s.turnCount % randomN === 0) {
+      const free = [];
+      s.board.eachCell((r, c) => {
+        if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0) free.push({ r, c });
+      });
+      if (free.length) {
+        // 随机抽取 1~4 个
+        for (let i = free.length - 1; i > 0; i -= 1) {
+          const j = this.rng.int(i + 1);
+          [free[i], free[j]] = [free[j], free[i]];
+        }
+        const pick = Math.min(1 + this.rng.int(4), free.length);
+        const frozen = free.slice(0, pick);
+        for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+        // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+        this.renderer?.syncBoard(s.board);
+        this.audio?.play('freeze');
+        this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
+        this.emitSession();
+        await this.renderer?.playFreeze?.(frozen);
+      }
+    }
+
+    if (areaN && s.turnCount % areaN === 0) {
+      const size = Math.max(2, Math.min(3, Number(rules.freezeAreaSize) || 2));
+      const maxIce = Number(rules.freezeAreaMaxIce);
+      const remaining = Number.isFinite(maxIce) && maxIce > 0 ? maxIce - s.board.countIce() : Infinity;
+      if (remaining <= 0) return;
+
+      const candidates = [];
+      for (let r = 0; r + size <= s.board.rows; r += 1) {
+        for (let c = 0; c + size <= s.board.cols; c += 1) {
+          let normal = 0;
+          for (let rr = r; rr < r + size; rr += 1) {
+            for (let cc = c; cc < c + size; cc += 1) {
+              if (
+                s.board.isFree(rr, cc) &&
+                s.board.typeAt(rr, cc) >= 0 &&
+                !s.board.specialAt(rr, cc)
+              ) {
+                normal += 1;
+              }
+            }
+          }
+          if (normal >= Math.max(2, Math.ceil((size * size) / 2))) candidates.push({ r, c, normal });
+        }
+      }
+      if (!candidates.length) return;
+
+      const maxNormal = Math.max(...candidates.map((x) => x.normal));
+      const pool = candidates.filter((x) => x.normal === maxNormal);
+      const spot = pool[this.rng.int(pool.length)];
+      const cells = [];
+      for (let rr = spot.r; rr < spot.r + size; rr += 1) {
+        for (let cc = spot.c; cc < spot.c + size; cc += 1) {
+          if (!s.board.isFree(rr, cc) || s.board.typeAt(rr, cc) < 0 || s.board.specialAt(rr, cc)) continue;
+          cells.push({ r: rr, c: cc });
+        }
+      }
+      if (!cells.length) return;
+
+      // 区域内随机挑几格结霜，避免一次冻住整片 2×2
+      for (let i = cells.length - 1; i > 0; i -= 1) {
+        const j = this.rng.int(i + 1);
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      const perFreeze = Number(rules.freezeAreaCells);
+      const limit = Math.max(
+        1,
+        Math.min(cells.length, Number.isFinite(perFreeze) && perFreeze > 0 ? perFreeze : cells.length, remaining)
+      );
+      const frozen = cells.slice(0, limit);
+      for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+      this.renderer?.syncBoard(s.board);
+      this.audio?.play('freeze');
+      this.toast(`第 ${s.turnCount} 步：霜潮冻结了 ${frozen.length} 格`, 'warn');
+      this.emitSession();
+      await this.renderer?.playFreeze?.(frozen);
+    }
+  }
+
+  /** EX-10 祭典：每 N 步随机把一个普通元素变成特殊方块 */
+  async applyGiftRule() {
+    const s = this.session;
+    const n = Number(s?.level?.rules?.giftSpecialEveryNMoves);
+    if (!Number.isFinite(n) || n <= 0 || s.turnCount % n !== 0) return;
 
     const free = [];
     s.board.eachCell((r, c) => {
-      if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0) free.push({ r, c });
+      if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0 && !s.board.specialAt(r, c)) {
+        free.push({ r, c });
+      }
     });
     if (!free.length) return;
 
-    // 随机抽取 1~4 个
-    for (let i = free.length - 1; i > 0; i -= 1) {
-      const j = this.rng.int(i + 1);
-      [free[i], free[j]] = [free[j], free[i]];
+    const cell = free[this.rng.int(free.length)];
+    const roll = this.rng.next();
+    let special;
+    let label;
+    if (roll < 0.5) {
+      special = this.rng.next() < 0.5 ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
+      label = '条纹';
+    } else if (roll < 0.8) {
+      special = SPECIAL.BOMB;
+      label = '炸弹';
+    } else {
+      special = SPECIAL.RAINBOW;
+      label = '彩虹';
     }
-    const pick = Math.min(1 + this.rng.int(4), free.length);
-    const frozen = free.slice(0, pick);
-    for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
 
-    // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+    s.board.setType(cell.r, cell.c, s.board.typeAt(cell.r, cell.c), special);
     this.renderer?.syncBoard(s.board);
-    this.audio?.play('freeze');
-    this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
+    this.audio?.play('special');
+    this.toast(`祭典赠礼：生成了一颗${label}`, 'good');
     this.emitSession();
-    await this.renderer?.playFreeze?.(frozen);
+    await this.renderer?.playSpecialSwap?.(cell, cell, 'gift');
   }
 
   /** 达成目标后主动结算，保留剩余步数奖励 */
@@ -7124,13 +7295,26 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.0',
+    date: '2026-10-26',
+    notes: [
+      '新增 EX-6 至 EX-10 五个关卡：回响、雷暴、霜潮、禁术、祭典',
+      'EX-6 生成特殊方块返还步数；EX-7 炸弹可连锁引爆全场炸弹',
+      'EX-8 改为每 5 步冻结 2 格并限制冰格总数；EX-9 改为 5 色高连锁禁术关',
+      'EX-10 改为每 4 步随机赠予一个特殊方块',
+      '按实际试玩成绩下调 EX 关卡目标分与星级线，已通关成绩会自动补星',
+      '新增成就“十重试炼”，成就总数达到 14',
+      '修复 EX-3 五连概率分支的崩溃问题',
+    ],
+  },
   {
     version: '1.6.0',
     date: '2026-10-26',
@@ -7313,6 +7497,14 @@ const ICONS = {
   crown: `<svg ${ATTRS}>
     <path d="M4 18h16l1-10-5 3.5L12 5 8 11.5 3 8l1 10Z" />
     <path d="M6 21h12" />
+  </svg>`,
+
+  // 十重试炼：宝石
+  gem: `<svg ${ATTRS}>
+    <path d="M6 3h12l3 6-9 12L3 9l3-6Z" />
+    <path d="M3 9h18" />
+    <path d="M9 3l3 6 3-6" />
+    <path d="M9 9l3 12 3-12" />
   </svg>`,
 
   // 初见锋芒：五角星
@@ -8145,7 +8337,9 @@ class SceneManager {
 
       btn.append(no, stars);
       if (lv.valid && lv.unlocked) {
-        btn.title = `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
+        btn.title = lv.isEx
+          ? `${lv.name}：${lv.goal}`
+          : `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
       }
       this.el.levelGrid.appendChild(btn);
     }
@@ -8905,8 +9099,8 @@ const LEVELS = [
     "moves": 20,
     "starThresholds": [
       2000,
-      3000,
-      4000
+      2800,
+      3300
     ],
     "disabledBoosters": [],
     "rules": {
@@ -8935,7 +9129,7 @@ const LEVELS = [
     "starThresholds": [
       2500,
       3700,
-      4900
+      4600
     ],
     "disabledBoosters": [],
     "rules": {
@@ -8963,8 +9157,8 @@ const LEVELS = [
     "moves": 20,
     "starThresholds": [
       2500,
-      3700,
-      4900
+      3400,
+      4100
     ],
     "disabledBoosters": [],
     "rules": {
@@ -9024,8 +9218,8 @@ const LEVELS = [
     "moves": 22,
     "starThresholds": [
       2600,
-      3800,
-      5000
+      3400,
+      4000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -9037,6 +9231,129 @@ const LEVELS = [
       }
     },
     "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 106,
+    "name": "EX-6 回响",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2600
+    },
+    "moves": 14,
+    "starThresholds": [
+      2600,
+      3400,
+      4300
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "refundMoveOnSpecial": 1
+    },
+    "tutorialHint": "每生成一个特殊方块返还 1 步，单次最多返还 2 步"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 107,
+    "name": "EX-7 雷暴",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 3400
+    },
+    "moves": 18,
+    "starThresholds": [
+      3400,
+      4000,
+      4900
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "forceBombOnMatch": true,
+      "bombRadius": 3,
+      "bombChainAll": true,
+      "bombBonus": 100
+    },
+    "tutorialHint": "四连及以上只会生成炸弹；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 108,
+    "name": "EX-8 霜潮",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2100
+    },
+    "moves": 20,
+    "starThresholds": [
+      2100,
+      3100,
+      3800
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "freezeAreaEveryNMoves": 5,
+      "freezeAreaSize": 2,
+      "freezeAreaCells": 2,
+      "freezeAreaMaxIce": 8
+    },
+    "tutorialHint": "每 5 步，随机 2×2 区域中的 2 格结霜；场上最多 8 格冰"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 109,
+    "name": "EX-9 禁术",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 3600
+    },
+    "moves": 20,
+    "starThresholds": [
+      3600,
+      4000,
+      4600
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "noSpecials": true,
+      "maxChainMultiplier": 4
+    },
+    "tutorialHint": "不再生成特殊方块；5 种颜色让连锁更密集，连锁倍率上限提升到 4 倍"
   },
   {
     "schemaVersion": 1,
@@ -9102,6 +9419,35 @@ const LEVELS = [
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 110,
+    "name": "EX-10 祭典",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2400
+    },
+    "moves": 20,
+    "starThresholds": [
+      2400,
+      3200,
+      3800
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "giftSpecialEveryNMoves": 4
+    },
+    "tutorialHint": "每 4 步，祭典会随机赠予一个特殊方块"
   },
   {
     "schemaVersion": 1,

@@ -16,6 +16,7 @@ import { isValidSwap } from '../js/domain/matchEngine.js';
 import { reshuffle } from '../js/domain/deadlockDetector.js';
 import { isGoalComplete, goalTasks } from '../js/domain/goals.js';
 import { RandomSource } from '../js/core/random.js';
+import { SPECIAL } from '../js/core/constants.js';
 
 const RUNS = Math.max(1, Number(process.argv[2]) || 4);
 const levelsRoot = new URL('../levels/', import.meta.url);
@@ -69,7 +70,10 @@ function candidateMoves(board) {
         if (!board.isFree(rr, cc)) continue;
         const a = { r, c };
         const b = { r: rr, c: cc };
-        if (isValidSwap(board, a, b)) out.push([a, b]);
+        const bombSwap =
+          board.specialAt(a.r, a.c) === SPECIAL.BOMB ||
+          board.specialAt(b.r, b.c) === SPECIAL.BOMB;
+        if (bombSwap || isValidSwap(board, a, b)) out.push([a, b]);
       }
     }
   }
@@ -84,8 +88,10 @@ function simulate(level, seed) {
   let score = 0;
   const collected = {};
   let bestSettle = 0;
+  // EX-6 回响：生成特殊方块会返还步数，模拟时也把这部分算进预算
+  let movesBudget = level.moves;
 
-  for (let move = 0; move < level.moves; move += 1) {
+  for (let move = 0; move < movesBudget; move += 1) {
     const moves = candidateMoves(board);
     if (!moves.length) {
       reshuffle(board, rng);
@@ -95,10 +101,16 @@ function simulate(level, seed) {
     let best = null;
     for (let i = 0; i < moves.length; i += 1) {
       const [a, b] = moves[i];
+      const bombSwap =
+        board.specialAt(a.r, a.c) === SPECIAL.BOMB ||
+        board.specialAt(b.r, b.c) === SPECIAL.BOMB;
       const clone = board.clone();
       clone.swap(a, b);
       const beforeIce = iceDurability(clone);
-      const res = resolveCascade(clone, { rng: new RandomSource(seed * 1000 + move * 100 + i) });
+      const res = resolveCascade(clone, {
+        rng: new RandomSource(seed * 1000 + move * 100 + i),
+        ...(bombSwap ? { initialCells: [a, b], preferred: [a, b] } : {}),
+      });
       let gain = 0;
       const gained = {};
       for (const step of res.sequence) {
@@ -114,7 +126,7 @@ function simulate(level, seed) {
       if (weights.ice) value += iceGain * weights.ice;
 
       if (!best || value > best.value) {
-        best = { value, board: clone, gain, gained };
+        best = { value, board: clone, gain, gained, specialsCreated: res.specialsCreated };
       }
     }
 
@@ -122,9 +134,16 @@ function simulate(level, seed) {
     score += best.gain;
     for (const [type, n] of Object.entries(best.gained)) collected[type] = (collected[type] || 0) + n;
 
+    const refundRule = Number(level.rules?.refundMoveOnSpecial);
+    if (Number.isFinite(refundRule) && refundRule > 0 && best.specialsCreated) {
+      const perSpecial = Math.max(1, Math.min(2, Math.floor(refundRule)));
+      const refund = Math.min(2, best.specialsCreated) * perSpecial;
+      movesBudget = Math.min(level.moves + 8, movesBudget + refund);
+    }
+
     const counters = { score, collected, iceLeft: iceCells(board), initialIce };
     if (isGoalComplete(level.goal, counters)) {
-      const remaining = level.moves - move - 1;
+      const remaining = movesBudget - move - 1;
       bestSettle = Math.max(bestSettle, score + remaining * 100);
     }
   }
@@ -147,7 +166,7 @@ function median(values) {
     : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
-const DEFAULT_IDS = [1, 3, 5, 8, 10, 12, 14, 15, 16, 17, 18, 19, 20, 101, 102, 103, 104, 105];
+const DEFAULT_IDS = [1, 3, 5, 8, 10, 12, 14, 15, 16, 17, 18, 19, 20, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110];
 const filter = process.argv[3] ? process.argv[3].split(',').map(Number).filter(Number.isInteger) : null;
 const ids = filter && filter.length ? filter : DEFAULT_IDS;
 console.log(`模拟 ${RUNS} 局/关\n`);

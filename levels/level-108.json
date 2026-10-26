@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "levelId": 108,
+  "name": "EX-8 霜潮",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2100
+  },
+  "moves": 20,
+  "starThresholds": [
+    2100,
+    3100,
+    3800
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "freezeAreaEveryNMoves": 5,
+    "freezeAreaSize": 2,
+    "freezeAreaCells": 2,
+    "freezeAreaMaxIce": 8
+  },
+  "tutorialHint": "每 5 步，随机 2×2 区域中的 2 格结霜；场上最多 8 格冰"
+}

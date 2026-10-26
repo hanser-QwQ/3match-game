@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "levelId": 106,
+  "name": "EX-6 回响",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2600
+  },
+  "moves": 14,
+  "starThresholds": [
+    2600,
+    3400,
+    4300
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "refundMoveOnSpecial": 1
+  },
+  "tutorialHint": "每生成一个特殊方块返还 1 步，单次最多返还 2 步"
+}

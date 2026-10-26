@@ -17,8 +17,8 @@
   "moves": 20,
   "starThresholds": [
     2000,
-    3000,
-    4000
+    2800,
+    3300
   ],
   "disabledBoosters": [],
   "rules": {

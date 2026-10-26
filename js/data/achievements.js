@@ -46,11 +46,20 @@ export const ACHIEVEMENTS = [
   {
     id: 'all_ex',
     name: '升阶大师',
-    desc: '通关全部 5 个 EX 关卡',
+    desc: '通关 5 个 EX 关卡',
     icon: 'crown',
     tier: 'gold',
     metric: 'clearedExCount',
     target: 5,
+  },
+  {
+    id: 'all_ex_10',
+    name: '十重试炼',
+    desc: '通关全部 10 个 EX 关卡',
+    icon: 'gem',
+    tier: 'platinum',
+    metric: 'clearedExCount',
+    target: 10,
   },
   {
     id: 'first_3star',

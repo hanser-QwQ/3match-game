@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "levelId": 110,
+  "name": "EX-10 祭典",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 2400
+  },
+  "moves": 20,
+  "starThresholds": [
+    2400,
+    3200,
+    3800
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "giftSpecialEveryNMoves": 4
+  },
+  "tutorialHint": "每 4 步，祭典会随机赠予一个特殊方块"
+}

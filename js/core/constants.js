@@ -80,6 +80,7 @@ export const GOAL = {
 };
 
 /** 连锁倍率：第 s 段 1 + 0.5 × (s − 1)，封顶 3 倍 */
-export function chainMultiplier(chainIndex) {
-  return Math.min(1 + 0.5 * (chainIndex - 1), SCORE.MAX_MULTIPLIER);
+export function chainMultiplier(chainIndex, maxMultiplier = SCORE.MAX_MULTIPLIER) {
+  const cap = Number.isFinite(maxMultiplier) && maxMultiplier >= 1 ? maxMultiplier : SCORE.MAX_MULTIPLIER;
+  return Math.min(1 + 0.5 * (chainIndex - 1), cap);
 }

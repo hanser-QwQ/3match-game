@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "levelId": 107,
+  "name": "EX-7 雷暴",
+  "isEx": true,
+  "board": {
+    "rows": 8,
+    "cols": 8,
+    "elementTypes": 6,
+    "iceCells": [],
+    "blockedCells": []
+  },
+  "goal": {
+    "type": "score",
+    "amount": 3400
+  },
+  "moves": 18,
+  "starThresholds": [
+    3400,
+    4000,
+    4900
+  ],
+  "disabledBoosters": [],
+  "rules": {
+    "moveTimeLimit": 7,
+    "forceBombOnMatch": true,
+    "bombRadius": 3,
+    "bombChainAll": true,
+    "bombBonus": 100
+  },
+  "tutorialHint": "四连及以上只会生成炸弹；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+}

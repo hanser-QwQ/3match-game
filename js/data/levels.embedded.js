@@ -334,8 +334,8 @@ export const LEVELS = [
     "moves": 20,
     "starThresholds": [
       2000,
-      3000,
-      4000
+      2800,
+      3300
     ],
     "disabledBoosters": [],
     "rules": {
@@ -364,7 +364,7 @@ export const LEVELS = [
     "starThresholds": [
       2500,
       3700,
-      4900
+      4600
     ],
     "disabledBoosters": [],
     "rules": {
@@ -392,8 +392,8 @@ export const LEVELS = [
     "moves": 20,
     "starThresholds": [
       2500,
-      3700,
-      4900
+      3400,
+      4100
     ],
     "disabledBoosters": [],
     "rules": {
@@ -453,8 +453,8 @@ export const LEVELS = [
     "moves": 22,
     "starThresholds": [
       2600,
-      3800,
-      5000
+      3400,
+      4000
     ],
     "disabledBoosters": [],
     "rules": {
@@ -466,6 +466,129 @@ export const LEVELS = [
       }
     },
     "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 106,
+    "name": "EX-6 回响",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2600
+    },
+    "moves": 14,
+    "starThresholds": [
+      2600,
+      3400,
+      4300
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "refundMoveOnSpecial": 1
+    },
+    "tutorialHint": "每生成一个特殊方块返还 1 步，单次最多返还 2 步"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 107,
+    "name": "EX-7 雷暴",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 3400
+    },
+    "moves": 18,
+    "starThresholds": [
+      3400,
+      4000,
+      4900
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "forceBombOnMatch": true,
+      "bombRadius": 3,
+      "bombChainAll": true,
+      "bombBonus": 100
+    },
+    "tutorialHint": "四连及以上只会生成炸弹；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 108,
+    "name": "EX-8 霜潮",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2100
+    },
+    "moves": 20,
+    "starThresholds": [
+      2100,
+      3100,
+      3800
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "freezeAreaEveryNMoves": 5,
+      "freezeAreaSize": 2,
+      "freezeAreaCells": 2,
+      "freezeAreaMaxIce": 8
+    },
+    "tutorialHint": "每 5 步，随机 2×2 区域中的 2 格结霜；场上最多 8 格冰"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 109,
+    "name": "EX-9 禁术",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 5,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 3600
+    },
+    "moves": 20,
+    "starThresholds": [
+      3600,
+      4000,
+      4600
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "noSpecials": true,
+      "maxChainMultiplier": 4
+    },
+    "tutorialHint": "不再生成特殊方块；5 种颜色让连锁更密集，连锁倍率上限提升到 4 倍"
   },
   {
     "schemaVersion": 1,
@@ -531,6 +654,35 @@ export const LEVELS = [
     ],
     "disabledBoosters": [],
     "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
+  },
+  {
+    "schemaVersion": 1,
+    "levelId": 110,
+    "name": "EX-10 祭典",
+    "isEx": true,
+    "board": {
+      "rows": 8,
+      "cols": 8,
+      "elementTypes": 6,
+      "iceCells": [],
+      "blockedCells": []
+    },
+    "goal": {
+      "type": "score",
+      "amount": 2400
+    },
+    "moves": 20,
+    "starThresholds": [
+      2400,
+      3200,
+      3800
+    ],
+    "disabledBoosters": [],
+    "rules": {
+      "moveTimeLimit": 7,
+      "giftSpecialEveryNMoves": 4
+    },
+    "tutorialHint": "每 4 步，祭典会随机赠予一个特殊方块"
   },
   {
     "schemaVersion": 1,

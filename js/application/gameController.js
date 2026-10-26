@@ -472,7 +472,8 @@ export class GameController {
         this.toast('两个条纹合成为彩虹', 'good');
         this.emitSession();
         // 降为普通元素后如果顺势形成了连线，正常结算掉，避免棋盘上留下现成三连
-        await this.runCascade({ preferred: [from, to] });
+        const upgraded = await this.runCascade({ preferred: [from, to] });
+        this.applySpecialMoveRefund(upgraded);
         await this.afterMove();
         return { ok: true };
       }
@@ -480,8 +481,10 @@ export class GameController {
         this.audio.play('special');
         await this.renderer.playSpecialSwap(from, to, effect.combo);
         s.spendMove();
+        s.pendingFreeze = true;
         this.emitSession();
-        await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
+        const result = await this.runCascade({ initialCells: effect.cells, preferred: [from, to] });
+        this.applySpecialMoveRefund(result);
       } else {
         /*
          * 任何相邻交换都会真正执行并消耗一步，不再预先判定"能否形成三连"。
@@ -495,6 +498,7 @@ export class GameController {
         s.pendingFreeze = true;
         this.emitSession();
         const result = await this.runCascade({ preferred: [from, to] });
+        this.applySpecialMoveRefund(result);
         if (!result.sequence.length) {
           // 没有连锁产生：给一个轻微的低音提示，画面保持交换后的状态
           this.audio.play('dud');
@@ -527,6 +531,26 @@ export class GameController {
     return result;
   }
 
+  /**
+   * EX-6 回响：本次操作生成特殊方块时返还步数。
+   * 单次最多按 2 个特殊方块计算，避免一次超大连锁无限续步。
+   */
+  applySpecialMoveRefund(result) {
+    const s = this.session;
+    if (!s) return 0;
+    const rule = Number(s.level.rules?.refundMoveOnSpecial);
+    if (!Number.isFinite(rule) || rule <= 0 || !result?.specialsCreated) return 0;
+
+    const perSpecial = Math.max(1, Math.min(2, Math.floor(rule)));
+    const count = Math.min(2, result.specialsCreated);
+    const gain = count * perSpecial;
+    s.movesLeft += gain;
+    s.movesTotal = Math.max(s.movesTotal, s.movesLeft);
+    this.toast(`特殊方块回响：返还 ${gain} 步`, 'good');
+    this.emitSession();
+    return gain;
+  }
+
   async afterMove() {
     const s = this.session;
     if (!s) return;
@@ -537,6 +561,7 @@ export class GameController {
       s.turnCount += 1;
       await this.applyFreezeRule();
     }
+    await this.applyGiftRule();
 
     // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
     // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
@@ -564,34 +589,131 @@ export class GameController {
     this.renderer?.setHint(this.tutorial?.active ? this.suggestMove() : null);
   }
 
-  /** EX-2：每走 N 步后随机冰冻 1~4 个空格 */
+  /** EX-2：每走 N 步随机冰冻 1~4 个空格；EX-8：每 N 步冻结一个区域 */
   async applyFreezeRule() {
     const s = this.session;
     const rules = s.level.rules || {};
-    const n = rules.freezeEveryNMoves;
-    if (!n || s.turnCount % n !== 0) return;
+    const randomN = rules.freezeEveryNMoves;
+    const areaN = rules.freezeAreaEveryNMoves;
+
+    if (randomN && s.turnCount % randomN === 0) {
+      const free = [];
+      s.board.eachCell((r, c) => {
+        if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0) free.push({ r, c });
+      });
+      if (free.length) {
+        // 随机抽取 1~4 个
+        for (let i = free.length - 1; i > 0; i -= 1) {
+          const j = this.rng.int(i + 1);
+          [free[i], free[j]] = [free[j], free[i]];
+        }
+        const pick = Math.min(1 + this.rng.int(4), free.length);
+        const frozen = free.slice(0, pick);
+        for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+        // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+        this.renderer?.syncBoard(s.board);
+        this.audio?.play('freeze');
+        this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
+        this.emitSession();
+        await this.renderer?.playFreeze?.(frozen);
+      }
+    }
+
+    if (areaN && s.turnCount % areaN === 0) {
+      const size = Math.max(2, Math.min(3, Number(rules.freezeAreaSize) || 2));
+      const maxIce = Number(rules.freezeAreaMaxIce);
+      const remaining = Number.isFinite(maxIce) && maxIce > 0 ? maxIce - s.board.countIce() : Infinity;
+      if (remaining <= 0) return;
+
+      const candidates = [];
+      for (let r = 0; r + size <= s.board.rows; r += 1) {
+        for (let c = 0; c + size <= s.board.cols; c += 1) {
+          let normal = 0;
+          for (let rr = r; rr < r + size; rr += 1) {
+            for (let cc = c; cc < c + size; cc += 1) {
+              if (
+                s.board.isFree(rr, cc) &&
+                s.board.typeAt(rr, cc) >= 0 &&
+                !s.board.specialAt(rr, cc)
+              ) {
+                normal += 1;
+              }
+            }
+          }
+          if (normal >= Math.max(2, Math.ceil((size * size) / 2))) candidates.push({ r, c, normal });
+        }
+      }
+      if (!candidates.length) return;
+
+      const maxNormal = Math.max(...candidates.map((x) => x.normal));
+      const pool = candidates.filter((x) => x.normal === maxNormal);
+      const spot = pool[this.rng.int(pool.length)];
+      const cells = [];
+      for (let rr = spot.r; rr < spot.r + size; rr += 1) {
+        for (let cc = spot.c; cc < spot.c + size; cc += 1) {
+          if (!s.board.isFree(rr, cc) || s.board.typeAt(rr, cc) < 0 || s.board.specialAt(rr, cc)) continue;
+          cells.push({ r: rr, c: cc });
+        }
+      }
+      if (!cells.length) return;
+
+      // 区域内随机挑几格结霜，避免一次冻住整片 2×2
+      for (let i = cells.length - 1; i > 0; i -= 1) {
+        const j = this.rng.int(i + 1);
+        [cells[i], cells[j]] = [cells[j], cells[i]];
+      }
+      const perFreeze = Number(rules.freezeAreaCells);
+      const limit = Math.max(
+        1,
+        Math.min(cells.length, Number.isFinite(perFreeze) && perFreeze > 0 ? perFreeze : cells.length, remaining)
+      );
+      const frozen = cells.slice(0, limit);
+      for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
+
+      this.renderer?.syncBoard(s.board);
+      this.audio?.play('freeze');
+      this.toast(`第 ${s.turnCount} 步：霜潮冻结了 ${frozen.length} 格`, 'warn');
+      this.emitSession();
+      await this.renderer?.playFreeze?.(frozen);
+    }
+  }
+
+  /** EX-10 祭典：每 N 步随机把一个普通元素变成特殊方块 */
+  async applyGiftRule() {
+    const s = this.session;
+    const n = Number(s?.level?.rules?.giftSpecialEveryNMoves);
+    if (!Number.isFinite(n) || n <= 0 || s.turnCount % n !== 0) return;
 
     const free = [];
     s.board.eachCell((r, c) => {
-      if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0) free.push({ r, c });
+      if (s.board.isFree(r, c) && s.board.typeAt(r, c) >= 0 && !s.board.specialAt(r, c)) {
+        free.push({ r, c });
+      }
     });
     if (!free.length) return;
 
-    // 随机抽取 1~4 个
-    for (let i = free.length - 1; i > 0; i -= 1) {
-      const j = this.rng.int(i + 1);
-      [free[i], free[j]] = [free[j], free[i]];
+    const cell = free[this.rng.int(free.length)];
+    const roll = this.rng.next();
+    let special;
+    let label;
+    if (roll < 0.5) {
+      special = this.rng.next() < 0.5 ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
+      label = '条纹';
+    } else if (roll < 0.8) {
+      special = SPECIAL.BOMB;
+      label = '炸弹';
+    } else {
+      special = SPECIAL.RAINBOW;
+      label = '彩虹';
     }
-    const pick = Math.min(1 + this.rng.int(4), free.length);
-    const frozen = free.slice(0, pick);
-    for (const cell of frozen) s.board.setIce(cell.r, cell.c, 1);
 
-    // 关键：渲染器维护的是棋盘克隆，必须同步回去才会立即显示
+    s.board.setType(cell.r, cell.c, s.board.typeAt(cell.r, cell.c), special);
     this.renderer?.syncBoard(s.board);
-    this.audio?.play('freeze');
-    this.toast(`第 ${s.turnCount} 步：随机冻住了 ${pick} 个元素`, 'warn');
+    this.audio?.play('special');
+    this.toast(`祭典赠礼：生成了一颗${label}`, 'good');
     this.emitSession();
-    await this.renderer?.playFreeze?.(frozen);
+    await this.renderer?.playSpecialSwap?.(cell, cell, 'gift');
   }
 
   /** 达成目标后主动结算，保留剩余步数奖励 */

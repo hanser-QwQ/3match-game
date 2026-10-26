@@ -186,10 +186,13 @@ function groupMatches(matches) {
 export function planSpecials(board, matches, preferred = [], rng = null) {
   if (!matches.length) return [];
   const rules = board?.rules || {};
+  // EX-9 禁术：不再生成任何新的特殊方块
+  if (rules.noSpecials) return [];
   const minLen = minMatchLength(board);
   const stripeThreshold = Number.isInteger(rules.stripeThreshold) ? rules.stripeThreshold : minLen + 1;
   const rainbowThreshold = Number.isInteger(rules.rainbowThreshold) ? rules.rainbowThreshold : minLen + 2;
   const bombBoost = Boolean(rules.bombChanceBoost) && rng;
+  const forceBomb = Boolean(rules.forceBombOnMatch);
   const preferredKeys = new Set(preferred.map((p) => key(p.r, p.c)));
   const plans = [];
 
@@ -197,10 +200,13 @@ export function planSpecials(board, matches, preferred = [], rng = null) {
     let special = null;
     if (group.hasRow && group.hasCol) {
       special = SPECIAL.BOMB;
+    } else if (forceBomb && group.maxLen >= 4) {
+      // EX-7 雷暴：四连及以上只出炸弹，不再生成条纹 / 彩虹
+      special = SPECIAL.BOMB;
     } else if (group.maxLen >= rainbowThreshold) {
       special = SPECIAL.RAINBOW;
       // EX-3：五连有概率变成炸弹（炸弹生成概率提升）
-      if (bombBoost && !group.hasRow && !group.hasCol && rng.float() < 0.5) {
+      if (bombBoost && !group.hasRow && !group.hasCol && rng.next() < 0.5) {
         special = SPECIAL.BOMB;
       }
     } else if (group.maxLen >= stripeThreshold) {
@@ -375,13 +381,16 @@ export function blastCells(board, r, c, special, rng = null) {
       for (let rr = 0; rr < board.rows; rr += 1) if (rr !== r) push(rr, c);
       break;
     case SPECIAL.BOMB: {
-      // EX-3 炸弹范围缩小为周围 4 格（正交邻居），否则用默认菱形 13 格
+      // EX-3 炸弹范围缩小为周围 4 格（正交邻居）；否则按 bombRadius 画菱形
       const smallBomb = rules.bombRange === 4;
       if (smallBomb) {
         for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) push(r + dr, c + dc);
       } else {
-        for (let dr = -2; dr <= 2; dr += 1) {
-          const span = 2 - Math.abs(dr);
+        const radius = Number.isFinite(rules.bombRadius)
+          ? Math.max(1, Math.min(4, Math.floor(rules.bombRadius)))
+          : 2;
+        for (let dr = -radius; dr <= radius; dr += 1) {
+          const span = radius - Math.abs(dr);
           for (let dc = -span; dc <= span; dc += 1) {
             if (dr === 0 && dc === 0) continue;
             push(r + dr, c + dc);
