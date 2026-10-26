@@ -800,6 +800,175 @@ body {
   line-height: 1.8;
 }
 
+/* ------------------------------------------------------------------ 成就 */
+
+.btn-achievements { position: relative; }
+
+.achievement-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+
+.achievement-summary-kicker {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.achievement-summary-num {
+  margin: 2px 0 0;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.achievement-summary-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.achievement-summary-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.achievement-list { display: grid; gap: 10px; }
+
+.achievement-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.achievement-card.locked { opacity: 0.62; }
+
+.achievement-mark {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.achievement-mark svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.tier-bronze .achievement-mark {
+  background: #f6e9dc;
+  border-color: #e7cfb7;
+  color: #9a5f2f;
+}
+.tier-silver .achievement-mark {
+  background: #f0f2f4;
+  border-color: #d9dee2;
+  color: #6f7880;
+}
+.tier-gold .achievement-mark {
+  background: #faf1d8;
+  border-color: #ead7a2;
+  color: #a97e1f;
+}
+.tier-platinum .achievement-mark {
+  background: #e9f1f3;
+  border-color: #c9dade;
+  color: #4f7883;
+}
+
+.achievement-card.locked .achievement-mark {
+  background: var(--paper-2);
+  border-color: var(--line);
+  color: var(--ink-3);
+  box-shadow: none;
+}
+
+.achievement-main { flex: 1; min-width: 0; }
+.achievement-head { display: flex; align-items: center; gap: 8px; }
+.achievement-head h3 { margin: 0; font-size: 14px; letter-spacing: 0.02em; color: var(--ink); }
+.achievement-tier {
+  font-size: 10px;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.achievement-desc { margin: 4px 0 0; font-size: 12px; line-height: 1.55; color: var(--ink-2); }
+.achievement-meta { margin-top: 6px; font-size: 11px; color: var(--ink-3); }
+
+.achievement-progress {
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+.achievement-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.achievement-new {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.achievement-unlock-card { max-width: 340px; text-align: left; }
+.achievement-unlock-kicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: var(--warm);
+  text-align: center;
+}
+.achievement-unlock-card h2 { text-align: center; }
+.achievement-unlock-list { display: grid; gap: 8px; margin: 12px 0 16px; }
+.achievement-unlock-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+.achievement-unlock-item .achievement-mark { width: 38px; height: 38px; border-radius: 12px; }
+.achievement-unlock-item .achievement-mark svg { width: 20px; height: 20px; }
+.achievement-unlock-item b { display: block; font-size: 13px; color: var(--ink); }
+.achievement-unlock-item p { margin: 2px 0 0; font-size: 11px; line-height: 1.5; color: var(--ink-3); }
+
 /* ------------------------------------------------------------------ 遮罩层 */
 
 .overlay {
@@ -1234,6 +1403,7 @@ body {
       <div class="home-grid">
         <button class="btn btn-ghost" data-action="levels"><span class="ico">▦</span>关卡</button>
         <button class="btn btn-ghost" data-action="rank"><span class="ico">★</span>成绩</button>
+        <button class="btn btn-ghost btn-achievements" data-action="achievements"><span class="ico">◈</span>成就<span class="reddot hidden" id="achievement-dot"></span></button>
         <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
@@ -1387,7 +1557,7 @@ body {
       <div class="panel panel-danger">
         <div class="panel-title">数据</div>
         <button class="btn btn-ghost btn-danger" id="btn-reset">清空本地进度</button>
-        <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
+        <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
       <button class="fine-print version-line" id="version-line">三消小径 v1.6.0</button>
@@ -1411,6 +1581,26 @@ body {
       </div>
       <div class="rank-list" id="rank-list"></div>
       <p class="fine-print">记录保存在浏览器本地，更换设备后不会同步。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 成就 ============================ -->
+  <section id="scene-achievements" class="scene" data-scene="achievements">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>成就</h2>
+      <span class="topbar-meta" id="achievements-meta">0 / 13</span>
+    </header>
+    <div class="scroll-area">
+      <div class="achievement-summary">
+        <div>
+          <p class="achievement-summary-kicker">已解锁</p>
+          <p class="achievement-summary-num" id="achievements-count">0</p>
+        </div>
+        <div class="achievement-summary-bar"><span id="achievements-bar"></span></div>
+      </div>
+      <div id="achievement-list" class="achievement-list"></div>
+      <p class="fine-print">成就只保存在本机，已解锁的成就不会因为版本调整而失效。</p>
     </div>
   </section>
 
@@ -1517,6 +1707,16 @@ body {
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
       <p class="level-intro-timer hidden" id="level-intro-timer"></p>
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
+    </div>
+  </div>
+
+  <!-- ============================ 成就解锁弹窗 ============================ -->
+  <div id="achievement-unlock" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="achievement-unlock-title">
+    <div class="overlay-card achievement-unlock-card">
+      <p class="achievement-unlock-kicker">成就解锁</p>
+      <h2 id="achievement-unlock-title">新的成就</h2>
+      <div id="achievement-unlock-list" class="achievement-unlock-list"></div>
+      <button class="btn btn-primary" id="btn-achievement-ok">太棒了</button>
     </div>
   </div>
 
@@ -1758,6 +1958,7 @@ const SCENE = {
   RESULT: 'result',
   SETTINGS: 'settings',
   RANK: 'rank',
+  ACHIEVEMENTS: 'achievements',
   RULES: 'rules',
   NOTICE: 'notice',
 };
@@ -2009,7 +2210,8 @@ __modules["js/infrastructure/storageService.js"] = function (exports, __req) {
  * M10 存档服务 StorageService（基础设施层）
  *
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
- *   player / progress / settings / interruptedSession / localBest
+ *   player / progress / settings / interruptedSession / localBest / achievements
+ * achievements 是向后兼容的附加字段，旧存档读取时补成空表。
  * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
@@ -2052,6 +2254,7 @@ function createDefaultSave() {
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
+    achievements: {},
   };
 }
 
@@ -2116,6 +2319,17 @@ function normalizeSave(input) {
     if (progress[id - 1]?.cleared) progress[id].unlocked = true;
   }
 
+  // 成就记录是附加字段：只保留结构合法的条目，旧存档缺省为空表
+  const achievements = {};
+  for (const [id, item] of Object.entries(data.achievements || {})) {
+    if (!id || id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+    if (!item || typeof item !== 'object') continue;
+    achievements[id] = {
+      unlockedAt: typeof item.unlockedAt === 'string' ? item.unlockedAt : null,
+      seen: Boolean(item.seen),
+    };
+  }
+
   return {
     savedAt: data.savedAt || base.savedAt,
     saveVersion: SAVE_VERSION,
@@ -2136,6 +2350,7 @@ function normalizeSave(input) {
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
+    achievements,
   };
 }
 
@@ -3990,6 +4205,230 @@ exports.isGoalComplete = isGoalComplete;
 exports.goalSummary = goalSummary;
 };
 
+__modules["js/data/achievements.js"] = function (exports, __req) {
+/**
+ * 成就定义（数据层）。
+ *
+ * metric 由 domain/achievements.js 的 buildAchievementStats 计算；
+ * runOnly 表示该成就无法从历史存档推断，只能在某一局结算时判定。
+ * icon 对应 presentation/achievementIcons.js 中的线性图标。
+ * tier 只影响展示配色：bronze / silver / gold / platinum。
+ */
+const ACHIEVEMENTS = [
+  {
+    id: 'first_clear',
+    name: '初出茅庐',
+    desc: '通关任意一个关卡',
+    icon: 'sprout',
+    tier: 'bronze',
+    metric: 'clearedCount',
+    target: 1,
+  },
+  {
+    id: 'clear_5',
+    name: '渐入佳境',
+    desc: '通关 5 个关卡',
+    icon: 'steps',
+    tier: 'bronze',
+    metric: 'clearedCount',
+    target: 5,
+  },
+  {
+    id: 'clear_20',
+    name: '雪境旅人',
+    desc: '通关全部 20 个普通关卡',
+    icon: 'mountain',
+    tier: 'gold',
+    metric: 'clearedNormalCount',
+    target: 20,
+  },
+  {
+    id: 'first_ex',
+    name: '破格者',
+    desc: '通关任意一个 EX 关卡',
+    icon: 'spark',
+    tier: 'silver',
+    metric: 'clearedExCount',
+    target: 1,
+  },
+  {
+    id: 'all_ex',
+    name: '升阶大师',
+    desc: '通关全部 5 个 EX 关卡',
+    icon: 'crown',
+    tier: 'gold',
+    metric: 'clearedExCount',
+    target: 5,
+  },
+  {
+    id: 'first_3star',
+    name: '初见锋芒',
+    desc: '首次获得 3 星评价',
+    icon: 'star',
+    tier: 'silver',
+    metric: 'threeStarCount',
+    target: 1,
+  },
+  {
+    id: 'stars_30',
+    name: '满天星斗',
+    desc: '累计获得 30 颗星',
+    icon: 'constellation',
+    tier: 'gold',
+    metric: 'totalStars',
+    target: 30,
+  },
+  {
+    id: 'three_star_10',
+    name: '三星收藏家',
+    desc: '10 个关卡达到 3 星',
+    icon: 'medal',
+    tier: 'gold',
+    metric: 'threeStarCount',
+    target: 10,
+  },
+  {
+    id: 'normal_all_three',
+    name: '完美雪境',
+    desc: '20 个普通关卡全部达到 3 星',
+    icon: 'trophy',
+    tier: 'platinum',
+    metric: 'normalThreeStarCount',
+    target: 20,
+  },
+  {
+    id: 'score_5000',
+    name: '高分选手',
+    desc: '单关最高分达到 5000',
+    icon: 'chart',
+    tier: 'silver',
+    metric: 'maxHighScore',
+    target: 5000,
+  },
+  {
+    id: 'chain_5',
+    name: '连锁大师',
+    desc: '单次操作达成 5 连锁',
+    icon: 'chain',
+    tier: 'silver',
+    metric: 'runChainBest',
+    target: 5,
+    runOnly: true,
+  },
+  {
+    id: 'no_booster_ex',
+    name: '徒手攀登',
+    desc: '不使用道具通关一个 EX 关卡',
+    icon: 'hand',
+    tier: 'gold',
+    metric: 'runNoBoosterEx',
+    target: 1,
+    runOnly: true,
+  },
+  {
+    id: 'moves_5',
+    name: '游刃有余',
+    desc: '通关时剩余至少 5 步',
+    icon: 'hourglass',
+    tier: 'bronze',
+    metric: 'runMovesLeft',
+    target: 5,
+    runOnly: true,
+  },
+];
+
+const ACHIEVEMENT_TIER_LABEL = {
+  bronze: '铜',
+  silver: '银',
+  gold: '金',
+  platinum: '铂',
+};
+
+exports.ACHIEVEMENTS = ACHIEVEMENTS;
+exports.ACHIEVEMENT_TIER_LABEL = ACHIEVEMENT_TIER_LABEL;
+};
+
+__modules["js/domain/achievements.js"] = function (exports, __req) {
+/**
+ * M16 成就判定（领域层，零浏览器依赖）。
+ *
+ * 成就分两类：
+ * - 可回溯：通关数、星数、最高分等能从存档算出来的指标；
+ * - 仅本局：连锁数、剩余步数、是否使用道具等只存在于一次结算结果里。
+ *
+ * 这样老存档在启动时可以补齐可回溯成就，而仅本局成就在之后的游戏里继续获得。
+ */
+const { ACHIEVEMENTS } = __req("js/data/achievements.js");
+
+/**
+ * 汇总成就指标。
+ * @param save 存档对象
+ * @param levels 关卡仓库（需要 list()）
+ * @param result 可选，本次结算结果
+ */
+function buildAchievementStats(save, levels, result = null) {
+  const list = levels?.list ? levels.list() : [];
+  const progress = save?.progress || {};
+  const stats = {
+    clearedCount: 0,
+    clearedNormalCount: 0,
+    clearedExCount: 0,
+    totalStars: 0,
+    threeStarCount: 0,
+    normalThreeStarCount: 0,
+    maxHighScore: 0,
+    totalScore: Math.max(0, Number(save?.player?.totalScore) || 0),
+    runChainBest: 0,
+    runNoBoosterEx: 0,
+    runMovesLeft: 0,
+  };
+
+  for (const level of list) {
+    if (level.valid === false) continue;
+    const p = progress[String(level.levelId)];
+    if (!p?.cleared) continue;
+    const stars = Math.max(0, Math.min(3, Number(p.stars) || 0));
+    stats.clearedCount += 1;
+    stats.totalStars += stars;
+    if (stars >= 3) {
+      stats.threeStarCount += 1;
+      if (!level.isEx) stats.normalThreeStarCount += 1;
+    }
+    if (level.isEx) stats.clearedExCount += 1;
+    else stats.clearedNormalCount += 1;
+    stats.maxHighScore = Math.max(stats.maxHighScore, Math.max(0, Number(p.highScore) || 0));
+  }
+
+  if (result) {
+    stats.runChainBest = Math.max(0, Number(result.chainBest) || 0);
+    stats.runMovesLeft = result.cleared ? Math.max(0, Number(result.movesLeft) || 0) : 0;
+    stats.runNoBoosterEx = result.cleared && result.isEx && (Number(result.boostersUsed) || 0) === 0 ? 1 : 0;
+  }
+
+  return stats;
+}
+
+/** 返回当前指标下已经达成的成就定义列表 */
+function evaluateAchievements(stats) {
+  return ACHIEVEMENTS.filter((achievement) => {
+    const value = Number(stats?.[achievement.metric] || 0);
+    return value >= achievement.target;
+  });
+}
+
+/** 单个成就的当前进度，最多显示到目标值 */
+function achievementProgress(achievement, stats) {
+  return Math.min(
+    Math.max(0, Number(achievement.target) || 0),
+    Math.max(0, Number(stats?.[achievement.metric] || 0))
+  );
+}
+
+exports.buildAchievementStats = buildAchievementStats;
+exports.evaluateAchievements = evaluateAchievements;
+exports.achievementProgress = achievementProgress;
+};
+
 __modules["js/application/gameSession.js"] = function (exports, __req) {
 /**
  * M08 会话状态机 GameSession（应用层）
@@ -4164,6 +4603,8 @@ const { hasValidMove, reshuffle, findAnyValidMove } = __req("js/domain/deadlockD
 const { settleScore, judgeStars } = __req("js/domain/scorer.js");
 const { checkBooster, consumeBooster, boosterLimit } = __req("js/domain/boosterService.js");
 const { goalSummary } = __req("js/domain/goals.js");
+const { ACHIEVEMENTS } = __req("js/data/achievements.js");
+const { buildAchievementStats, evaluateAchievements, achievementProgress } = __req("js/domain/achievements.js");
 const { GameSession } = __req("js/application/gameSession.js");
 const { sanitizeNickname } = __req("js/application/nickname.js");
 const { createDefaultSave, localISO } = __req("js/infrastructure/storageService.js");
@@ -4211,6 +4652,8 @@ class GameController {
       this.save.interruptedSession = null;
     }
     this.recalculateStars();
+    // 老存档按现有进度补发可回溯成就；仅本局成就留到之后的结算
+    this.claimAchievements();
     this.applySettings();
     return this.save;
   }
@@ -4763,6 +5206,7 @@ class GameController {
     s.result = {
       levelId: s.level.levelId,
       levelName: s.level.name,
+      isEx: Boolean(s.level.isEx),
       cleared,
       baseScore,
       bonusScore,
@@ -4772,6 +5216,7 @@ class GameController {
       movesTotal: s.movesTotal,
       chainBest: s.chainBest,
       tilesCleared: s.tilesCleared,
+      boostersUsed: s.boosterUsedTotal,
       goalTasks: s.goalTasks,
       hint: goalSummary(s.level.goal),
       at: localISO(),
@@ -4781,6 +5226,8 @@ class GameController {
     };
 
     if (cleared) this.applyProgress(s.result);
+    // 在写入存档前判定成就；结果对象带上本次新解锁项，供结算页弹窗
+    s.result.achievements = this.claimAchievements({ result: s.result, persist: false });
     this.save.interruptedSession = null;
     this._stopMoveTimer();
     const wr = this.storage.write(this.save);
@@ -4847,6 +5294,78 @@ class GameController {
       const lv = this.levels.get(id);
       return lv && !lv.hidden ? sum + p.highScore : sum;
     }, 0);
+  }
+
+  // ---------------------------------------------------------------- 成就
+
+  /**
+   * 判定并写入新解锁的成就。
+   * result 为本次结算结果；启动补发时不传，只计算可回溯指标。
+   * persist=false 时由调用方统一写档（finish 会紧接着写一次）。
+   */
+  claimAchievements({ result = null, persist = true } = {}) {
+    const stats = buildAchievementStats(this.save, this.levels, result);
+    const earned = evaluateAchievements(stats);
+    this.save.achievements = this.save.achievements || {};
+    const unlocked = [];
+    const at = result?.at || localISO();
+
+    for (const achievement of earned) {
+      if (this.save.achievements[achievement.id]) continue;
+      this.save.achievements[achievement.id] = { unlockedAt: at, seen: false };
+      unlocked.push(achievement);
+    }
+
+    if (unlocked.length && persist) {
+      const wr = this.storage.write(this.save);
+      if (!wr.ok) this.storageDegraded = true;
+    }
+    return unlocked;
+  }
+
+  achievementSummary() {
+    const records = this.save.achievements || {};
+    let unlocked = 0;
+    let unseen = 0;
+    for (const achievement of ACHIEVEMENTS) {
+      const record = records[achievement.id];
+      if (!record) continue;
+      unlocked += 1;
+      if (!record.seen) unseen += 1;
+    }
+    return { total: ACHIEVEMENTS.length, unlocked, unseen };
+  }
+
+  achievementList() {
+    const stats = buildAchievementStats(this.save, this.levels);
+    const records = this.save.achievements || {};
+    return ACHIEVEMENTS.map((achievement) => {
+      const record = records[achievement.id] || null;
+      return {
+        ...achievement,
+        unlocked: Boolean(record),
+        unlockedAt: record?.unlockedAt || null,
+        seen: Boolean(record?.seen),
+        current: achievementProgress(achievement, stats),
+      };
+    });
+  }
+
+  markAchievementsSeen(ids = null) {
+    const records = this.save.achievements || {};
+    const list = Array.isArray(ids) ? ids : Object.keys(records);
+    let changed = false;
+    for (const id of list) {
+      if (records[id] && !records[id].seen) {
+        records[id].seen = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      const wr = this.storage.write(this.save);
+      if (!wr.ok) this.storageDegraded = true;
+    }
+    return changed;
   }
 
   // ---------------------------------------------------------------- 暂停与重开
@@ -6614,8 +7133,9 @@ const APP_VERSION = '1.6.0';
 const CHANGELOG = [
   {
     version: '1.6.0',
-    date: '2026-10-24',
+    date: '2026-10-26',
     notes: [
+      '新增 13 项成就：首页成就入口、历史进度补发、结算解锁弹窗',
       'EX-1 重做为“两个条纹交换合成彩虹”：合成的彩虹会留在棋盘上，可继续用于清除同色元素',
       '修复在冰块旁边生成特殊方块时，冰块没有削减的问题',
       '按历史最高分重新判定星级，已通关的关卡不会因本轮难度下调而少星',
@@ -6753,11 +7273,127 @@ exports.CHANGELOG = CHANGELOG;
 exports.compareVersions = compareVersions;
 };
 
+__modules["js/presentation/achievementIcons.js"] = function (exports, __req) {
+/**
+ * 成就线性图标。
+ *
+ * 统一 24×24 视窗、1.7px 描边、圆角端点；颜色由外层徽章的 currentColor 决定，
+ * 因此同一套图标可以随铜 / 银 / 金 / 铂等级换色。
+ */
+const ATTRS =
+  'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"';
+
+const ICONS = {
+  // 初出茅庐：一株刚冒头的嫩芽
+  sprout: `<svg ${ATTRS}>
+    <path d="M12 21v-7" />
+    <path d="M12 14C8.5 14 6 11.5 6 8c3.5 0 6 2.5 6 6Z" />
+    <path d="M12 12c3.5 0 6-2.2 6-5.5C14.5 6.5 12 8.8 12 12Z" />
+    <path d="M5 21h14" />
+  </svg>`,
+
+  // 渐入佳境：向上走的阶梯
+  steps: `<svg ${ATTRS}>
+    <path d="M4 20h4v-4h4v-4h4V8h4" />
+    <path d="M3 21h18" />
+  </svg>`,
+
+  // 雪境旅人：带雪线的山口
+  mountain: `<svg ${ATTRS}>
+    <path d="M2.5 20 9 8l4 7 2-3.5L21.5 20H2.5Z" />
+    <path d="M6.8 13.5 9 8l2.2 5.5" />
+  </svg>`,
+
+  // 破格者：四角星芒
+  spark: `<svg ${ATTRS}>
+    <path d="M12 3c.6 4.8 2.6 6.8 7.4 7.4-4.8.6-6.8 2.6-7.4 7.4-.6-4.8-2.6-6.8-7.4-7.4C9.4 9.8 11.4 7.8 12 3Z" />
+  </svg>`,
+
+  // 升阶大师：皇冠
+  crown: `<svg ${ATTRS}>
+    <path d="M4 18h16l1-10-5 3.5L12 5 8 11.5 3 8l1 10Z" />
+    <path d="M6 21h12" />
+  </svg>`,
+
+  // 初见锋芒：五角星
+  star: `<svg ${ATTRS}>
+    <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9L12 3.5Z" />
+  </svg>`,
+
+  // 满天星斗：连成星座的星点
+  constellation: `<svg ${ATTRS}>
+    <path d="M5 17 10 9l5 4 5-7" />
+    <circle cx="5" cy="17" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="10" cy="9" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="15" cy="13" r="1.3" fill="currentColor" stroke="none" />
+    <circle cx="20" cy="6" r="1.3" fill="currentColor" stroke="none" />
+  </svg>`,
+
+  // 三星收藏家：带绶带的奖章
+  medal: `<svg ${ATTRS}>
+    <path d="M8 3l3 6" />
+    <path d="M16 3l-3 6" />
+    <circle cx="12" cy="14" r="5.5" />
+    <path d="M12 11.2l.9 1.8 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3.9-1.8Z" fill="currentColor" stroke="none" />
+  </svg>`,
+
+  // 完美雪境：奖杯
+  trophy: `<svg ${ATTRS}>
+    <path d="M8 4h8v5a4 4 0 0 1-8 0V4Z" />
+    <path d="M8 6H5v2a3 3 0 0 0 3 3" />
+    <path d="M16 6h3v2a3 3 0 0 1-3 3" />
+    <path d="M12 13v4" />
+    <path d="M9 21h6" />
+    <path d="M10 17h4v4" />
+  </svg>`,
+
+  // 高分选手：柱状图
+  chart: `<svg ${ATTRS}>
+    <path d="M4 4v16h16" />
+    <path d="M8 20v-5" />
+    <path d="M12 20v-8" />
+    <path d="M16 20v-3" />
+  </svg>`,
+
+  // 连锁大师：两节锁链
+  chain: `<svg ${ATTRS}>
+    <path d="M10 8H8a4 4 0 0 0 0 8h2" />
+    <path d="M14 8h2a4 4 0 0 1 0 8h-2" />
+    <path d="M8.5 12h7" />
+  </svg>`,
+
+  // 徒手攀登：张开的手掌
+  hand: `<svg ${ATTRS}>
+    <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+    <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+    <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+  </svg>`,
+
+  // 游刃有余：沙漏
+  hourglass: `<svg ${ATTRS}>
+    <path d="M7 3h10" />
+    <path d="M7 21h10" />
+    <path d="M8 3c0 5 4 5 4 9" />
+    <path d="M16 3c0 5-4 5-4 9" />
+    <path d="M8 21c0-5 4-5 4-9" />
+    <path d="M16 21c0-5-4-5-4-9" />
+    <path d="M10.5 18h3" />
+  </svg>`,
+};
+
+function achievementIcon(name) {
+  return ICONS[name] || ICONS.spark;
+}
+
+exports.achievementIcon = achievementIcon;
+};
+
 __modules["js/presentation/sceneManager.js"] = function (exports, __req) {
 /**
  * M16 场景与界面 SceneManager（表现层／应用层之间）
  *
- * 六个场景：首页、关卡列表、游戏、结算、设置、成绩。
+ * 场景：首页、关卡列表、游戏、结算、设置、成绩、成就、规则、公告。
  * 只负责把应用层下发的视图模型渲染为 DOM 并转发用户意图，
  * 不判断规则是否成立，也不直接读写存档。
  */
@@ -6767,6 +7403,8 @@ const { SCENE } = __req("js/core/constants.js");
 const { goalSummary } = __req("js/domain/goals.js");
 const { drawShareCard, downloadShareCard, shareText } = __req("js/presentation/shareCard.js");
 const { APP_VERSION, CHANGELOG, compareVersions } = __req("js/data/changelog.js");
+const { ACHIEVEMENT_TIER_LABEL } = __req("js/data/achievements.js");
+const { achievementIcon } = __req("js/presentation/achievementIcons.js");
 
 const STAR = '★';
 
@@ -6782,6 +7420,8 @@ class SceneManager {
     this.lastScore = -1;
     // 记录已经弹过关卡开始信息的会话，避免同一局重复弹出
     this.introSessionId = null;
+    // 结算页成就弹窗待标记已读的成就 id
+    this.pendingAchievementIds = [];
     // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
     this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
@@ -6823,6 +7463,14 @@ class SceneManager {
       moveTimerText: $('move-timer-text'),
       saveNote: $('save-note'),
       badge: $('board-badge'),
+      achievementDot: $('achievement-dot'),
+      achievementsMeta: $('achievements-meta'),
+      achievementsCount: $('achievements-count'),
+      achievementsBar: $('achievements-bar'),
+      achievementList: $('achievement-list'),
+      achievementUnlock: $('achievement-unlock'),
+      achievementUnlockList: $('achievement-unlock-list'),
+      btnAchievementOk: $('btn-achievement-ok'),
       resultKicker: $('result-kicker'),
       resultTitle: $('result-title'),
       resultStars: $('result-stars'),
@@ -6929,6 +7577,15 @@ class SceneManager {
       this.audio.play('button');
       this.hideLevelIntro();
       this.el.btnLevelStart.blur();
+    });
+
+    this.el.btnAchievementOk?.addEventListener('click', () => {
+      this.audio.play('button');
+      const ids = this.pendingAchievementIds || [];
+      this.pendingAchievementIds = [];
+      this.el.achievementUnlock?.classList.add('hidden');
+      this.controller.markAchievementsSeen(ids);
+      this.refreshHome();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -7213,8 +7870,10 @@ class SceneManager {
     });
     this.current = scene;
     if (scene !== SCENE.GAME) this.hideLevelIntro();
+    if (scene !== SCENE.RESULT) this.el.achievementUnlock?.classList.add('hidden');
 
     if (scene === SCENE.LEVELS) this.renderLevels();
+    if (scene === SCENE.ACHIEVEMENTS) this.renderAchievements();
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
     if (scene === SCENE.NOTICE) this.renderNotice();
@@ -7309,6 +7968,14 @@ class SceneManager {
     this.el.homeProgress.textContent = cleared
       ? `已通关 ${cleared} / ${total} · 累计 ${save.player.totalScore} 分`
       : '尚未开始';
+
+    const achievements = this.controller.achievementSummary();
+    this.el.achievementDot?.classList.toggle('hidden', achievements.unseen === 0);
+    const achievementBtn = document.querySelector('[data-action="achievements"]');
+    achievementBtn?.setAttribute(
+      'aria-label',
+      `成就，已解锁 ${achievements.unlocked} / ${achievements.total}`
+    );
   }
 
   renderSession(vm) {
@@ -7543,6 +8210,37 @@ class SceneManager {
     this.el.resultRetry.classList.toggle('hidden', !result.cleared);
     this.el.resultShare.classList.toggle('hidden', !result.cleared);
     this.el.resultRow?.classList.toggle('single', !result.cleared);
+
+    if (result.achievements?.length) this.showAchievementUnlock(result.achievements);
+    else this.el.achievementUnlock?.classList.add('hidden');
+  }
+
+  showAchievementUnlock(achievements) {
+    if (!Array.isArray(achievements) || !achievements.length || !this.el.achievementUnlock) return;
+    this.pendingAchievementIds = achievements.map((achievement) => achievement.id);
+    this.el.achievementUnlockList.textContent = '';
+
+    for (const achievement of achievements) {
+      const item = document.createElement('div');
+      item.className = `achievement-unlock-item tier-${achievement.tier}`;
+
+      const mark = document.createElement('span');
+      mark.className = 'achievement-mark';
+      mark.innerHTML = achievementIcon(achievement.icon);
+
+      const text = document.createElement('div');
+      const name = document.createElement('b');
+      name.textContent = achievement.name;
+      const desc = document.createElement('p');
+      desc.textContent = achievement.desc;
+      text.append(name, desc);
+
+      item.append(mark, text);
+      this.el.achievementUnlockList.appendChild(item);
+    }
+
+    this.el.achievementUnlock.classList.remove('hidden');
+    this.el.btnAchievementOk?.focus({ preventScroll: true });
   }
 
   renderRank() {
@@ -7581,6 +8279,78 @@ class SceneManager {
       item.append(idx, mid, score);
       this.el.rankList.appendChild(item);
     });
+  }
+
+  renderAchievements() {
+    const list = this.controller.achievementList();
+    const unlocked = list.filter((a) => a.unlocked).length;
+    this.el.achievementsMeta.textContent = `${unlocked} / ${list.length}`;
+    this.el.achievementsCount.textContent = String(unlocked);
+    this.el.achievementsBar.style.width = `${list.length ? (unlocked / list.length) * 100 : 0}%`;
+    this.el.achievementList.textContent = '';
+
+    for (const achievement of list) {
+      const card = document.createElement('article');
+      card.className = `achievement-card tier-${achievement.tier} ${achievement.unlocked ? 'unlocked' : 'locked'}`;
+
+      const mark = document.createElement('div');
+      mark.className = 'achievement-mark';
+      mark.innerHTML = achievementIcon(achievement.icon);
+
+      const main = document.createElement('div');
+      main.className = 'achievement-main';
+
+      const head = document.createElement('div');
+      head.className = 'achievement-head';
+      const name = document.createElement('h3');
+      name.textContent = achievement.name;
+      const tier = document.createElement('span');
+      tier.className = 'achievement-tier';
+      tier.textContent = ACHIEVEMENT_TIER_LABEL[achievement.tier] || '';
+      head.append(name, tier);
+      if (achievement.unlocked && !achievement.seen) {
+        const badge = document.createElement('span');
+        badge.className = 'achievement-new';
+        badge.textContent = 'NEW';
+        head.appendChild(badge);
+      }
+
+      const desc = document.createElement('p');
+      desc.className = 'achievement-desc';
+      desc.textContent = achievement.desc;
+      main.append(head, desc);
+
+      if (achievement.unlocked) {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = achievement.unlockedAt
+          ? `${achievement.unlockedAt.slice(0, 10)} 解锁`
+          : '已解锁';
+        main.appendChild(meta);
+      } else if (achievement.runOnly) {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = '完成对应挑战解锁';
+        main.appendChild(meta);
+      } else {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = `进度 ${achievement.current} / ${achievement.target}`;
+        const bar = document.createElement('div');
+        bar.className = 'achievement-progress';
+        const fill = document.createElement('span');
+        fill.style.width = `${achievement.target > 0 ? (achievement.current / achievement.target) * 100 : 0}%`;
+        bar.appendChild(fill);
+        main.append(meta, bar);
+      }
+
+      card.append(mark, main);
+      this.el.achievementList.appendChild(card);
+    }
+
+    // 已看过成就页后清除首页红点；卡片上的 NEW 标记在本次渲染中保留
+    this.controller.markAchievementsSeen();
+    this.refreshHome();
   }
 
   syncSettings() {

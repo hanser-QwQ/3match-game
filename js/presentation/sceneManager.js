@@ -1,7 +1,7 @@
 /**
  * M16 场景与界面 SceneManager（表现层／应用层之间）
  *
- * 六个场景：首页、关卡列表、游戏、结算、设置、成绩。
+ * 场景：首页、关卡列表、游戏、结算、设置、成绩、成就、规则、公告。
  * 只负责把应用层下发的视图模型渲染为 DOM 并转发用户意图，
  * 不判断规则是否成立，也不直接读写存档。
  */
@@ -11,6 +11,8 @@ import { SCENE } from '../core/constants.js';
 import { goalSummary } from '../domain/goals.js';
 import { drawShareCard, downloadShareCard, shareText } from './shareCard.js';
 import { APP_VERSION, CHANGELOG, compareVersions } from '../data/changelog.js';
+import { ACHIEVEMENT_TIER_LABEL } from '../data/achievements.js';
+import { achievementIcon } from './achievementIcons.js';
 
 const STAR = '★';
 
@@ -26,6 +28,8 @@ export class SceneManager {
     this.lastScore = -1;
     // 记录已经弹过关卡开始信息的会话，避免同一局重复弹出
     this.introSessionId = null;
+    // 结算页成就弹窗待标记已读的成就 id
+    this.pendingAchievementIds = [];
     // 道具按钮复用，避免计时器每次刷新都重建 DOM 导致点击丢失
     this.boosterButtons = new Map();
     this.tutorialAnchor = 'board';
@@ -67,6 +71,14 @@ export class SceneManager {
       moveTimerText: $('move-timer-text'),
       saveNote: $('save-note'),
       badge: $('board-badge'),
+      achievementDot: $('achievement-dot'),
+      achievementsMeta: $('achievements-meta'),
+      achievementsCount: $('achievements-count'),
+      achievementsBar: $('achievements-bar'),
+      achievementList: $('achievement-list'),
+      achievementUnlock: $('achievement-unlock'),
+      achievementUnlockList: $('achievement-unlock-list'),
+      btnAchievementOk: $('btn-achievement-ok'),
       resultKicker: $('result-kicker'),
       resultTitle: $('result-title'),
       resultStars: $('result-stars'),
@@ -173,6 +185,15 @@ export class SceneManager {
       this.audio.play('button');
       this.hideLevelIntro();
       this.el.btnLevelStart.blur();
+    });
+
+    this.el.btnAchievementOk?.addEventListener('click', () => {
+      this.audio.play('button');
+      const ids = this.pendingAchievementIds || [];
+      this.pendingAchievementIds = [];
+      this.el.achievementUnlock?.classList.add('hidden');
+      this.controller.markAchievementsSeen(ids);
+      this.refreshHome();
     });
 
     document.getElementById('btn-restart').addEventListener('click', () => {
@@ -457,8 +478,10 @@ export class SceneManager {
     });
     this.current = scene;
     if (scene !== SCENE.GAME) this.hideLevelIntro();
+    if (scene !== SCENE.RESULT) this.el.achievementUnlock?.classList.add('hidden');
 
     if (scene === SCENE.LEVELS) this.renderLevels();
+    if (scene === SCENE.ACHIEVEMENTS) this.renderAchievements();
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
     if (scene === SCENE.NOTICE) this.renderNotice();
@@ -553,6 +576,14 @@ export class SceneManager {
     this.el.homeProgress.textContent = cleared
       ? `已通关 ${cleared} / ${total} · 累计 ${save.player.totalScore} 分`
       : '尚未开始';
+
+    const achievements = this.controller.achievementSummary();
+    this.el.achievementDot?.classList.toggle('hidden', achievements.unseen === 0);
+    const achievementBtn = document.querySelector('[data-action="achievements"]');
+    achievementBtn?.setAttribute(
+      'aria-label',
+      `成就，已解锁 ${achievements.unlocked} / ${achievements.total}`
+    );
   }
 
   renderSession(vm) {
@@ -787,6 +818,37 @@ export class SceneManager {
     this.el.resultRetry.classList.toggle('hidden', !result.cleared);
     this.el.resultShare.classList.toggle('hidden', !result.cleared);
     this.el.resultRow?.classList.toggle('single', !result.cleared);
+
+    if (result.achievements?.length) this.showAchievementUnlock(result.achievements);
+    else this.el.achievementUnlock?.classList.add('hidden');
+  }
+
+  showAchievementUnlock(achievements) {
+    if (!Array.isArray(achievements) || !achievements.length || !this.el.achievementUnlock) return;
+    this.pendingAchievementIds = achievements.map((achievement) => achievement.id);
+    this.el.achievementUnlockList.textContent = '';
+
+    for (const achievement of achievements) {
+      const item = document.createElement('div');
+      item.className = `achievement-unlock-item tier-${achievement.tier}`;
+
+      const mark = document.createElement('span');
+      mark.className = 'achievement-mark';
+      mark.innerHTML = achievementIcon(achievement.icon);
+
+      const text = document.createElement('div');
+      const name = document.createElement('b');
+      name.textContent = achievement.name;
+      const desc = document.createElement('p');
+      desc.textContent = achievement.desc;
+      text.append(name, desc);
+
+      item.append(mark, text);
+      this.el.achievementUnlockList.appendChild(item);
+    }
+
+    this.el.achievementUnlock.classList.remove('hidden');
+    this.el.btnAchievementOk?.focus({ preventScroll: true });
   }
 
   renderRank() {
@@ -825,6 +887,78 @@ export class SceneManager {
       item.append(idx, mid, score);
       this.el.rankList.appendChild(item);
     });
+  }
+
+  renderAchievements() {
+    const list = this.controller.achievementList();
+    const unlocked = list.filter((a) => a.unlocked).length;
+    this.el.achievementsMeta.textContent = `${unlocked} / ${list.length}`;
+    this.el.achievementsCount.textContent = String(unlocked);
+    this.el.achievementsBar.style.width = `${list.length ? (unlocked / list.length) * 100 : 0}%`;
+    this.el.achievementList.textContent = '';
+
+    for (const achievement of list) {
+      const card = document.createElement('article');
+      card.className = `achievement-card tier-${achievement.tier} ${achievement.unlocked ? 'unlocked' : 'locked'}`;
+
+      const mark = document.createElement('div');
+      mark.className = 'achievement-mark';
+      mark.innerHTML = achievementIcon(achievement.icon);
+
+      const main = document.createElement('div');
+      main.className = 'achievement-main';
+
+      const head = document.createElement('div');
+      head.className = 'achievement-head';
+      const name = document.createElement('h3');
+      name.textContent = achievement.name;
+      const tier = document.createElement('span');
+      tier.className = 'achievement-tier';
+      tier.textContent = ACHIEVEMENT_TIER_LABEL[achievement.tier] || '';
+      head.append(name, tier);
+      if (achievement.unlocked && !achievement.seen) {
+        const badge = document.createElement('span');
+        badge.className = 'achievement-new';
+        badge.textContent = 'NEW';
+        head.appendChild(badge);
+      }
+
+      const desc = document.createElement('p');
+      desc.className = 'achievement-desc';
+      desc.textContent = achievement.desc;
+      main.append(head, desc);
+
+      if (achievement.unlocked) {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = achievement.unlockedAt
+          ? `${achievement.unlockedAt.slice(0, 10)} 解锁`
+          : '已解锁';
+        main.appendChild(meta);
+      } else if (achievement.runOnly) {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = '完成对应挑战解锁';
+        main.appendChild(meta);
+      } else {
+        const meta = document.createElement('p');
+        meta.className = 'achievement-meta';
+        meta.textContent = `进度 ${achievement.current} / ${achievement.target}`;
+        const bar = document.createElement('div');
+        bar.className = 'achievement-progress';
+        const fill = document.createElement('span');
+        fill.style.width = `${achievement.target > 0 ? (achievement.current / achievement.target) * 100 : 0}%`;
+        bar.appendChild(fill);
+        main.append(meta, bar);
+      }
+
+      card.append(mark, main);
+      this.el.achievementList.appendChild(card);
+    }
+
+    // 已看过成就页后清除首页红点；卡片上的 NEW 标记在本次渲染中保留
+    this.controller.markAchievementsSeen();
+    this.refreshHome();
   }
 
   syncSettings() {

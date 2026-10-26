@@ -62,6 +62,7 @@ export const SCENE = {
   RESULT: 'result',
   SETTINGS: 'settings',
   RANK: 'rank',
+  ACHIEVEMENTS: 'achievements',
   RULES: 'rules',
   NOTICE: 'notice',
 };

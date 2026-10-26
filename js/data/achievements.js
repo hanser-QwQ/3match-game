@@ -1,0 +1,137 @@
+/**
+ * 成就定义（数据层）。
+ *
+ * metric 由 domain/achievements.js 的 buildAchievementStats 计算；
+ * runOnly 表示该成就无法从历史存档推断，只能在某一局结算时判定。
+ * icon 对应 presentation/achievementIcons.js 中的线性图标。
+ * tier 只影响展示配色：bronze / silver / gold / platinum。
+ */
+export const ACHIEVEMENTS = [
+  {
+    id: 'first_clear',
+    name: '初出茅庐',
+    desc: '通关任意一个关卡',
+    icon: 'sprout',
+    tier: 'bronze',
+    metric: 'clearedCount',
+    target: 1,
+  },
+  {
+    id: 'clear_5',
+    name: '渐入佳境',
+    desc: '通关 5 个关卡',
+    icon: 'steps',
+    tier: 'bronze',
+    metric: 'clearedCount',
+    target: 5,
+  },
+  {
+    id: 'clear_20',
+    name: '雪境旅人',
+    desc: '通关全部 20 个普通关卡',
+    icon: 'mountain',
+    tier: 'gold',
+    metric: 'clearedNormalCount',
+    target: 20,
+  },
+  {
+    id: 'first_ex',
+    name: '破格者',
+    desc: '通关任意一个 EX 关卡',
+    icon: 'spark',
+    tier: 'silver',
+    metric: 'clearedExCount',
+    target: 1,
+  },
+  {
+    id: 'all_ex',
+    name: '升阶大师',
+    desc: '通关全部 5 个 EX 关卡',
+    icon: 'crown',
+    tier: 'gold',
+    metric: 'clearedExCount',
+    target: 5,
+  },
+  {
+    id: 'first_3star',
+    name: '初见锋芒',
+    desc: '首次获得 3 星评价',
+    icon: 'star',
+    tier: 'silver',
+    metric: 'threeStarCount',
+    target: 1,
+  },
+  {
+    id: 'stars_30',
+    name: '满天星斗',
+    desc: '累计获得 30 颗星',
+    icon: 'constellation',
+    tier: 'gold',
+    metric: 'totalStars',
+    target: 30,
+  },
+  {
+    id: 'three_star_10',
+    name: '三星收藏家',
+    desc: '10 个关卡达到 3 星',
+    icon: 'medal',
+    tier: 'gold',
+    metric: 'threeStarCount',
+    target: 10,
+  },
+  {
+    id: 'normal_all_three',
+    name: '完美雪境',
+    desc: '20 个普通关卡全部达到 3 星',
+    icon: 'trophy',
+    tier: 'platinum',
+    metric: 'normalThreeStarCount',
+    target: 20,
+  },
+  {
+    id: 'score_5000',
+    name: '高分选手',
+    desc: '单关最高分达到 5000',
+    icon: 'chart',
+    tier: 'silver',
+    metric: 'maxHighScore',
+    target: 5000,
+  },
+  {
+    id: 'chain_5',
+    name: '连锁大师',
+    desc: '单次操作达成 5 连锁',
+    icon: 'chain',
+    tier: 'silver',
+    metric: 'runChainBest',
+    target: 5,
+    runOnly: true,
+  },
+  {
+    id: 'no_booster_ex',
+    name: '徒手攀登',
+    desc: '不使用道具通关一个 EX 关卡',
+    icon: 'hand',
+    tier: 'gold',
+    metric: 'runNoBoosterEx',
+    target: 1,
+    runOnly: true,
+  },
+  {
+    id: 'moves_5',
+    name: '游刃有余',
+    desc: '通关时剩余至少 5 步',
+    icon: 'hourglass',
+    tier: 'bronze',
+    metric: 'runMovesLeft',
+    target: 5,
+    runOnly: true,
+  },
+];
+
+export const ACHIEVEMENT_TIER_LABEL = {
+  bronze: '铜',
+  silver: '银',
+  gold: '金',
+  platinum: '铂',
+};

@@ -44,6 +44,7 @@
       <div class="home-grid">
         <button class="btn btn-ghost" data-action="levels"><span class="ico">▦</span>关卡</button>
         <button class="btn btn-ghost" data-action="rank"><span class="ico">★</span>成绩</button>
+        <button class="btn btn-ghost btn-achievements" data-action="achievements"><span class="ico">◈</span>成就<span class="reddot hidden" id="achievement-dot"></span></button>
         <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
@@ -197,7 +198,7 @@
       <div class="panel panel-danger">
         <div class="panel-title">数据</div>
         <button class="btn btn-ghost btn-danger" id="btn-reset">清空本地进度</button>
-        <p class="fine-print">清空后所有关卡星级与最高分都会重置，操作不可撤销。</p>
+        <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
       <button class="fine-print version-line" id="version-line">三消小径 v1.6.0</button>
@@ -221,6 +222,26 @@
       </div>
       <div class="rank-list" id="rank-list"></div>
       <p class="fine-print">记录保存在浏览器本地，更换设备后不会同步。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 成就 ============================ -->
+  <section id="scene-achievements" class="scene" data-scene="achievements">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>成就</h2>
+      <span class="topbar-meta" id="achievements-meta">0 / 13</span>
+    </header>
+    <div class="scroll-area">
+      <div class="achievement-summary">
+        <div>
+          <p class="achievement-summary-kicker">已解锁</p>
+          <p class="achievement-summary-num" id="achievements-count">0</p>
+        </div>
+        <div class="achievement-summary-bar"><span id="achievements-bar"></span></div>
+      </div>
+      <div id="achievement-list" class="achievement-list"></div>
+      <p class="fine-print">成就只保存在本机，已解锁的成就不会因为版本调整而失效。</p>
     </div>
   </section>
 
@@ -327,6 +348,16 @@
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
       <p class="level-intro-timer hidden" id="level-intro-timer"></p>
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
+    </div>
+  </div>
+
+  <!-- ============================ 成就解锁弹窗 ============================ -->
+  <div id="achievement-unlock" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="achievement-unlock-title">
+    <div class="overlay-card achievement-unlock-card">
+      <p class="achievement-unlock-kicker">成就解锁</p>
+      <h2 id="achievement-unlock-title">新的成就</h2>
+      <div id="achievement-unlock-list" class="achievement-unlock-list"></div>
+      <button class="btn btn-primary" id="btn-achievement-ok">太棒了</button>
     </div>
   </div>
 

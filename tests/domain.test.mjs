@@ -22,6 +22,7 @@ import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '..
 import { GameSession } from '../js/application/gameSession.js';
 import { readFileSync } from 'node:fs';
 import { createDefaultSave, normalizeSave } from '../js/infrastructure/storageService.js';
+import { buildAchievementStats, evaluateAchievements } from '../js/domain/achievements.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
 
@@ -773,6 +774,202 @@ test('存档迁移：按历史最高分重算星级，只升不降', () => {
   assert.equal(controller.save.localBest[0].stars, 2, '本地成绩的星级也应同步');
 
   assert.equal(controller.recalculateStars(), false, '第二次重算不应再产生变化');
+});
+
+test('成就：统计通关数、星数与最高分，识别可回溯成就', () => {
+  const levels = Array.from({ length: 20 }, (_, i) => ({ levelId: i + 1, isEx: false }));
+  levels.push({ levelId: 101, isEx: true });
+  const progress = {};
+  for (let id = 1; id <= 5; id += 1) {
+    progress[String(id)] = { cleared: true, stars: id <= 2 ? 3 : 2, highScore: id * 1000 };
+  }
+  progress['101'] = { cleared: true, stars: 3, highScore: 6000 };
+
+  const stats = buildAchievementStats({ progress, player: { totalScore: 9999 } }, { list: () => levels });
+  assert.equal(stats.clearedCount, 6);
+  assert.equal(stats.clearedNormalCount, 5);
+  assert.equal(stats.clearedExCount, 1);
+  assert.equal(stats.threeStarCount, 3);
+  assert.equal(stats.normalThreeStarCount, 2);
+  assert.equal(stats.totalStars, 15);
+  assert.equal(stats.maxHighScore, 6000);
+
+  const ids = evaluateAchievements(stats).map((a) => a.id);
+  assert.ok(ids.includes('first_clear'));
+  assert.ok(ids.includes('clear_5'));
+  assert.ok(ids.includes('first_ex'));
+  assert.ok(ids.includes('first_3star'));
+  assert.ok(ids.includes('score_5000'));
+  assert.equal(ids.includes('clear_20'), false);
+  assert.equal(ids.includes('all_ex'), false);
+  assert.equal(ids.includes('chain_5'), false);
+});
+
+test('成就：本局连锁、剩余步数与无道具 EX 判定', () => {
+  const stats = buildAchievementStats(
+    { progress: {}, player: {} },
+    { list: () => [] },
+    { cleared: true, isEx: true, chainBest: 5, movesLeft: 6, boostersUsed: 0 }
+  );
+  const ids = evaluateAchievements(stats).map((a) => a.id);
+  assert.ok(ids.includes('chain_5'));
+  assert.ok(ids.includes('no_booster_ex'));
+  assert.ok(ids.includes('moves_5'));
+});
+
+test('成就：启动时按已有进度补发可回溯成就', () => {
+  const levels = Array.from({ length: 5 }, (_, i) => ({ levelId: i + 1, isEx: false, valid: true }));
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => levels.find((lv) => lv.levelId === Number(id)) || null,
+      list: () => levels,
+      playable: () => levels,
+    },
+    audio: { setEnabled() {}, setVolume() {} },
+    renderer: null,
+    tutorial: null,
+    rng: null,
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    progress: {
+      1: { cleared: true, stars: 3, highScore: 6000 },
+      2: { cleared: true, stars: 1, highScore: 1000 },
+      3: { cleared: true, stars: 1, highScore: 1000 },
+      4: { cleared: true, stars: 1, highScore: 1000 },
+      5: { cleared: true, stars: 1, highScore: 1000 },
+    },
+    player: { totalScore: 10000 },
+    achievements: {},
+  };
+
+  const ids = controller.claimAchievements().map((a) => a.id);
+  assert.ok(ids.includes('first_clear'));
+  assert.ok(ids.includes('clear_5'));
+  assert.ok(ids.includes('first_3star'));
+  assert.ok(ids.includes('score_5000'));
+  assert.equal(ids.includes('clear_20'), false);
+  assert.equal(controller.save.achievements.first_clear.seen, false, '补发成就应标为未读');
+  assert.equal(controller.claimAchievements().length, 0, '重复补发不应新增');
+});
+
+test('成就：结算结果可解锁仅本局成就', () => {
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: { get: () => null, list: () => [], playable: () => [] },
+    audio: { setEnabled() {}, setVolume() {} },
+    renderer: null,
+    tutorial: null,
+    rng: null,
+    navigate() {},
+    toast() {},
+  });
+  controller.save = { progress: {}, player: {}, achievements: {} };
+
+  const unlocked = controller.claimAchievements({
+    result: {
+      cleared: true,
+      isEx: true,
+      chainBest: 5,
+      movesLeft: 6,
+      boostersUsed: 0,
+      at: '2026-10-26T10:00:00+08:00',
+    },
+    persist: false,
+  });
+  const ids = unlocked.map((a) => a.id);
+  assert.ok(ids.includes('chain_5'));
+  assert.ok(ids.includes('no_booster_ex'));
+  assert.ok(ids.includes('moves_5'));
+  assert.equal(controller.save.achievements.chain_5.unlockedAt, '2026-10-26T10:00:00+08:00');
+  assert.equal(controller.save.achievements.chain_5.seen, false);
+  assert.equal(controller.achievementSummary().unseen, 3);
+});
+
+test('成就：通关结算会在结果对象上带出新解锁成就', async () => {
+  const level = {
+    levelId: 1,
+    name: 'L1',
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 100 },
+    board: { rows: 4, cols: 4, elementTypes: 4, iceCells: [], blockedCells: [] },
+    rules: {},
+    disabledBoosters: [],
+    starThresholds: [100, 200, 300],
+  };
+  const renderer = {
+    setBoard() {},
+    setHint() {},
+    setInputLocked() {},
+    setArmedTarget() {},
+    syncBoard() {},
+    async playSwap() {},
+    async playSpecialSwap() {},
+    async playStep() {},
+    async playReshuffle() {},
+  };
+  let routed = null;
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => (Number(id) === 1 ? level : null),
+      list: () => [level],
+      playable: () => [level],
+    },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer,
+    tutorial: null,
+    rng: new RandomSource(3),
+    navigate: (scene, payload) => {
+      routed = { scene, payload };
+    },
+    toast() {},
+  });
+  controller.save = {
+    progress: {},
+    settings: { soundEnabled: true, volume: 50 },
+    tutorialDone: false,
+    interruptedSession: null,
+    localBest: [],
+    achievements: {},
+    player: { nickname: 'T', totalScore: 0 },
+  };
+
+  assert.equal(controller.startLevel(1, { resume: false }), true);
+  const s = controller.session;
+  s.counters.score = 150;
+  s.movesLeft = 6;
+  s.chainBest = 5;
+  await controller.finish(true);
+
+  assert.equal(routed.scene, 'result');
+  const ids = routed.payload.achievements.map((a) => a.id);
+  assert.ok(ids.includes('first_clear'));
+  assert.ok(ids.includes('first_3star'));
+  assert.ok(ids.includes('moves_5'));
+  assert.ok(ids.includes('chain_5'));
+  assert.ok(controller.save.achievements.first_clear, '成就应写入存档');
+});
+
+test('存档：成就记录读取，旧存档缺省为空表', () => {
+  const save = normalizeSave({
+    achievements: {
+      first_clear: { unlockedAt: '2026-10-26T10:00:00+08:00', seen: false },
+      bad: null,
+    },
+  });
+  assert.equal(save.achievements.first_clear.unlockedAt, '2026-10-26T10:00:00+08:00');
+  assert.equal(save.achievements.first_clear.seen, false);
+  assert.equal('bad' in save.achievements, false);
+  assert.deepEqual(normalizeSave({ progress: {} }).achievements, {});
+  assert.deepEqual(createDefaultSave().achievements, {});
 });
 
 test('EX 计时：进入关卡先待开始，第一次操作后才启动，重开清除旧暂停状态', () => {

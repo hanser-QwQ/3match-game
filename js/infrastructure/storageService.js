@@ -2,7 +2,8 @@
  * M10 存档服务 StorageService（基础设施层）
  *
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
- *   player / progress / settings / interruptedSession / localBest
+ *   player / progress / settings / interruptedSession / localBest / achievements
+ * achievements 是向后兼容的附加字段，旧存档读取时补成空表。
  * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
@@ -45,6 +46,7 @@ export function createDefaultSave() {
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
+    achievements: {},
   };
 }
 
@@ -109,6 +111,17 @@ export function normalizeSave(input) {
     if (progress[id - 1]?.cleared) progress[id].unlocked = true;
   }
 
+  // 成就记录是附加字段：只保留结构合法的条目，旧存档缺省为空表
+  const achievements = {};
+  for (const [id, item] of Object.entries(data.achievements || {})) {
+    if (!id || id === '__proto__' || id === 'constructor' || id === 'prototype') continue;
+    if (!item || typeof item !== 'object') continue;
+    achievements[id] = {
+      unlockedAt: typeof item.unlockedAt === 'string' ? item.unlockedAt : null,
+      seen: Boolean(item.seen),
+    };
+  }
+
   return {
     savedAt: data.savedAt || base.savedAt,
     saveVersion: SAVE_VERSION,
@@ -129,6 +142,7 @@ export function normalizeSave(input) {
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
+    achievements,
   };
 }
 

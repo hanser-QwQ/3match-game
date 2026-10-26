@@ -19,6 +19,8 @@ import { hasValidMove, reshuffle, findAnyValidMove } from '../domain/deadlockDet
 import { settleScore, judgeStars } from '../domain/scorer.js';
 import { checkBooster, consumeBooster, boosterLimit } from '../domain/boosterService.js';
 import { goalSummary } from '../domain/goals.js';
+import { ACHIEVEMENTS } from '../data/achievements.js';
+import { buildAchievementStats, evaluateAchievements, achievementProgress } from '../domain/achievements.js';
 import { GameSession } from './gameSession.js';
 import { sanitizeNickname } from './nickname.js';
 import { createDefaultSave, localISO } from '../infrastructure/storageService.js';
@@ -66,6 +68,8 @@ export class GameController {
       this.save.interruptedSession = null;
     }
     this.recalculateStars();
+    // 老存档按现有进度补发可回溯成就；仅本局成就留到之后的结算
+    this.claimAchievements();
     this.applySettings();
     return this.save;
   }
@@ -618,6 +622,7 @@ export class GameController {
     s.result = {
       levelId: s.level.levelId,
       levelName: s.level.name,
+      isEx: Boolean(s.level.isEx),
       cleared,
       baseScore,
       bonusScore,
@@ -627,6 +632,7 @@ export class GameController {
       movesTotal: s.movesTotal,
       chainBest: s.chainBest,
       tilesCleared: s.tilesCleared,
+      boostersUsed: s.boosterUsedTotal,
       goalTasks: s.goalTasks,
       hint: goalSummary(s.level.goal),
       at: localISO(),
@@ -636,6 +642,8 @@ export class GameController {
     };
 
     if (cleared) this.applyProgress(s.result);
+    // 在写入存档前判定成就；结果对象带上本次新解锁项，供结算页弹窗
+    s.result.achievements = this.claimAchievements({ result: s.result, persist: false });
     this.save.interruptedSession = null;
     this._stopMoveTimer();
     const wr = this.storage.write(this.save);
@@ -702,6 +710,78 @@ export class GameController {
       const lv = this.levels.get(id);
       return lv && !lv.hidden ? sum + p.highScore : sum;
     }, 0);
+  }
+
+  // ---------------------------------------------------------------- 成就
+
+  /**
+   * 判定并写入新解锁的成就。
+   * result 为本次结算结果；启动补发时不传，只计算可回溯指标。
+   * persist=false 时由调用方统一写档（finish 会紧接着写一次）。
+   */
+  claimAchievements({ result = null, persist = true } = {}) {
+    const stats = buildAchievementStats(this.save, this.levels, result);
+    const earned = evaluateAchievements(stats);
+    this.save.achievements = this.save.achievements || {};
+    const unlocked = [];
+    const at = result?.at || localISO();
+
+    for (const achievement of earned) {
+      if (this.save.achievements[achievement.id]) continue;
+      this.save.achievements[achievement.id] = { unlockedAt: at, seen: false };
+      unlocked.push(achievement);
+    }
+
+    if (unlocked.length && persist) {
+      const wr = this.storage.write(this.save);
+      if (!wr.ok) this.storageDegraded = true;
+    }
+    return unlocked;
+  }
+
+  achievementSummary() {
+    const records = this.save.achievements || {};
+    let unlocked = 0;
+    let unseen = 0;
+    for (const achievement of ACHIEVEMENTS) {
+      const record = records[achievement.id];
+      if (!record) continue;
+      unlocked += 1;
+      if (!record.seen) unseen += 1;
+    }
+    return { total: ACHIEVEMENTS.length, unlocked, unseen };
+  }
+
+  achievementList() {
+    const stats = buildAchievementStats(this.save, this.levels);
+    const records = this.save.achievements || {};
+    return ACHIEVEMENTS.map((achievement) => {
+      const record = records[achievement.id] || null;
+      return {
+        ...achievement,
+        unlocked: Boolean(record),
+        unlockedAt: record?.unlockedAt || null,
+        seen: Boolean(record?.seen),
+        current: achievementProgress(achievement, stats),
+      };
+    });
+  }
+
+  markAchievementsSeen(ids = null) {
+    const records = this.save.achievements || {};
+    const list = Array.isArray(ids) ? ids : Object.keys(records);
+    let changed = false;
+    for (const id of list) {
+      if (records[id] && !records[id].seen) {
+        records[id].seen = true;
+        changed = true;
+      }
+    }
+    if (changed) {
+      const wr = this.storage.write(this.save);
+      if (!wr.ok) this.storageDegraded = true;
+    }
+    return changed;
   }
 
   // ---------------------------------------------------------------- 暂停与重开
