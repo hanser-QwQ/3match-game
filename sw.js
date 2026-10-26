@@ -18,6 +18,7 @@ const CORE = [
   './js/core/random.js',
   './js/data/changelog.js',
   './js/data/levels.embedded.js',
+  './js/data/achievements.js',
   './js/domain/board.js',
   './js/domain/boardFactory.js',
   './js/domain/matchEngine.js',
@@ -25,6 +26,7 @@ const CORE = [
   './js/domain/deadlockDetector.js',
   './js/domain/scorer.js',
   './js/domain/goals.js',
+  './js/domain/achievements.js',
   './js/domain/boosterService.js',
   './js/application/gameController.js',
   './js/application/gameSession.js',
@@ -38,6 +40,7 @@ const CORE = [
   './js/presentation/inputController.js',
   './js/presentation/a11yService.js',
   './js/presentation/sceneManager.js',
+  './js/presentation/achievementIcons.js',
   './js/presentation/shareCard.js',
   './levels/index.json',
 ];
