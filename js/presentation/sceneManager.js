@@ -38,16 +38,60 @@ export class SceneManager {
     this.serverVersion = null;
     this.updateAvailable = false;
     this.el = {};
+    this._onGlobalKeyDown = this._onGlobalKeyDown.bind(this);
   }
 
   init() {
     this.cacheElements();
     this.bindStatic();
     this.bindBus();
+    // 非游戏场景的 Esc 返回；游戏内由 InputController 处理
+    window.addEventListener('keydown', this._onGlobalKeyDown);
     this.refreshHome();
     if (this.el.versionLine) this.el.versionLine.textContent = `三消小径 v${APP_VERSION}`;
     this.checkVersion();
     return this;
+  }
+
+  /**
+   * 全局 Esc：设置、关卡、成绩、成就、规则、公告等界面返回首页。
+   * 游戏场景交给 InputController（暂停 / 继续 / 关闭关卡说明），避免双重处理。
+   */
+  _onGlobalKeyDown(event) {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (!this.current || this.current === SCENE.HOME || this.current === SCENE.GAME) return;
+
+    // 文本类输入框先取消编辑；滑条、开关等控件不拦截 Esc，直接返回
+    const active = document.activeElement;
+    const textEditing = active && (
+      active.tagName === 'TEXTAREA' ||
+      active.tagName === 'SELECT' ||
+      (active.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes(active.type))
+    );
+    if (textEditing) {
+      active.blur();
+      event.preventDefault();
+      return;
+    }
+
+    // 成绩分享弹层：Esc 只关闭弹层，不离开结算页
+    if (this.el.share && !this.el.share.classList.contains('hidden')) {
+      event.preventDefault();
+      this.audio.play('button');
+      this.el.share.classList.add('hidden');
+      return;
+    }
+
+    // 结算页的新成就弹窗：Esc 等同于“知道了”
+    if (this.el.achievementUnlock && !this.el.achievementUnlock.classList.contains('hidden')) {
+      event.preventDefault();
+      this.el.btnAchievementOk?.click();
+      return;
+    }
+
+    event.preventDefault();
+    this.audio.play('button');
+    this.goto(SCENE.HOME);
   }
 
   cacheElements() {
@@ -388,6 +432,7 @@ export class SceneManager {
     b.on('game:resumed', () => this.hidePause());
     b.on('ui:pause-request', () => this.controller.pause());
     b.on('ui:resume-request', () => this.controller.resume());
+    b.on('ui:intro-close', () => this.hideLevelIntro());
     b.on(EVENTS.LEVEL_CLEARED, () => this.refreshHome());
     b.on('offline:update', () => {
       // Service Worker 检测到有新版本已装好、等待刷新

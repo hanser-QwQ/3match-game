@@ -17,17 +17,17 @@
   "moves": 22,
   "starThresholds": [
     2600,
-    3400,
-    4000
+    3100,
+    3600
   ],
   "disabledBoosters": [],
   "rules": {
     "moveTimeLimit": 7,
     "specialQuota": {
       "stripe": 4,
-      "bomb": 3,
-      "rainbow": 1
+      "bomb": 4,
+      "rainbow": 2
     }
   },
-  "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
+  "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 4 个、彩虹 2 个，配额用完后不再生成"
 }

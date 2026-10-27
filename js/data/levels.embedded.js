@@ -358,13 +358,13 @@ export const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2500
+      "amount": 2200
     },
     "moves": 22,
     "starThresholds": [
-      2500,
-      3700,
-      4600
+      2200,
+      2700,
+      3200
     ],
     "disabledBoosters": [],
     "rules": {
@@ -423,16 +423,16 @@ export const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2500,
-      3700,
-      5000
+      2200,
+      2700,
+      3200
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
       "initialDoubleIce": 18
     },
-    "tutorialHint": "开局有大量双层冰，需要消除两次相邻才能彻底敲碎"
+    "tutorialHint": "开局棋盘上随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
   },
   {
     "schemaVersion": 1,
@@ -453,19 +453,19 @@ export const LEVELS = [
     "moves": 22,
     "starThresholds": [
       2600,
-      3400,
-      4000
+      3100,
+      3600
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
       "specialQuota": {
         "stripe": 4,
-        "bomb": 3,
-        "rainbow": 1
+        "bomb": 4,
+        "rainbow": 2
       }
     },
-    "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
+    "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 4 个、彩虹 2 个，配额用完后不再生成"
   },
   {
     "schemaVersion": 1,
@@ -526,7 +526,7 @@ export const LEVELS = [
       "bombChainAll": true,
       "bombBonus": 100
     },
-    "tutorialHint": "四连及以上只会生成炸弹；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+    "tutorialHint": "四连及以上只会生成炸弹，炸弹范围扩大到 7×7 菱形；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
   },
   {
     "schemaVersion": 1,
@@ -574,13 +574,13 @@ export const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 3600
+      "amount": 2400
     },
     "moves": 20,
     "starThresholds": [
-      3600,
-      4000,
-      4600
+      2400,
+      3000,
+      3600
     ],
     "disabledBoosters": [],
     "rules": {
@@ -669,13 +669,13 @@ export const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2400
+      "amount": 2800
     },
     "moves": 20,
     "starThresholds": [
-      2400,
-      3200,
-      3800
+      2800,
+      3600,
+      4400
     ],
     "disabledBoosters": [],
     "rules": {

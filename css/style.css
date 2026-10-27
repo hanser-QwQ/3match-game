@@ -1463,8 +1463,14 @@ body.plain-bg { background-image: none; }
 }
 
 [data-theme="dark"] .level-stars,
-[data-theme="dark"] .stars .star {
+[data-theme="dark"] .stars .star:not(.on) {
   color: #5f5867;
+}
+
+/* 已获得的星星必须保持金色，不能被上面的未获得态覆盖 */
+[data-theme="dark"] .level-stars .on,
+[data-theme="dark"] .stars .star.on {
+  color: #f0b43c;
 }
 
 [data-theme="dark"] .goal-chip.done {

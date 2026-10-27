@@ -125,11 +125,18 @@ export class InputController {
   _onKeyDown(event) {
     const scene = document.querySelector('[data-scene="game"].active');
     if (!scene) return;
+    // 结算页会保留棋盘作为背景，但键盘操作应交给结算页处理
+    if (document.querySelector('[data-scene="result"].active')) return;
     const s = this.controller.session;
     if (!s) return;
 
     if (event.key === 'Escape') {
       event.preventDefault();
+      // 关卡说明打开时，Esc 先收起说明，不要直接暂停到说明背后
+      if (this.controller.introOpen) {
+        this.bus?.emit('ui:intro-close', {});
+        return;
+      }
       if (s.state === 'paused') this.bus?.emit('ui:resume-request', {});
       else this.bus?.emit('ui:pause-request', {});
       return;

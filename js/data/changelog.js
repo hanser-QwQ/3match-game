@@ -6,13 +6,23 @@
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-export const APP_VERSION = '1.7.1';
+export const APP_VERSION = '1.7.2';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 export const CHANGELOG = [
+  {
+    version: '1.7.2',
+    date: '2026-10-27',
+    notes: [
+      '修复深色模式下结算星星显示异常',
+      '设置、关卡、成绩、成就、规则与公告界面支持 Esc 返回',
+      '调整部分 EX 关卡的目标分、星级线与规则，已通关成绩会自动补星',
+      '补充部分 EX 关卡的规则说明',
+    ],
+  },
   {
     version: '1.7.1',
     date: '2026-10-27',

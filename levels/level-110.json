@@ -12,13 +12,13 @@
   },
   "goal": {
     "type": "score",
-    "amount": 2400
+    "amount": 2800
   },
   "moves": 20,
   "starThresholds": [
-    2400,
-    3200,
-    3800
+    2800,
+    3600,
+    4400
   ],
   "disabledBoosters": [],
   "rules": {

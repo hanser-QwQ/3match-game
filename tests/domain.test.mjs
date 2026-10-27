@@ -1272,6 +1272,29 @@ test('EX 计时：进入关卡先待开始，第一次操作后才启动，重�
   controller._stopMoveTimer();
 });
 
+test('星级重算：按新阈值只升不降，已通关关卡不会掉星', () => {
+  const levels = new Map([
+    [101, { valid: true, starThresholds: [2000, 2800, 3300] }],
+    [102, { valid: true, starThresholds: [2200, 2700, 3200] }],
+  ]);
+  const writes = [];
+  const controller = Object.create(GameController.prototype);
+  controller.save = {
+    progress: {
+      101: { cleared: true, highScore: 3000, stars: 3 },
+      102: { cleared: true, highScore: 2800, stars: 1 },
+    },
+    localBest: [],
+  };
+  controller.levels = { get: (id) => levels.get(Number(id)) };
+  controller.storage = { write: (save) => writes.push(save) };
+
+  assert.equal(controller.recalculateStars(), true);
+  assert.equal(controller.save.progress['102'].stars, 2, '2800 应按新阈值升到 2 星');
+  assert.equal(controller.save.progress['101'].stars, 3, '已获得的 3 星不应被降');
+  assert.equal(writes.length, 1, '有变化时应落盘');
+});
+
 test('设置：主题模式、背景色相与纯色背景可持久化并夹紧', () => {
   const def = createDefaultSave();
   assert.equal(def.settings.themeMode, 'auto');

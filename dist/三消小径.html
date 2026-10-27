@@ -1473,8 +1473,14 @@ body.plain-bg { background-image: none; }
 }
 
 [data-theme="dark"] .level-stars,
-[data-theme="dark"] .stars .star {
+[data-theme="dark"] .stars .star:not(.on) {
   color: #5f5867;
+}
+
+/* 已获得的星星必须保持金色，不能被上面的未获得态覆盖 */
+[data-theme="dark"] .level-stars .on,
+[data-theme="dark"] .stars .star.on {
+  color: #f0b43c;
 }
 
 [data-theme="dark"] .goal-chip.done {
@@ -1707,7 +1713,7 @@ body.plain-bg { background-image: none; }
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.1</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.2</button>
     </div>
   </section>
 
@@ -7192,11 +7198,18 @@ class InputController {
   _onKeyDown(event) {
     const scene = document.querySelector('[data-scene="game"].active');
     if (!scene) return;
+    // 结算页会保留棋盘作为背景，但键盘操作应交给结算页处理
+    if (document.querySelector('[data-scene="result"].active')) return;
     const s = this.controller.session;
     if (!s) return;
 
     if (event.key === 'Escape') {
       event.preventDefault();
+      // 关卡说明打开时，Esc 先收起说明，不要直接暂停到说明背后
+      if (this.controller.introOpen) {
+        this.bus?.emit('ui:intro-close', {});
+        return;
+      }
       if (s.state === 'paused') this.bus?.emit('ui:resume-request', {});
       else this.bus?.emit('ui:pause-request', {});
       return;
@@ -7521,13 +7534,23 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.7.1';
+const APP_VERSION = '1.7.2';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.2',
+    date: '2026-10-27',
+    notes: [
+      '修复深色模式下结算星星显示异常',
+      '设置、关卡、成绩、成就、规则与公告界面支持 Esc 返回',
+      '调整部分 EX 关卡的目标分、星级线与规则，已通关成绩会自动补星',
+      '补充部分 EX 关卡的规则说明',
+    ],
+  },
   {
     version: '1.7.1',
     date: '2026-10-27',
@@ -7854,16 +7877,60 @@ class SceneManager {
     this.serverVersion = null;
     this.updateAvailable = false;
     this.el = {};
+    this._onGlobalKeyDown = this._onGlobalKeyDown.bind(this);
   }
 
   init() {
     this.cacheElements();
     this.bindStatic();
     this.bindBus();
+    // 非游戏场景的 Esc 返回；游戏内由 InputController 处理
+    window.addEventListener('keydown', this._onGlobalKeyDown);
     this.refreshHome();
     if (this.el.versionLine) this.el.versionLine.textContent = `三消小径 v${APP_VERSION}`;
     this.checkVersion();
     return this;
+  }
+
+  /**
+   * 全局 Esc：设置、关卡、成绩、成就、规则、公告等界面返回首页。
+   * 游戏场景交给 InputController（暂停 / 继续 / 关闭关卡说明），避免双重处理。
+   */
+  _onGlobalKeyDown(event) {
+    if (event.key !== 'Escape' || event.defaultPrevented) return;
+    if (!this.current || this.current === SCENE.HOME || this.current === SCENE.GAME) return;
+
+    // 文本类输入框先取消编辑；滑条、开关等控件不拦截 Esc，直接返回
+    const active = document.activeElement;
+    const textEditing = active && (
+      active.tagName === 'TEXTAREA' ||
+      active.tagName === 'SELECT' ||
+      (active.tagName === 'INPUT' && !['range', 'checkbox', 'radio', 'button', 'submit', 'reset'].includes(active.type))
+    );
+    if (textEditing) {
+      active.blur();
+      event.preventDefault();
+      return;
+    }
+
+    // 成绩分享弹层：Esc 只关闭弹层，不离开结算页
+    if (this.el.share && !this.el.share.classList.contains('hidden')) {
+      event.preventDefault();
+      this.audio.play('button');
+      this.el.share.classList.add('hidden');
+      return;
+    }
+
+    // 结算页的新成就弹窗：Esc 等同于“知道了”
+    if (this.el.achievementUnlock && !this.el.achievementUnlock.classList.contains('hidden')) {
+      event.preventDefault();
+      this.el.btnAchievementOk?.click();
+      return;
+    }
+
+    event.preventDefault();
+    this.audio.play('button');
+    this.goto(SCENE.HOME);
   }
 
   cacheElements() {
@@ -8204,6 +8271,7 @@ class SceneManager {
     b.on('game:resumed', () => this.hidePause());
     b.on('ui:pause-request', () => this.controller.pause());
     b.on('ui:resume-request', () => this.controller.resume());
+    b.on('ui:intro-close', () => this.hideLevelIntro());
     b.on(EVENTS.LEVEL_CLEARED, () => this.refreshHome());
     b.on('offline:update', () => {
       // Service Worker 检测到有新版本已装好、等待刷新
@@ -9401,13 +9469,13 @@ const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2500
+      "amount": 2200
     },
     "moves": 22,
     "starThresholds": [
-      2500,
-      3700,
-      4600
+      2200,
+      2700,
+      3200
     ],
     "disabledBoosters": [],
     "rules": {
@@ -9466,16 +9534,16 @@ const LEVELS = [
     },
     "moves": 25,
     "starThresholds": [
-      2500,
-      3700,
-      5000
+      2200,
+      2700,
+      3200
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
       "initialDoubleIce": 18
     },
-    "tutorialHint": "开局有大量双层冰，需要消除两次相邻才能彻底敲碎"
+    "tutorialHint": "开局棋盘上随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
   },
   {
     "schemaVersion": 1,
@@ -9496,19 +9564,19 @@ const LEVELS = [
     "moves": 22,
     "starThresholds": [
       2600,
-      3400,
-      4000
+      3100,
+      3600
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
       "specialQuota": {
         "stripe": 4,
-        "bomb": 3,
-        "rainbow": 1
+        "bomb": 4,
+        "rainbow": 2
       }
     },
-    "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 3 个、彩虹 1 个，配额用完后不再生成"
+    "tutorialHint": "特殊方块限量生成：条纹 4 个、炸弹 4 个、彩虹 2 个，配额用完后不再生成"
   },
   {
     "schemaVersion": 1,
@@ -9569,7 +9637,7 @@ const LEVELS = [
       "bombChainAll": true,
       "bombBonus": 100
     },
-    "tutorialHint": "四连及以上只会生成炸弹；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+    "tutorialHint": "四连及以上只会生成炸弹，炸弹范围扩大到 7×7 菱形；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
   },
   {
     "schemaVersion": 1,
@@ -9617,13 +9685,13 @@ const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 3600
+      "amount": 2400
     },
     "moves": 20,
     "starThresholds": [
-      3600,
-      4000,
-      4600
+      2400,
+      3000,
+      3600
     ],
     "disabledBoosters": [],
     "rules": {
@@ -9712,13 +9780,13 @@ const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2400
+      "amount": 2800
     },
     "moves": 20,
     "starThresholds": [
-      2400,
-      3200,
-      3800
+      2800,
+      3600,
+      4400
     ],
     "disabledBoosters": [],
     "rules": {
