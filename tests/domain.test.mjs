@@ -19,7 +19,7 @@ import { SPECIAL, chainMultiplier } from '../js/core/constants.js';
 import { resolveTheme } from '../js/core/theme.js';
 import { LevelRepository } from '../js/infrastructure/levelRepository.js';
 import { GameController } from '../js/application/gameController.js';
-import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '../js/domain/boosterService.js';
+import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal, sanitizeBoosterLoadout } from '../js/domain/boosterService.js';
 import { GameSession } from '../js/application/gameSession.js';
 import { readFileSync } from 'node:fs';
 import { createDefaultSave, normalizeSave } from '../js/infrastructure/storageService.js';
@@ -492,6 +492,26 @@ test('EX-7 雷暴：一颗炸弹会连锁引爆全场炸弹', () => {
   assert.ok(res.sequence[0].score >= 200, '两颗炸弹的额外加分应计入');
 });
 
+test('EX-9 禁术·咒发：四连立即释放条纹，且不留下特殊方块', () => {
+  const board = makeBoard([
+    'AAAAB',
+    'CDEFC',
+    'DEFCD',
+    'EFDCE',
+  ]);
+  board.rules = { instantSpecials: true };
+  const res = resolveCascade(board, { rng: rng(3) });
+
+  assert.equal(res.sequence[0].specials.length, 0, '不应生成成品特殊方块');
+  assert.ok(res.sequence[0].cleared.length > 4, '四连应额外释放一次条纹');
+  assert.equal(res.specialsCreated, 0);
+  let specials = 0;
+  board.eachCell((r, c) => {
+    if (board.specialAt(r, c)) specials += 1;
+  });
+  assert.equal(specials, 0, '结算后棋盘上不应留下特殊方块');
+});
+
 test('EX-9 禁术：不再生成特殊方块，基础分翻倍', () => {
   const board = makeBoard([
     'AAAAB',
@@ -909,6 +929,121 @@ test('道具：每关三种道具共用 2 次，不再有库存概念', () => {
   usage.hammer = consumeBooster('hammer', { used: usage.hammer }).used;
   assert.equal(boosterUsedTotal(usage), 2);
   assert.equal(checkBooster('addMoves', { usedTotal: boosterUsedTotal(usage) }).ok, false);
+});
+
+test('道具配置：去重、过滤未知道具、最多 3 个、允许为空', () => {
+  assert.deepEqual(
+    sanitizeBoosterLoadout(['shuffle', 'shuffle', 'bomb', 'nope', 'rainbow', 'icePick', 'hammer']),
+    ['shuffle', 'bomb', 'rainbow']
+  );
+  assert.deepEqual(sanitizeBoosterLoadout([]), [], '显式空数组表示不带道具');
+  assert.deepEqual(sanitizeBoosterLoadout(null), []);
+});
+
+test('道具配置：未携带的道具不可用，新道具需要点选目标', () => {
+  const notLoaded = checkBooster('rainbow', { usedTotal: 0, state: 'in_progress', loadout: ['shuffle'] });
+  assert.equal(notLoaded.ok, false);
+  assert.equal(notLoaded.reason, 'NOT_LOADED');
+
+  assert.equal(checkBooster('rainbow', { usedTotal: 0, state: 'in_progress', loadout: ['rainbow'] }).needsTarget, true);
+  assert.equal(checkBooster('bomb', { usedTotal: 0, state: 'in_progress', loadout: ['bomb'] }).needsTarget, true);
+  assert.equal(checkBooster('icePick', { usedTotal: 0, state: 'in_progress', loadout: ['icePick'] }).needsTarget, true);
+  assert.equal(checkBooster('shuffle', { usedTotal: 0, state: 'in_progress', loadout: ['shuffle'] }).needsTarget, false);
+});
+
+test('存档：道具配置默认沿用三件套，显式空数组保留', () => {
+  assert.deepEqual(createDefaultSave().boosterLoadout, ['shuffle', 'hammer', 'addMoves']);
+  assert.deepEqual(normalizeSave({}).boosterLoadout, ['shuffle', 'hammer', 'addMoves']);
+  assert.deepEqual(normalizeSave({ boosterLoadout: [] }).boosterLoadout, []);
+  assert.deepEqual(
+    normalizeSave({ boosterLoadout: ['bomb', 'bomb', 'nope', 'rainbow', 'icePick', 'shuffle'] }).boosterLoadout,
+    ['bomb', 'rainbow', 'icePick']
+  );
+});
+
+test('会话：快照保存本局道具配置', () => {
+  const session = new GameSession({
+    level: { moves: 20, goal: { type: 'score', amount: 100 } },
+    board: new Board(8, 8, 6),
+    loadout: ['bomb', 'rainbow'],
+  });
+  assert.deepEqual(session.boosterLoadout, ['bomb', 'rainbow']);
+  assert.deepEqual(session.snapshot().boosterLoadout, ['bomb', 'rainbow']);
+});
+
+test('续玩：改道具组后使用新配置，已用次数保留', () => {
+  const level = {
+    levelId: 1,
+    name: 'L1',
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 1000 },
+    board: { rows: 8, cols: 8, elementTypes: 5, iceCells: [], blockedCells: [] },
+    rules: {},
+    disabledBoosters: [],
+    starThresholds: [1000, 2000, 3000],
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => (Number(id) === 1 ? level : null),
+      list: () => [level],
+      playable: () => [level],
+    },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer: null,
+    tutorial: null,
+    rng: new RandomSource(3),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = { ...createDefaultSave(), boosterLoadout: ['shuffle', 'hammer', 'addMoves'] };
+
+  assert.equal(controller.startLevel(1, { resume: false }), true);
+  assert.deepEqual(controller.session.boosterLoadout, ['shuffle', 'hammer', 'addMoves']);
+  controller.session.boosterUsage.shuffle = 1;
+  controller.save.interruptedSession = controller.session.snapshot();
+  controller.session = null;
+  controller.save.boosterLoadout = [];
+
+  assert.equal(controller.startLevel(1, { resume: true }), true);
+  assert.deepEqual(
+    controller.session.boosterLoadout,
+    ['shuffle', 'hammer', 'addMoves'],
+    '续玩是同一局，应沿用快照里的道具配置'
+  );
+  assert.equal(controller.session.isResumed, true);
+  assert.equal(controller.session.boosterUsedTotal, 1, '续玩不应重置已用次数');
+});
+
+test('道具配置：修改会同步到当前会话，续玩不重置已用次数', () => {
+  const controller = Object.create(GameController.prototype);
+  controller.save = { boosterLoadout: [] };
+  controller.session = {
+    state: 'in_progress',
+    isResumed: false,
+    turnCount: 0,
+    boosterUsedTotal: 0,
+    boosterLoadout: [],
+  };
+  controller.storage = { write() {} };
+  controller.emitSession = () => {};
+
+  const out = controller.setBoosterLoadout(['rainbow', 'rainbow', 'bomb', 'icePick', 'shuffle']);
+  assert.deepEqual(out, ['rainbow', 'bomb', 'icePick']);
+  assert.deepEqual(controller.session.boosterLoadout, out, '未操作时应同步到当前会话');
+
+  controller.session.turnCount = 1;
+  controller.session.boosterUsedTotal = 1;
+  controller.setBoosterLoadout(['shuffle']);
+  assert.deepEqual(controller.session.boosterLoadout, ['shuffle'], '新开的一局可以换道具组');
+  assert.equal(controller.session.boosterUsedTotal, 1, '换道具组不应重置已用次数');
+
+  controller.session.isResumed = true;
+  controller.setBoosterLoadout(['bomb']);
+  assert.deepEqual(controller.session.boosterLoadout, ['shuffle'], '续玩局不应被外部配置改动');
 });
 
 test('道具：会话按三种道具的合计次数计算共享次数', () => {

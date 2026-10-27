@@ -574,21 +574,21 @@ export const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2400
+      "amount": 4000
     },
     "moves": 20,
     "starThresholds": [
-      2400,
-      3000,
-      3600
+      4000,
+      5000,
+      6000
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "noSpecials": true,
+      "instantSpecials": true,
       "maxChainMultiplier": 4
     },
-    "tutorialHint": "不再生成特殊方块；5 种颜色让连锁更密集，连锁倍率上限提升到 4 倍"
+    "tutorialHint": "棋盘只有 5 种颜色；特殊方块不再留下，四连立刻释放条纹，五连立刻清掉一种颜色，拐角匹配立刻爆炸"
   },
   {
     "schemaVersion": 1,

@@ -70,9 +70,13 @@ export class InputController {
       return;
     }
 
-    // 锤子待选目标：点哪里敲哪里
-    if (this.controller.boosterArmed === 'hammer') {
-      this.controller.dispatch({ type: 'USE_BOOSTER', boosterId: 'hammer', target: cell });
+    // 需要选目标的道具：点哪里用哪里
+    if (this.controller.boosterArmed) {
+      this.controller.dispatch({
+        type: 'USE_BOOSTER',
+        boosterId: this.controller.boosterArmed,
+        target: cell,
+      });
       return;
     }
 
@@ -159,6 +163,21 @@ export class InputController {
         c: Math.min(7, Math.max(0, cursor.c + moves[event.key].c)),
       };
       this.renderer.setCursor(next, true);
+      return;
+    }
+
+    if (this.controller.boosterArmed) {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        const target = this.renderer.cursor;
+        if (target) {
+          this.controller.dispatch({
+            type: 'USE_BOOSTER',
+            boosterId: this.controller.boosterArmed,
+            target: { ...target },
+          });
+        }
+      }
       return;
     }
 

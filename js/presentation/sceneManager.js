@@ -7,8 +7,9 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { SCENE } from '../core/constants.js';
+import { SCENE, BOOSTERS } from '../core/constants.js';
 import { goalSummary } from '../domain/goals.js';
+import { boosterList } from '../domain/boosterService.js';
 import { drawShareCard, downloadShareCard, shareText } from './shareCard.js';
 import { APP_VERSION, CHANGELOG, compareVersions } from '../data/changelog.js';
 import { ACHIEVEMENT_TIER_LABEL } from '../data/achievements.js';
@@ -37,6 +38,8 @@ export class SceneManager {
     // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
     this.serverVersion = null;
     this.updateAvailable = false;
+    // 道具配置页的返回目标：home 或 intro（关卡说明）
+    this.loadoutReturn = null;
     this.el = {};
     this._onGlobalKeyDown = this._onGlobalKeyDown.bind(this);
   }
@@ -60,6 +63,13 @@ export class SceneManager {
   _onGlobalKeyDown(event) {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
     if (!this.current || this.current === SCENE.HOME || this.current === SCENE.GAME) return;
+
+    if (this.current === SCENE.BOOSTERS) {
+      event.preventDefault();
+      this.audio.play('button');
+      this.returnFromLoadout();
+      return;
+    }
 
     // 文本类输入框先取消编辑；滑条、开关等控件不拦截 Esc，直接返回
     const active = document.activeElement;
@@ -147,7 +157,16 @@ export class SceneManager {
       levelIntroStar3: $('level-intro-star3'),
       levelIntroMechanic: $('level-intro-mechanic'),
       levelIntroTimer: $('level-intro-timer'),
+      introBoosters: $('level-intro-boosters'),
+      btnIntroBoosters: $('btn-intro-boosters'),
+      introLoadoutTitle: $('intro-loadout-title'),
       btnLevelStart: $('btn-level-start'),
+      boostersMeta: $('boosters-meta'),
+      loadoutGrid: $('loadout-grid'),
+      btnBoostersBack: $('btn-boosters-back'),
+      btnLoadoutClear: $('btn-loadout-clear'),
+      btnLoadoutDone: $('btn-loadout-done'),
+      boosterEmpty: $('booster-empty'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -186,6 +205,7 @@ export class SceneManager {
     document.querySelectorAll('[data-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.audio.play('button');
+        if (btn.dataset.action === SCENE.BOOSTERS) this.loadoutReturn = 'home';
         this.goto(btn.dataset.action);
       });
     });
@@ -195,6 +215,44 @@ export class SceneManager {
         this.audio.play('button');
         this.goto(btn.dataset.back);
       });
+    });
+
+    this.el.btnBoostersBack?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.returnFromLoadout();
+    });
+    this.el.btnLoadoutDone?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.returnFromLoadout();
+    });
+    this.el.btnLoadoutClear?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.setBoosterLoadout([]);
+      this.renderLoadout();
+      this.toast('本局不带道具', 'info');
+    });
+    this.el.loadoutGrid?.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-booster]');
+      if (!card) return;
+      const id = card.dataset.booster;
+      const selected = [...(c.save.boosterLoadout || [])];
+      const index = selected.indexOf(id);
+      if (index >= 0) {
+        selected.splice(index, 1);
+      } else {
+        if (selected.length >= 3) {
+          this.toast('最多携带 3 个道具', 'warn');
+          return;
+        }
+        selected.push(id);
+      }
+      this.audio.play('button');
+      c.setBoosterLoadout(selected);
+      this.renderLoadout();
+    });
+    this.el.btnIntroBoosters?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.openLoadout('intro');
     });
 
     this.el.btnContinue.addEventListener('click', () => {
@@ -559,7 +617,11 @@ export class SceneManager {
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
     if (scene === SCENE.NOTICE) this.renderNotice();
-    if (scene === SCENE.HOME) this.refreshHome();
+    if (scene === SCENE.BOOSTERS) this.renderLoadout();
+    if (scene === SCENE.HOME) {
+      this.loadoutReturn = null;
+      this.refreshHome();
+    }
     if (scene === SCENE.GAME) {
       this.lastScore = -1;
       requestAnimationFrame(() => this.renderer._onResize());
@@ -570,6 +632,71 @@ export class SceneManager {
       this.el.tutorial.classList.add('hidden');
     } else if (this.tutorialStep) {
       this.showTutorial(this.tutorialStep);
+    }
+  }
+
+  openLoadout(returnTo = 'home') {
+    this.loadoutReturn = returnTo;
+    this.goto(SCENE.BOOSTERS);
+  }
+
+  /** 从道具配置返回：关卡说明阶段回到说明，否则回首页 */
+  returnFromLoadout() {
+    const fromIntro = this.loadoutReturn === 'intro';
+    const s = this.controller.session;
+    this.loadoutReturn = null;
+    if (fromIntro && s) {
+      this.goto(SCENE.GAME);
+      // 道具页期间 renderSession 会因场景不是游戏而跳过，这里补一次刷新道具栏
+      this.renderSession(this.controller.viewModel());
+      this.showLevelIntro(s.level);
+    } else {
+      this.goto(SCENE.HOME);
+    }
+  }
+
+  renderLoadout() {
+    const selected = this.controller.save.boosterLoadout || [];
+    if (this.el.boostersMeta) this.el.boostersMeta.textContent = `${selected.length} / 3`;
+    if (!this.el.loadoutGrid) return;
+
+    const level = this.loadoutReturn === 'intro' ? this.controller.session?.level : null;
+    const blocked = new Set(level?.disabledBoosters || []);
+    this.el.loadoutGrid.textContent = '';
+
+    for (const def of boosterList()) {
+      const index = selected.indexOf(def.id);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'loadout-card' + (index >= 0 ? ' selected' : '');
+      card.dataset.booster = def.id;
+      card.setAttribute('aria-pressed', String(index >= 0));
+
+      const head = document.createElement('div');
+      head.className = 'lc-head';
+      const name = document.createElement('span');
+      name.className = 'lc-name';
+      name.textContent = def.name;
+      head.appendChild(name);
+      if (index >= 0) {
+        const order = document.createElement('span');
+        order.className = 'lc-order';
+        order.textContent = String(index + 1);
+        head.appendChild(order);
+      }
+
+      const desc = document.createElement('span');
+      desc.className = 'lc-desc';
+      desc.textContent = def.desc;
+      card.append(head, desc);
+
+      if (blocked.has(def.id)) {
+        const warn = document.createElement('span');
+        warn.className = 'lc-warn';
+        warn.textContent = '本关禁用';
+        card.appendChild(warn);
+      }
+      this.el.loadoutGrid.appendChild(card);
     }
   }
 
@@ -603,8 +730,43 @@ export class SceneManager {
       this.el.levelIntroTimer.classList.add('hidden');
     }
 
+    this.renderIntroBoosters(level);
+    // 新开的一局可以调整；续玩是同一局，道具配置已固定
+    const active = this.controller.session;
+    const canAdjust = !active || !active.isResumed;
+    this.el.btnIntroBoosters?.classList.toggle('hidden', !canAdjust);
+    if (this.el.introLoadoutTitle) {
+      this.el.introLoadoutTitle.textContent = canAdjust ? '本局道具' : '本局道具（已固定）';
+    }
     this.el.levelIntro.classList.remove('hidden');
     this.el.btnLevelStart?.focus({ preventScroll: true });
+  }
+
+  renderIntroBoosters(level) {
+    if (!this.el.introBoosters) return;
+    const loadout = this.controller.session?.boosterLoadout
+      || this.controller.save.boosterLoadout
+      || [];
+    const blocked = new Set(level?.disabledBoosters || []);
+    this.el.introBoosters.textContent = '';
+
+    if (!loadout.length) {
+      const empty = document.createElement('span');
+      empty.className = 'intro-booster-empty';
+      empty.textContent = '未携带道具，仍可正常挑战';
+      this.el.introBoosters.appendChild(empty);
+      return;
+    }
+
+    for (const id of loadout) {
+      const def = BOOSTERS[id];
+      if (!def) continue;
+      const chip = document.createElement('span');
+      chip.className = 'intro-booster-chip' + (blocked.has(id) ? ' disabled' : '');
+      chip.textContent = def.name;
+      if (blocked.has(id)) chip.title = '本关禁用';
+      this.el.introBoosters.appendChild(chip);
+    }
   }
 
   hideLevelIntro() {
@@ -712,6 +874,10 @@ export class SceneManager {
      * EX 关的计时器每 100ms 触发一次 emitSession，如果每次都重建按钮，
      * 玩家按下与松开之间按钮被替换，click 事件就会丢失，表现为“点不动”。
      */
+    const hasBoosters = vm.boosters.length > 0;
+    this.el.boosterBar.classList.toggle('hidden', !hasBoosters);
+    this.el.boosterEmpty?.classList.toggle('hidden', hasBoosters);
+
     const seen = new Set();
     for (const b of vm.boosters) {
       seen.add(b.id);
@@ -733,8 +899,8 @@ export class SceneManager {
       }
       btn.classList.toggle('armed', Boolean(b.armed));
       btn.disabled = !b.available && !b.armed;
-      btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
-      // 三种道具共用次数池，三张卡显示同一个剩余次数
+      btn.setAttribute('aria-label', `${b.name}，所选道具共用次数，本关剩余 ${b.count} 次`);
+      // 所选道具共用次数池，所有卡显示同一个剩余次数
       btn.querySelector('.b-count').textContent = String(b.count);
       btn.querySelector('.b-limit').textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
     }

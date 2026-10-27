@@ -48,6 +48,7 @@
         <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
+        <button class="btn btn-ghost home-boosters" data-action="boosters"><span class="ico">✚</span>道具</button>
       </div>
     </div>
     <div class="home-foot">
@@ -69,6 +70,24 @@
     <div class="scroll-area">
       <div id="level-grid" class="level-grid"></div>
       <p class="fine-print">已通关的关卡可重复挑战，记录只保留最高星级与最高分。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 道具配置 ============================ -->
+  <section id="scene-boosters" class="scene" data-scene="boosters">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-boosters-back" aria-label="返回">←</button>
+      <h2>道具配置</h2>
+      <span class="topbar-meta" id="boosters-meta">3 / 3</span>
+    </header>
+    <div class="scroll-area">
+      <p class="rule-text">每局最多携带 3 个道具；本局所有道具共用 2 次使用次数。也可以不带道具直接挑战。</p>
+      <div class="loadout-grid" id="loadout-grid"></div>
+      <div class="loadout-actions">
+        <button class="btn btn-ghost" id="btn-loadout-clear">不带道具</button>
+        <button class="btn btn-primary" id="btn-loadout-done">保存并返回</button>
+      </div>
+      <p class="fine-print">配置保存在本机；修改后对新开的一局生效，续玩中的对局会保持原配置和剩余次数。</p>
     </div>
   </section>
 
@@ -113,6 +132,7 @@
     </div>
 
     <div class="booster-bar" id="booster-bar"></div>
+    <p class="booster-empty hidden" id="booster-empty">本局未携带道具</p>
     <p class="save-note hidden" id="save-note">进度可能不会被保存（本地存储不可用）</p>
   </section>
 
@@ -219,7 +239,7 @@
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.2</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.3</button>
     </div>
   </section>
 
@@ -300,8 +320,11 @@
           <dt>洗牌</dt><dd>重排整个棋盘，不消耗步数。</dd>
           <dt>锤子</dt><dd>敲掉任意一个元素，不消耗步数。</dd>
           <dt>加三步</dt><dd>本关剩余步数 +3。</dd>
+          <dt>彩虹</dt><dd>把一个普通元素变成彩虹，交换后清除同色元素。</dd>
+          <dt>炸弹</dt><dd>把一个普通元素变成炸弹，交换后引爆。</dd>
+          <dt>破冰</dt><dd>削减目标周围 3×3 范围内每格一层冰。</dd>
         </dl>
-        <p class="rule-text">每关三种道具共用 2 次使用机会，可以自由选择用哪一种；部分关卡会禁用个别道具。</p>
+        <p class="rule-text">每局最多携带 3 个道具，所有道具共用 2 次使用机会；可以不带道具。配置入口在首页「道具」或关卡说明里的「调整」。</p>
       </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
@@ -365,6 +388,15 @@
 
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
       <p class="level-intro-timer hidden" id="level-intro-timer"></p>
+
+      <div class="level-intro-loadout">
+        <div class="level-intro-loadout-head">
+          <span id="intro-loadout-title">本局道具</span>
+          <button type="button" class="link-btn" id="btn-intro-boosters">调整</button>
+        </div>
+        <div class="intro-booster-list" id="level-intro-boosters"></div>
+      </div>
+
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
     </div>
   </div>

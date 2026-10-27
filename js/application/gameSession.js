@@ -6,14 +6,17 @@
  * 避免出现"画面已经结算但状态仍是进行中"这类不一致（TB-03）。
  */
 
-import { SESSION_STATE } from '../core/constants.js';
+import { SESSION_STATE, DEFAULT_BOOSTER_LOADOUT } from '../core/constants.js';
 import { createCounters, goalTasks, isGoalComplete } from '../domain/goals.js';
+import { sanitizeBoosterLoadout } from '../domain/boosterService.js';
 
 export class GameSession {
-  constructor({ level, board, resumed = null }) {
+  constructor({ level, board, resumed = null, loadout = null }) {
     this.level = level;
     this.board = board;
     this.state = SESSION_STATE.IN_PROGRESS;
+    // 续玩是同一局：道具配置与剩余次数都以快照为准，不能被外部配置改动
+    this.isResumed = Boolean(resumed);
     this.movesLeft = resumed?.movesLeft ?? level.moves;
     /*
      * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
@@ -24,7 +27,18 @@ export class GameSession {
       ? restoredTotal
       : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
-    this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
+    const rawLoadout = Array.isArray(resumed?.boosterLoadout) ? resumed.boosterLoadout : loadout;
+    this.boosterLoadout = Array.isArray(rawLoadout)
+      ? sanitizeBoosterLoadout(rawLoadout)
+      : [...DEFAULT_BOOSTER_LOADOUT];
+    this.boosterUsage = resumed?.boosterUsage ?? {
+      shuffle: 0,
+      hammer: 0,
+      addMoves: 0,
+      rainbow: 0,
+      bomb: 0,
+      icePick: 0,
+    };
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
     this.turnCount = resumed?.turnCount ?? 0;
@@ -46,7 +60,7 @@ export class GameSession {
     return this.state === SESSION_STATE.RESOLVED;
   }
 
-  /** 本关三种道具已经使用的总次数（共享次数池） */
+  /** 本局所选道具已经使用的总次数（共享次数池） */
   get boosterUsedTotal() {
     return Object.values(this.boosterUsage).reduce((sum, n) => sum + (Number(n) || 0), 0);
   }
@@ -97,6 +111,7 @@ export class GameSession {
       movesTotal: this.movesTotal,
       score: this.counters.score,
       boostersUsed: { ...this.boosterUsage },
+      boosterLoadout: [...this.boosterLoadout],
       goalProgress: { cleared: first.cleared, total: first.total },
       collected: { ...this.counters.collected },
       initialIce: this.counters.initialIce,

@@ -1515,6 +1515,122 @@ body.plain-bg { background-image: none; }
   background: hsl(30, 24%, 16%);
 }
 
+/* ------------------------------------------------------------------ 道具配置 */
+
+.home-boosters { grid-column: span 3; }
+
+.loadout-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.loadout-card {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.12s ease;
+}
+
+.loadout-card:active { transform: scale(0.98); }
+.loadout-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.loadout-card .lc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.loadout-card .lc-name { font-size: 14px; font-weight: 700; }
+.loadout-card .lc-order {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--paper);
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+}
+.loadout-card .lc-desc { display: block; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+.loadout-card .lc-warn { display: block; margin-top: 5px; font-size: 11px; color: var(--danger); }
+
+.loadout-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.level-intro-loadout {
+  margin: 0 0 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  text-align: left;
+}
+
+.level-intro-loadout-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.link-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.intro-booster-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.intro-booster-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.intro-booster-chip.disabled { opacity: 0.55; text-decoration: line-through; }
+.intro-booster-empty { font-size: 12px; color: var(--ink-3); }
+
+.booster-empty {
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
 </style>
 </head>
 <body>
@@ -1542,6 +1658,7 @@ body.plain-bg { background-image: none; }
         <button class="btn btn-ghost" data-action="rules"><span class="ico">?</span>规则</button>
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
+        <button class="btn btn-ghost home-boosters" data-action="boosters"><span class="ico">✚</span>道具</button>
       </div>
     </div>
     <div class="home-foot">
@@ -1563,6 +1680,24 @@ body.plain-bg { background-image: none; }
     <div class="scroll-area">
       <div id="level-grid" class="level-grid"></div>
       <p class="fine-print">已通关的关卡可重复挑战，记录只保留最高星级与最高分。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 道具配置 ============================ -->
+  <section id="scene-boosters" class="scene" data-scene="boosters">
+    <header class="topbar">
+      <button class="icon-btn" id="btn-boosters-back" aria-label="返回">←</button>
+      <h2>道具配置</h2>
+      <span class="topbar-meta" id="boosters-meta">3 / 3</span>
+    </header>
+    <div class="scroll-area">
+      <p class="rule-text">每局最多携带 3 个道具；本局所有道具共用 2 次使用次数。也可以不带道具直接挑战。</p>
+      <div class="loadout-grid" id="loadout-grid"></div>
+      <div class="loadout-actions">
+        <button class="btn btn-ghost" id="btn-loadout-clear">不带道具</button>
+        <button class="btn btn-primary" id="btn-loadout-done">保存并返回</button>
+      </div>
+      <p class="fine-print">配置保存在本机；修改后对新开的一局生效，续玩中的对局会保持原配置和剩余次数。</p>
     </div>
   </section>
 
@@ -1607,6 +1742,7 @@ body.plain-bg { background-image: none; }
     </div>
 
     <div class="booster-bar" id="booster-bar"></div>
+    <p class="booster-empty hidden" id="booster-empty">本局未携带道具</p>
     <p class="save-note hidden" id="save-note">进度可能不会被保存（本地存储不可用）</p>
   </section>
 
@@ -1713,7 +1849,7 @@ body.plain-bg { background-image: none; }
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.2</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.3</button>
     </div>
   </section>
 
@@ -1794,8 +1930,11 @@ body.plain-bg { background-image: none; }
           <dt>洗牌</dt><dd>重排整个棋盘，不消耗步数。</dd>
           <dt>锤子</dt><dd>敲掉任意一个元素，不消耗步数。</dd>
           <dt>加三步</dt><dd>本关剩余步数 +3。</dd>
+          <dt>彩虹</dt><dd>把一个普通元素变成彩虹，交换后清除同色元素。</dd>
+          <dt>炸弹</dt><dd>把一个普通元素变成炸弹，交换后引爆。</dd>
+          <dt>破冰</dt><dd>削减目标周围 3×3 范围内每格一层冰。</dd>
         </dl>
-        <p class="rule-text">每关三种道具共用 2 次使用机会，可以自由选择用哪一种；部分关卡会禁用个别道具。</p>
+        <p class="rule-text">每局最多携带 3 个道具，所有道具共用 2 次使用机会；可以不带道具。配置入口在首页「道具」或关卡说明里的「调整」。</p>
       </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
@@ -1859,6 +1998,15 @@ body.plain-bg { background-image: none; }
 
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
       <p class="level-intro-timer hidden" id="level-intro-timer"></p>
+
+      <div class="level-intro-loadout">
+        <div class="level-intro-loadout-head">
+          <span id="intro-loadout-title">本局道具</span>
+          <button type="button" class="link-btn" id="btn-intro-boosters">调整</button>
+        </div>
+        <div class="intro-booster-list" id="level-intro-boosters"></div>
+      </div>
+
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
     </div>
   </div>
@@ -2089,12 +2237,21 @@ const SCORE = {
 /** 道具定义（FR-12） */
 const BOOSTERS = {
   shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', desc: '重排整个棋盘' },
-  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素' },
+  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素', target: true },
   addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', desc: '本关剩余步数 +3' },
+  rainbow: { id: 'rainbow', name: '彩虹', icon: 'rainbow', desc: '把一个元素变成彩虹', target: true },
+  bomb: { id: 'bomb', name: '炸弹', icon: 'bomb', desc: '把一个元素变成炸弹', target: true },
+  icePick: { id: 'icePick', name: '破冰', icon: 'ice', desc: '削减 3×3 范围内的冰层', target: true },
 };
 
-/** 每关三种道具共用的使用次数（不是每种各 2 次） */
+/** 每局所选道具共用的使用次数（不是每种各 2 次） */
 const BOOSTER_TOTAL_LIMIT = 2;
+
+/** 每局最多携带的道具数量 */
+const BOOSTER_LOADOUT_LIMIT = 3;
+
+/** 老存档与默认配置：沿用原来的三件套 */
+const DEFAULT_BOOSTER_LOADOUT = ['shuffle', 'hammer', 'addMoves'];
 
 /** 会话状态（TB-03） */
 const SESSION_STATE = {
@@ -2109,6 +2266,7 @@ const SCENE = {
   LEVELS: 'levels',
   GAME: 'game',
   RESULT: 'result',
+  BOOSTERS: 'boosters',
   SETTINGS: 'settings',
   RANK: 'rank',
   ACHIEVEMENTS: 'achievements',
@@ -2142,6 +2300,8 @@ exports.SPECIAL = SPECIAL;
 exports.SCORE = SCORE;
 exports.BOOSTERS = BOOSTERS;
 exports.BOOSTER_TOTAL_LIMIT = BOOSTER_TOTAL_LIMIT;
+exports.BOOSTER_LOADOUT_LIMIT = BOOSTER_LOADOUT_LIMIT;
+exports.DEFAULT_BOOSTER_LOADOUT = DEFAULT_BOOSTER_LOADOUT;
 exports.SESSION_STATE = SESSION_STATE;
 exports.SCENE = SCENE;
 exports.SAVE_KEY = SAVE_KEY;
@@ -2366,7 +2526,7 @@ __modules["js/infrastructure/storageService.js"] = function (exports, __req) {
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
  *   player / progress / settings / interruptedSession / localBest / achievements
  * achievements 是向后兼容的附加字段，旧存档读取时补成空表。
- * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
+ * 道具不再有跨关库存，每局所选道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
  * 失败路径（FR-07 / NFR-14 / AC-11、AC-35）：
@@ -2375,9 +2535,19 @@ __modules["js/infrastructure/storageService.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { SAVE_KEY, SAVE_VERSION } = __req("js/core/constants.js");
+const { SAVE_KEY, SAVE_VERSION, BOOSTERS, BOOSTER_LOADOUT_LIMIT, DEFAULT_BOOSTER_LOADOUT } = __req("js/core/constants.js");
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+function normalizeBoosterLoadout(list) {
+  const out = [];
+  for (const id of Array.isArray(list) ? list : []) {
+    if (!BOOSTERS[id] || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= BOOSTER_LOADOUT_LIMIT) break;
+  }
+  return out;
+}
 
 function localISO(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -2408,6 +2578,7 @@ function createDefaultSave() {
     player: { nickname: '玩家', totalScore: 0, createdAt: now },
     progress: {},
     settings: defaultSettings(),
+    boosterLoadout: [...DEFAULT_BOOSTER_LOADOUT],
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
@@ -2510,6 +2681,9 @@ function normalizeSave(input) {
       })(),
       plainBg: Boolean(settings.plainBg),
     },
+    boosterLoadout: Array.isArray(data.boosterLoadout)
+      ? normalizeBoosterLoadout(data.boosterLoadout)
+      : [...DEFAULT_BOOSTER_LOADOUT],
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
@@ -3958,6 +4132,7 @@ function resolveCascade(board, options = {}) {
   const sequence = [];
   const collected = {};
   const specialCycle = Boolean(board?.rules?.specialCycle);
+  const instantSpecials = Boolean(board?.rules?.instantSpecials);
   let totalScore = 0;
   let specialsCreated = 0;
   let iceCleared = 0;
@@ -3991,8 +4166,21 @@ function resolveCascade(board, options = {}) {
       if (!matches.length) break;
       // EX-5 限量规则的实现位置：配额用完的类型不再进入生成计划（该次匹配只消除、不生成）
       plans = planSpecials(board, matches, preferred, rng).filter((plan) => board.canGenerateSpecial(plan.special));
-      for (const plan of plans) exclude.add(key(plan.r, plan.c));
-      for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+      if (instantSpecials) {
+        /*
+         * EX-9 禁术·咒发：把特殊方块直接放在匹配落点上并立刻引爆，
+         * 不进入 exclude，也不留下成品。玩家看到的是四连放条纹、
+         * 五连清色、拐角爆炸的即时效果。
+         */
+        for (const plan of plans) {
+          board.setType(plan.r, plan.c, board.typeAt(plan.r, plan.c), plan.special);
+        }
+        for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+        plans = [];
+      } else {
+        for (const plan of plans) exclude.add(key(plan.r, plan.c));
+        for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+      }
     }
 
     if (!clearMap.size && !plans.length) break;
@@ -4228,26 +4416,37 @@ __modules["js/domain/boosterService.js"] = function (exports, __req) {
  * 只负责"能不能用"的规则判定。真正的效果（重排棋盘、敲掉元素、
  * 加步数）由应用层调用领域能力完成，次数计数与写档同事务处理。
  *
- * 规则：每关三种道具共用 2 次使用机会，不再有跨关库存。
+ * 规则：每局所选道具共用 2 次使用机会，不再有跨关库存。
  */
 
-const { BOOSTERS, BOOSTER_TOTAL_LIMIT } = __req("js/core/constants.js");
+const { BOOSTERS, BOOSTER_TOTAL_LIMIT, BOOSTER_LOADOUT_LIMIT } = __req("js/core/constants.js");
 
 const BOOSTER_IDS = Object.keys(BOOSTERS);
 
-/** 每关道具总次数（三种道具共享） */
+/** 去重、过滤未知道具，并限制最多携带数量；显式空数组表示“不带道具” */
+function sanitizeBoosterLoadout(ids) {
+  const out = [];
+  for (const id of Array.isArray(ids) ? ids : []) {
+    if (!BOOSTERS[id] || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= BOOSTER_LOADOUT_LIMIT) break;
+  }
+  return out;
+}
+
+/** 每局道具总次数（所选道具共享） */
 function boosterLimit() {
   return BOOSTER_TOTAL_LIMIT;
 }
 
-/** 本关三种道具已经使用的总次数 */
+/** 本局所选道具已经使用的总次数 */
 function boosterUsedTotal(usage = {}) {
   return Object.values(usage).reduce((sum, n) => sum + (Number(n) || 0), 0);
 }
 
 /**
  * @param id 道具标识
- * @param ctx.usedTotal 本关三种道具已使用的总次数
+ * @param ctx.usedTotal 本局所选道具已使用的总次数
  * @param ctx.disabled 本关禁用的道具列表
  * @param ctx.state 会话状态
  */
@@ -4260,10 +4459,13 @@ function checkBooster(id, ctx = {}) {
   if ((ctx.disabled || []).includes(id)) {
     return { ok: false, reason: 'DISABLED', message: '本关不能使用该道具' };
   }
+  if (Array.isArray(ctx.loadout) && !ctx.loadout.includes(id)) {
+    return { ok: false, reason: 'NOT_LOADED', message: '本局未携带该道具' };
+  }
   if ((ctx.usedTotal || 0) >= boosterLimit()) {
     return { ok: false, reason: 'LIMIT', message: '本关道具次数已用完' };
   }
-  return { ok: true, needsTarget: id === 'hammer' };
+  return { ok: true, needsTarget: Boolean(def.target) };
 }
 
 /** 道具使用后的本道具计数（返回新对象，便于同事务写档） */
@@ -4276,6 +4478,7 @@ function boosterList() {
 }
 
 exports.BOOSTER_IDS = BOOSTER_IDS;
+exports.sanitizeBoosterLoadout = sanitizeBoosterLoadout;
 exports.boosterLimit = boosterLimit;
 exports.boosterUsedTotal = boosterUsedTotal;
 exports.checkBooster = checkBooster;
@@ -4649,14 +4852,17 @@ __modules["js/application/gameSession.js"] = function (exports, __req) {
  * 避免出现"画面已经结算但状态仍是进行中"这类不一致（TB-03）。
  */
 
-const { SESSION_STATE } = __req("js/core/constants.js");
+const { SESSION_STATE, DEFAULT_BOOSTER_LOADOUT } = __req("js/core/constants.js");
 const { createCounters, goalTasks, isGoalComplete } = __req("js/domain/goals.js");
+const { sanitizeBoosterLoadout } = __req("js/domain/boosterService.js");
 
 class GameSession {
-  constructor({ level, board, resumed = null }) {
+  constructor({ level, board, resumed = null, loadout = null }) {
     this.level = level;
     this.board = board;
     this.state = SESSION_STATE.IN_PROGRESS;
+    // 续玩是同一局：道具配置与剩余次数都以快照为准，不能被外部配置改动
+    this.isResumed = Boolean(resumed);
     this.movesLeft = resumed?.movesLeft ?? level.moves;
     /*
      * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
@@ -4667,7 +4873,18 @@ class GameSession {
       ? restoredTotal
       : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
-    this.boosterUsage = resumed?.boosterUsage ?? { shuffle: 0, hammer: 0, addMoves: 0 };
+    const rawLoadout = Array.isArray(resumed?.boosterLoadout) ? resumed.boosterLoadout : loadout;
+    this.boosterLoadout = Array.isArray(rawLoadout)
+      ? sanitizeBoosterLoadout(rawLoadout)
+      : [...DEFAULT_BOOSTER_LOADOUT];
+    this.boosterUsage = resumed?.boosterUsage ?? {
+      shuffle: 0,
+      hammer: 0,
+      addMoves: 0,
+      rainbow: 0,
+      bomb: 0,
+      icePick: 0,
+    };
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
     this.turnCount = resumed?.turnCount ?? 0;
@@ -4689,7 +4906,7 @@ class GameSession {
     return this.state === SESSION_STATE.RESOLVED;
   }
 
-  /** 本关三种道具已经使用的总次数（共享次数池） */
+  /** 本局所选道具已经使用的总次数（共享次数池） */
   get boosterUsedTotal() {
     return Object.values(this.boosterUsage).reduce((sum, n) => sum + (Number(n) || 0), 0);
   }
@@ -4740,6 +4957,7 @@ class GameSession {
       movesTotal: this.movesTotal,
       score: this.counters.score,
       boostersUsed: { ...this.boosterUsage },
+      boosterLoadout: [...this.boosterLoadout],
       goalProgress: { cleared: first.cleared, total: first.total },
       collected: { ...this.counters.collected },
       initialIce: this.counters.initialIce,
@@ -4812,7 +5030,7 @@ const { isAdjacent, isValidSwap, planSpecialSwap } = __req("js/domain/matchEngin
 const { resolveCascade } = __req("js/domain/cascadeResolver.js");
 const { hasValidMove, reshuffle, findAnyValidMove } = __req("js/domain/deadlockDetector.js");
 const { settleScore, judgeStars } = __req("js/domain/scorer.js");
-const { checkBooster, consumeBooster, boosterLimit } = __req("js/domain/boosterService.js");
+const { checkBooster, consumeBooster, boosterLimit, sanitizeBoosterLoadout } = __req("js/domain/boosterService.js");
 const { goalSummary } = __req("js/domain/goals.js");
 const { ACHIEVEMENTS } = __req("js/data/achievements.js");
 const { buildAchievementStats, evaluateAchievements, achievementProgress } = __req("js/domain/achievements.js");
@@ -4942,6 +5160,20 @@ class GameController {
     this.emitSession();
   }
 
+  /** 修改本局携带的道具；关卡说明阶段（尚未操作）会同步到当前会话 */
+  setBoosterLoadout(ids) {
+    const loadout = sanitizeBoosterLoadout(ids);
+    this.save.boosterLoadout = loadout;
+    const s = this.session;
+    if (s && !s.isResumed && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)) {
+      // 新开的一局可以改；续玩是同一局，外部配置只留给下一局
+      s.boosterLoadout = [...loadout];
+    }
+    this.storage.write(this.save);
+    this.emitSession();
+    return loadout;
+  }
+
   setNickname(raw) {
     const { value } = sanitizeNickname(raw);
     this.save.player.nickname = value;
@@ -5031,7 +5263,17 @@ class GameController {
             movesLeft: restoredLeft,
             movesTotal: restoredTotal,
             counters: GameSession.restoreCounters(snap, board),
-            boosterUsage: { shuffle: 0, hammer: 0, addMoves: 0, ...(snap.boostersUsed || {}) },
+            boosterUsage: {
+              shuffle: 0,
+              hammer: 0,
+              addMoves: 0,
+              rainbow: 0,
+              bomb: 0,
+              icePick: 0,
+              ...(snap.boostersUsed || {}),
+            },
+            // 续玩沿用本局快照；只有快照缺失的旧存档才回退到当前配置
+            boosterLoadout: Array.isArray(snap.boosterLoadout) ? snap.boosterLoadout : null,
             chainBest: Number(snap.chainBest) || 0,
             tilesCleared: Number(snap.tilesCleared) || 0,
             turnCount: Number(snap.turnCount) || 0,
@@ -5045,7 +5287,12 @@ class GameController {
     if (!board) board = createBoard({ ...level.board, rules: level.rules || {} }, this.rng);
     board.rules = level.rules || {};
 
-    this.session = new GameSession({ level, board, resumed });
+    this.session = new GameSession({
+      level,
+      board,
+      resumed,
+      loadout: this.save.boosterLoadout,
+    });
     this.sessionCounter += 1;
     this.introOpen = false;
     this.boosterArmed = null;
@@ -5352,12 +5599,15 @@ class GameController {
     if (!s) return;
 
     // 处理 EX-2 的“每 N 步随机冰冻”
+    let turnAdvanced = false;
     if (s.pendingFreeze) {
       s.pendingFreeze = false;
       s.turnCount += 1;
+      turnAdvanced = true;
       await this.applyFreezeRule();
     }
-    await this.applyGiftRule();
+    // 只有真正推进了一步才触发祭典赠礼，避免用道具刷新赠礼
+    if (turnAdvanced) await this.applyGiftRule();
 
     // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
     // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
@@ -5479,7 +5729,7 @@ class GameController {
   async applyGiftRule() {
     const s = this.session;
     const n = Number(s?.level?.rules?.giftSpecialEveryNMoves);
-    if (!Number.isFinite(n) || n <= 0 || s.turnCount % n !== 0) return;
+    if (!Number.isFinite(n) || n <= 0 || s.turnCount <= 0 || s.turnCount % n !== 0) return;
 
     const free = [];
     s.board.eachCell((r, c) => {
@@ -5778,17 +6028,24 @@ class GameController {
   armBooster(id) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
+    const def = BOOSTERS[id];
+    const loadout = Array.isArray(s.boosterLoadout) ? s.boosterLoadout : [];
+    if (!def || !loadout.includes(id)) {
+      this.toast('本局未携带该道具', 'warn');
+      return { ok: false, error: 'NOT_LOADED' };
+    }
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
+      loadout: s.boosterLoadout,
     });
     if (!check.ok) {
       this.toast(check.message, 'warn');
       return { ok: false, error: check.reason };
     }
-    if (id !== 'hammer') return this.useBooster(id, null);
-    this.boosterArmed = this.boosterArmed === 'hammer' ? null : 'hammer';
+    if (!def.target) return this.useBooster(id, null);
+    this.boosterArmed = this.boosterArmed === id ? null : id;
     this.renderer?.setArmedTarget(this.boosterArmed);
     this.emitSession();
     return { ok: true };
@@ -5797,25 +6054,42 @@ class GameController {
   async useBooster(id, target) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
-    if (!BOOSTERS[id]) return { ok: false, error: 'UNKNOWN_BOOSTER' };
+    const def = BOOSTERS[id];
+    if (!def) return { ok: false, error: 'UNKNOWN_BOOSTER' };
 
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
+      loadout: s.boosterLoadout,
     });
     if (!check.ok) {
       this.toast(check.message, 'warn');
       return { ok: false, error: check.reason };
     }
 
+    if (def.target && !target) {
+      this.toast('点选一个目标', 'info');
+      return { ok: false, error: 'NEEDS_TARGET' };
+    }
+
     if (id === 'hammer') {
-      if (!target) {
-        this.toast('点选一个要敲掉的元素', 'info');
-        return { ok: false, error: 'NEEDS_TARGET' };
-      }
       if (!s.board.isFree(target.r, target.c) || s.board.typeAt(target.r, target.c) < 0) {
         this.toast('这个位置不能被敲掉', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+    } else if (id === 'rainbow' || id === 'bomb') {
+      if (!s.board.isFree(target.r, target.c) || s.board.typeAt(target.r, target.c) < 0) {
+        this.toast('这个位置不能放置', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+      if (s.board.specialAt(target.r, target.c)) {
+        this.toast('这个位置已经有特殊方块', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+    } else if (id === 'icePick') {
+      if (!s.board.inside(target.r, target.c) || s.board.iceAt(target.r, target.c) <= 0) {
+        this.toast('这个位置没有冰', 'warn');
         return { ok: false, error: 'INVALID_TARGET' };
       }
     }
@@ -5839,6 +6113,31 @@ class GameController {
         this.saveSession();
       } else if (id === 'hammer') {
         await this.runCascade({ initialCells: [target] });
+        await this.afterMove();
+      } else if (id === 'rainbow' || id === 'bomb') {
+        const special = id === 'rainbow' ? SPECIAL.RAINBOW : SPECIAL.BOMB;
+        s.board.setType(target.r, target.c, s.board.typeAt(target.r, target.c), special);
+        this.renderer?.syncBoard(s.board);
+        this.audio.play('special');
+        this.toast(id === 'rainbow' ? '彩虹已就位' : '炸弹已就位', 'good');
+        this.saveSession();
+      } else if (id === 'icePick') {
+        let hit = 0;
+        for (let rr = target.r - 1; rr <= target.r + 1; rr += 1) {
+          for (let cc = target.c - 1; cc <= target.c + 1; cc += 1) {
+            if (!s.board.inside(rr, cc)) continue;
+            const left = s.board.iceAt(rr, cc);
+            if (left > 0) {
+              s.board.setIce(rr, cc, left - 1);
+              hit += 1;
+            }
+          }
+        }
+        s.counters.iceLeft = s.board.countIce();
+        this.renderer?.syncBoard(s.board);
+        this.audio.play('special');
+        this.toast(`破冰：削减了 ${hit} 格冰`, 'good');
+        this.saveSession();
         await this.afterMove();
       }
       // 使用道具后重置思考时间，避免刚用完道具就被计时器逼着走
@@ -5873,17 +6172,19 @@ class GameController {
     const usedTotal = s.boosterUsedTotal;
     const limit = boosterLimit();
     const remaining = Math.max(0, limit - usedTotal);
-    const boosters = Object.values(BOOSTERS).map((def) => {
+    const loadout = Array.isArray(s.boosterLoadout) ? s.boosterLoadout : [];
+    const boosters = loadout.map((id) => BOOSTERS[id]).filter(Boolean).map((def) => {
       const check = checkBooster(def.id, {
         usedTotal,
         disabled: s.level.disabledBoosters,
         state: s.state,
+        loadout,
       });
       return {
         id: def.id,
         name: def.name,
         desc: def.desc,
-        // 三种道具共用次数池：count 是共享剩余次数
+        // 所选道具共用次数池：count 是共享剩余次数
         count: remaining,
         used: s.boosterUsage[def.id],
         usedTotal,
@@ -7143,9 +7444,13 @@ class InputController {
       return;
     }
 
-    // 锤子待选目标：点哪里敲哪里
-    if (this.controller.boosterArmed === 'hammer') {
-      this.controller.dispatch({ type: 'USE_BOOSTER', boosterId: 'hammer', target: cell });
+    // 需要选目标的道具：点哪里用哪里
+    if (this.controller.boosterArmed) {
+      this.controller.dispatch({
+        type: 'USE_BOOSTER',
+        boosterId: this.controller.boosterArmed,
+        target: cell,
+      });
       return;
     }
 
@@ -7232,6 +7537,21 @@ class InputController {
         c: Math.min(7, Math.max(0, cursor.c + moves[event.key].c)),
       };
       this.renderer.setCursor(next, true);
+      return;
+    }
+
+    if (this.controller.boosterArmed) {
+      if (event.key === ' ' || event.key === 'Enter') {
+        event.preventDefault();
+        const target = this.renderer.cursor;
+        if (target) {
+          this.controller.dispatch({
+            type: 'USE_BOOSTER',
+            boosterId: this.controller.boosterArmed,
+            target: { ...target },
+          });
+        }
+      }
       return;
     }
 
@@ -7534,13 +7854,24 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.7.2';
+const APP_VERSION = '1.7.3';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.3',
+    date: '2026-10-27',
+    notes: [
+      '新增彩虹、炸弹、破冰三种道具，道具总数达到 6 种',
+      '每局最多携带 3 个道具，可少带或不带；所选道具共用 2 次使用次数',
+      '首页新增“道具”入口，关卡说明里也可以直接调整本局道具',
+      '重做 EX-9“禁术”：长连会立刻释放特殊效果，不再只是纯连锁计分',
+      '重新开始可以更换道具；续玩同一局会保持原配置和剩余次数',
+    ],
+  },
   {
     version: '1.7.2',
     date: '2026-10-27',
@@ -7846,8 +8177,9 @@ __modules["js/presentation/sceneManager.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { SCENE } = __req("js/core/constants.js");
+const { SCENE, BOOSTERS } = __req("js/core/constants.js");
 const { goalSummary } = __req("js/domain/goals.js");
+const { boosterList } = __req("js/domain/boosterService.js");
 const { drawShareCard, downloadShareCard, shareText } = __req("js/presentation/shareCard.js");
 const { APP_VERSION, CHANGELOG, compareVersions } = __req("js/data/changelog.js");
 const { ACHIEVEMENT_TIER_LABEL } = __req("js/data/achievements.js");
@@ -7876,6 +8208,8 @@ class SceneManager {
     // 线上是否存在比当前构建更新的版本（决定首页红点与更新条）
     this.serverVersion = null;
     this.updateAvailable = false;
+    // 道具配置页的返回目标：home 或 intro（关卡说明）
+    this.loadoutReturn = null;
     this.el = {};
     this._onGlobalKeyDown = this._onGlobalKeyDown.bind(this);
   }
@@ -7899,6 +8233,13 @@ class SceneManager {
   _onGlobalKeyDown(event) {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
     if (!this.current || this.current === SCENE.HOME || this.current === SCENE.GAME) return;
+
+    if (this.current === SCENE.BOOSTERS) {
+      event.preventDefault();
+      this.audio.play('button');
+      this.returnFromLoadout();
+      return;
+    }
 
     // 文本类输入框先取消编辑；滑条、开关等控件不拦截 Esc，直接返回
     const active = document.activeElement;
@@ -7986,7 +8327,16 @@ class SceneManager {
       levelIntroStar3: $('level-intro-star3'),
       levelIntroMechanic: $('level-intro-mechanic'),
       levelIntroTimer: $('level-intro-timer'),
+      introBoosters: $('level-intro-boosters'),
+      btnIntroBoosters: $('btn-intro-boosters'),
+      introLoadoutTitle: $('intro-loadout-title'),
       btnLevelStart: $('btn-level-start'),
+      boostersMeta: $('boosters-meta'),
+      loadoutGrid: $('loadout-grid'),
+      btnBoostersBack: $('btn-boosters-back'),
+      btnLoadoutClear: $('btn-loadout-clear'),
+      btnLoadoutDone: $('btn-loadout-done'),
+      boosterEmpty: $('booster-empty'),
       share: $('share-overlay'),
       shareCanvas: $('share-canvas'),
       tutorial: $('tutorial-bubble'),
@@ -8025,6 +8375,7 @@ class SceneManager {
     document.querySelectorAll('[data-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.audio.play('button');
+        if (btn.dataset.action === SCENE.BOOSTERS) this.loadoutReturn = 'home';
         this.goto(btn.dataset.action);
       });
     });
@@ -8034,6 +8385,44 @@ class SceneManager {
         this.audio.play('button');
         this.goto(btn.dataset.back);
       });
+    });
+
+    this.el.btnBoostersBack?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.returnFromLoadout();
+    });
+    this.el.btnLoadoutDone?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.returnFromLoadout();
+    });
+    this.el.btnLoadoutClear?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.setBoosterLoadout([]);
+      this.renderLoadout();
+      this.toast('本局不带道具', 'info');
+    });
+    this.el.loadoutGrid?.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-booster]');
+      if (!card) return;
+      const id = card.dataset.booster;
+      const selected = [...(c.save.boosterLoadout || [])];
+      const index = selected.indexOf(id);
+      if (index >= 0) {
+        selected.splice(index, 1);
+      } else {
+        if (selected.length >= 3) {
+          this.toast('最多携带 3 个道具', 'warn');
+          return;
+        }
+        selected.push(id);
+      }
+      this.audio.play('button');
+      c.setBoosterLoadout(selected);
+      this.renderLoadout();
+    });
+    this.el.btnIntroBoosters?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.openLoadout('intro');
     });
 
     this.el.btnContinue.addEventListener('click', () => {
@@ -8398,7 +8787,11 @@ class SceneManager {
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
     if (scene === SCENE.NOTICE) this.renderNotice();
-    if (scene === SCENE.HOME) this.refreshHome();
+    if (scene === SCENE.BOOSTERS) this.renderLoadout();
+    if (scene === SCENE.HOME) {
+      this.loadoutReturn = null;
+      this.refreshHome();
+    }
     if (scene === SCENE.GAME) {
       this.lastScore = -1;
       requestAnimationFrame(() => this.renderer._onResize());
@@ -8409,6 +8802,71 @@ class SceneManager {
       this.el.tutorial.classList.add('hidden');
     } else if (this.tutorialStep) {
       this.showTutorial(this.tutorialStep);
+    }
+  }
+
+  openLoadout(returnTo = 'home') {
+    this.loadoutReturn = returnTo;
+    this.goto(SCENE.BOOSTERS);
+  }
+
+  /** 从道具配置返回：关卡说明阶段回到说明，否则回首页 */
+  returnFromLoadout() {
+    const fromIntro = this.loadoutReturn === 'intro';
+    const s = this.controller.session;
+    this.loadoutReturn = null;
+    if (fromIntro && s) {
+      this.goto(SCENE.GAME);
+      // 道具页期间 renderSession 会因场景不是游戏而跳过，这里补一次刷新道具栏
+      this.renderSession(this.controller.viewModel());
+      this.showLevelIntro(s.level);
+    } else {
+      this.goto(SCENE.HOME);
+    }
+  }
+
+  renderLoadout() {
+    const selected = this.controller.save.boosterLoadout || [];
+    if (this.el.boostersMeta) this.el.boostersMeta.textContent = `${selected.length} / 3`;
+    if (!this.el.loadoutGrid) return;
+
+    const level = this.loadoutReturn === 'intro' ? this.controller.session?.level : null;
+    const blocked = new Set(level?.disabledBoosters || []);
+    this.el.loadoutGrid.textContent = '';
+
+    for (const def of boosterList()) {
+      const index = selected.indexOf(def.id);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'loadout-card' + (index >= 0 ? ' selected' : '');
+      card.dataset.booster = def.id;
+      card.setAttribute('aria-pressed', String(index >= 0));
+
+      const head = document.createElement('div');
+      head.className = 'lc-head';
+      const name = document.createElement('span');
+      name.className = 'lc-name';
+      name.textContent = def.name;
+      head.appendChild(name);
+      if (index >= 0) {
+        const order = document.createElement('span');
+        order.className = 'lc-order';
+        order.textContent = String(index + 1);
+        head.appendChild(order);
+      }
+
+      const desc = document.createElement('span');
+      desc.className = 'lc-desc';
+      desc.textContent = def.desc;
+      card.append(head, desc);
+
+      if (blocked.has(def.id)) {
+        const warn = document.createElement('span');
+        warn.className = 'lc-warn';
+        warn.textContent = '本关禁用';
+        card.appendChild(warn);
+      }
+      this.el.loadoutGrid.appendChild(card);
     }
   }
 
@@ -8442,8 +8900,43 @@ class SceneManager {
       this.el.levelIntroTimer.classList.add('hidden');
     }
 
+    this.renderIntroBoosters(level);
+    // 新开的一局可以调整；续玩是同一局，道具配置已固定
+    const active = this.controller.session;
+    const canAdjust = !active || !active.isResumed;
+    this.el.btnIntroBoosters?.classList.toggle('hidden', !canAdjust);
+    if (this.el.introLoadoutTitle) {
+      this.el.introLoadoutTitle.textContent = canAdjust ? '本局道具' : '本局道具（已固定）';
+    }
     this.el.levelIntro.classList.remove('hidden');
     this.el.btnLevelStart?.focus({ preventScroll: true });
+  }
+
+  renderIntroBoosters(level) {
+    if (!this.el.introBoosters) return;
+    const loadout = this.controller.session?.boosterLoadout
+      || this.controller.save.boosterLoadout
+      || [];
+    const blocked = new Set(level?.disabledBoosters || []);
+    this.el.introBoosters.textContent = '';
+
+    if (!loadout.length) {
+      const empty = document.createElement('span');
+      empty.className = 'intro-booster-empty';
+      empty.textContent = '未携带道具，仍可正常挑战';
+      this.el.introBoosters.appendChild(empty);
+      return;
+    }
+
+    for (const id of loadout) {
+      const def = BOOSTERS[id];
+      if (!def) continue;
+      const chip = document.createElement('span');
+      chip.className = 'intro-booster-chip' + (blocked.has(id) ? ' disabled' : '');
+      chip.textContent = def.name;
+      if (blocked.has(id)) chip.title = '本关禁用';
+      this.el.introBoosters.appendChild(chip);
+    }
   }
 
   hideLevelIntro() {
@@ -8551,6 +9044,10 @@ class SceneManager {
      * EX 关的计时器每 100ms 触发一次 emitSession，如果每次都重建按钮，
      * 玩家按下与松开之间按钮被替换，click 事件就会丢失，表现为“点不动”。
      */
+    const hasBoosters = vm.boosters.length > 0;
+    this.el.boosterBar.classList.toggle('hidden', !hasBoosters);
+    this.el.boosterEmpty?.classList.toggle('hidden', hasBoosters);
+
     const seen = new Set();
     for (const b of vm.boosters) {
       seen.add(b.id);
@@ -8572,8 +9069,8 @@ class SceneManager {
       }
       btn.classList.toggle('armed', Boolean(b.armed));
       btn.disabled = !b.available && !b.armed;
-      btn.setAttribute('aria-label', `${b.name}，三种道具共用次数，本关剩余 ${b.count} 次`);
-      // 三种道具共用次数池，三张卡显示同一个剩余次数
+      btn.setAttribute('aria-label', `${b.name}，所选道具共用次数，本关剩余 ${b.count} 次`);
+      // 所选道具共用次数池，所有卡显示同一个剩余次数
       btn.querySelector('.b-count').textContent = String(b.count);
       btn.querySelector('.b-limit').textContent = b.disabled ? '本关禁用' : `共用 ${b.usedTotal}/${b.limit}`;
     }
@@ -9685,21 +10182,21 @@ const LEVELS = [
     },
     "goal": {
       "type": "score",
-      "amount": 2400
+      "amount": 4000
     },
     "moves": 20,
     "starThresholds": [
-      2400,
-      3000,
-      3600
+      4000,
+      5000,
+      6000
     ],
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "noSpecials": true,
+      "instantSpecials": true,
       "maxChainMultiplier": 4
     },
-    "tutorialHint": "不再生成特殊方块；5 种颜色让连锁更密集，连锁倍率上限提升到 4 倍"
+    "tutorialHint": "棋盘只有 5 种颜色；特殊方块不再留下，四连立刻释放条纹，五连立刻清掉一种颜色，拐角匹配立刻爆炸"
   },
   {
     "schemaVersion": 1,

@@ -17,7 +17,7 @@ import { isAdjacent, isValidSwap, planSpecialSwap } from '../domain/matchEngine.
 import { resolveCascade } from '../domain/cascadeResolver.js';
 import { hasValidMove, reshuffle, findAnyValidMove } from '../domain/deadlockDetector.js';
 import { settleScore, judgeStars } from '../domain/scorer.js';
-import { checkBooster, consumeBooster, boosterLimit } from '../domain/boosterService.js';
+import { checkBooster, consumeBooster, boosterLimit, sanitizeBoosterLoadout } from '../domain/boosterService.js';
 import { goalSummary } from '../domain/goals.js';
 import { ACHIEVEMENTS } from '../data/achievements.js';
 import { buildAchievementStats, evaluateAchievements, achievementProgress } from '../domain/achievements.js';
@@ -147,6 +147,20 @@ export class GameController {
     this.emitSession();
   }
 
+  /** 修改本局携带的道具；关卡说明阶段（尚未操作）会同步到当前会话 */
+  setBoosterLoadout(ids) {
+    const loadout = sanitizeBoosterLoadout(ids);
+    this.save.boosterLoadout = loadout;
+    const s = this.session;
+    if (s && !s.isResumed && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)) {
+      // 新开的一局可以改；续玩是同一局，外部配置只留给下一局
+      s.boosterLoadout = [...loadout];
+    }
+    this.storage.write(this.save);
+    this.emitSession();
+    return loadout;
+  }
+
   setNickname(raw) {
     const { value } = sanitizeNickname(raw);
     this.save.player.nickname = value;
@@ -236,7 +250,17 @@ export class GameController {
             movesLeft: restoredLeft,
             movesTotal: restoredTotal,
             counters: GameSession.restoreCounters(snap, board),
-            boosterUsage: { shuffle: 0, hammer: 0, addMoves: 0, ...(snap.boostersUsed || {}) },
+            boosterUsage: {
+              shuffle: 0,
+              hammer: 0,
+              addMoves: 0,
+              rainbow: 0,
+              bomb: 0,
+              icePick: 0,
+              ...(snap.boostersUsed || {}),
+            },
+            // 续玩沿用本局快照；只有快照缺失的旧存档才回退到当前配置
+            boosterLoadout: Array.isArray(snap.boosterLoadout) ? snap.boosterLoadout : null,
             chainBest: Number(snap.chainBest) || 0,
             tilesCleared: Number(snap.tilesCleared) || 0,
             turnCount: Number(snap.turnCount) || 0,
@@ -250,7 +274,12 @@ export class GameController {
     if (!board) board = createBoard({ ...level.board, rules: level.rules || {} }, this.rng);
     board.rules = level.rules || {};
 
-    this.session = new GameSession({ level, board, resumed });
+    this.session = new GameSession({
+      level,
+      board,
+      resumed,
+      loadout: this.save.boosterLoadout,
+    });
     this.sessionCounter += 1;
     this.introOpen = false;
     this.boosterArmed = null;
@@ -557,12 +586,15 @@ export class GameController {
     if (!s) return;
 
     // 处理 EX-2 的“每 N 步随机冰冻”
+    let turnAdvanced = false;
     if (s.pendingFreeze) {
       s.pendingFreeze = false;
       s.turnCount += 1;
+      turnAdvanced = true;
       await this.applyFreezeRule();
     }
-    await this.applyGiftRule();
+    // 只有真正推进了一步才触发祭典赠礼，避免用道具刷新赠礼
+    if (turnAdvanced) await this.applyGiftRule();
 
     // 步数用尽才自动结算。达标后不强制结束，玩家可以继续消除把分数做高，
     // 否则"提前结算 + 剩余步数 ×100"往往低于继续消除的收益，反而拿不到三星。
@@ -684,7 +716,7 @@ export class GameController {
   async applyGiftRule() {
     const s = this.session;
     const n = Number(s?.level?.rules?.giftSpecialEveryNMoves);
-    if (!Number.isFinite(n) || n <= 0 || s.turnCount % n !== 0) return;
+    if (!Number.isFinite(n) || n <= 0 || s.turnCount <= 0 || s.turnCount % n !== 0) return;
 
     const free = [];
     s.board.eachCell((r, c) => {
@@ -983,17 +1015,24 @@ export class GameController {
   armBooster(id) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
+    const def = BOOSTERS[id];
+    const loadout = Array.isArray(s.boosterLoadout) ? s.boosterLoadout : [];
+    if (!def || !loadout.includes(id)) {
+      this.toast('本局未携带该道具', 'warn');
+      return { ok: false, error: 'NOT_LOADED' };
+    }
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
+      loadout: s.boosterLoadout,
     });
     if (!check.ok) {
       this.toast(check.message, 'warn');
       return { ok: false, error: check.reason };
     }
-    if (id !== 'hammer') return this.useBooster(id, null);
-    this.boosterArmed = this.boosterArmed === 'hammer' ? null : 'hammer';
+    if (!def.target) return this.useBooster(id, null);
+    this.boosterArmed = this.boosterArmed === id ? null : id;
     this.renderer?.setArmedTarget(this.boosterArmed);
     this.emitSession();
     return { ok: true };
@@ -1002,25 +1041,42 @@ export class GameController {
   async useBooster(id, target) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
-    if (!BOOSTERS[id]) return { ok: false, error: 'UNKNOWN_BOOSTER' };
+    const def = BOOSTERS[id];
+    if (!def) return { ok: false, error: 'UNKNOWN_BOOSTER' };
 
     const check = checkBooster(id, {
       usedTotal: s.boosterUsedTotal,
       disabled: s.level.disabledBoosters,
       state: s.state,
+      loadout: s.boosterLoadout,
     });
     if (!check.ok) {
       this.toast(check.message, 'warn');
       return { ok: false, error: check.reason };
     }
 
+    if (def.target && !target) {
+      this.toast('点选一个目标', 'info');
+      return { ok: false, error: 'NEEDS_TARGET' };
+    }
+
     if (id === 'hammer') {
-      if (!target) {
-        this.toast('点选一个要敲掉的元素', 'info');
-        return { ok: false, error: 'NEEDS_TARGET' };
-      }
       if (!s.board.isFree(target.r, target.c) || s.board.typeAt(target.r, target.c) < 0) {
         this.toast('这个位置不能被敲掉', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+    } else if (id === 'rainbow' || id === 'bomb') {
+      if (!s.board.isFree(target.r, target.c) || s.board.typeAt(target.r, target.c) < 0) {
+        this.toast('这个位置不能放置', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+      if (s.board.specialAt(target.r, target.c)) {
+        this.toast('这个位置已经有特殊方块', 'warn');
+        return { ok: false, error: 'INVALID_TARGET' };
+      }
+    } else if (id === 'icePick') {
+      if (!s.board.inside(target.r, target.c) || s.board.iceAt(target.r, target.c) <= 0) {
+        this.toast('这个位置没有冰', 'warn');
         return { ok: false, error: 'INVALID_TARGET' };
       }
     }
@@ -1044,6 +1100,31 @@ export class GameController {
         this.saveSession();
       } else if (id === 'hammer') {
         await this.runCascade({ initialCells: [target] });
+        await this.afterMove();
+      } else if (id === 'rainbow' || id === 'bomb') {
+        const special = id === 'rainbow' ? SPECIAL.RAINBOW : SPECIAL.BOMB;
+        s.board.setType(target.r, target.c, s.board.typeAt(target.r, target.c), special);
+        this.renderer?.syncBoard(s.board);
+        this.audio.play('special');
+        this.toast(id === 'rainbow' ? '彩虹已就位' : '炸弹已就位', 'good');
+        this.saveSession();
+      } else if (id === 'icePick') {
+        let hit = 0;
+        for (let rr = target.r - 1; rr <= target.r + 1; rr += 1) {
+          for (let cc = target.c - 1; cc <= target.c + 1; cc += 1) {
+            if (!s.board.inside(rr, cc)) continue;
+            const left = s.board.iceAt(rr, cc);
+            if (left > 0) {
+              s.board.setIce(rr, cc, left - 1);
+              hit += 1;
+            }
+          }
+        }
+        s.counters.iceLeft = s.board.countIce();
+        this.renderer?.syncBoard(s.board);
+        this.audio.play('special');
+        this.toast(`破冰：削减了 ${hit} 格冰`, 'good');
+        this.saveSession();
         await this.afterMove();
       }
       // 使用道具后重置思考时间，避免刚用完道具就被计时器逼着走
@@ -1078,17 +1159,19 @@ export class GameController {
     const usedTotal = s.boosterUsedTotal;
     const limit = boosterLimit();
     const remaining = Math.max(0, limit - usedTotal);
-    const boosters = Object.values(BOOSTERS).map((def) => {
+    const loadout = Array.isArray(s.boosterLoadout) ? s.boosterLoadout : [];
+    const boosters = loadout.map((id) => BOOSTERS[id]).filter(Boolean).map((def) => {
       const check = checkBooster(def.id, {
         usedTotal,
         disabled: s.level.disabledBoosters,
         state: s.state,
+        loadout,
       });
       return {
         id: def.id,
         name: def.name,
         desc: def.desc,
-        // 三种道具共用次数池：count 是共享剩余次数
+        // 所选道具共用次数池：count 是共享剩余次数
         count: remaining,
         used: s.boosterUsage[def.id],
         usedTotal,

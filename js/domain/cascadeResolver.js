@@ -23,6 +23,7 @@ export function resolveCascade(board, options = {}) {
   const sequence = [];
   const collected = {};
   const specialCycle = Boolean(board?.rules?.specialCycle);
+  const instantSpecials = Boolean(board?.rules?.instantSpecials);
   let totalScore = 0;
   let specialsCreated = 0;
   let iceCleared = 0;
@@ -56,8 +57,21 @@ export function resolveCascade(board, options = {}) {
       if (!matches.length) break;
       // EX-5 限量规则的实现位置：配额用完的类型不再进入生成计划（该次匹配只消除、不生成）
       plans = planSpecials(board, matches, preferred, rng).filter((plan) => board.canGenerateSpecial(plan.special));
-      for (const plan of plans) exclude.add(key(plan.r, plan.c));
-      for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+      if (instantSpecials) {
+        /*
+         * EX-9 禁术·咒发：把特殊方块直接放在匹配落点上并立刻引爆，
+         * 不进入 exclude，也不留下成品。玩家看到的是四连放条纹、
+         * 五连清色、拐角爆炸的即时效果。
+         */
+        for (const plan of plans) {
+          board.setType(plan.r, plan.c, board.typeAt(plan.r, plan.c), plan.special);
+        }
+        for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+        plans = [];
+      } else {
+        for (const plan of plans) exclude.add(key(plan.r, plan.c));
+        for (const m of matches) for (const cell of m.cells) addCell(cell.r, cell.c);
+      }
     }
 
     if (!clearMap.size && !plans.length) break;

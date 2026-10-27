@@ -4,7 +4,7 @@
  * 存档结构与需求文档第 7.3 节一致，当前 saveVersion 为 2：
  *   player / progress / settings / interruptedSession / localBest / achievements
  * achievements 是向后兼容的附加字段，旧存档读取时补成空表。
- * 道具不再有跨关库存，每关三种道具共用 2 次，计数只存在于会话快照中。
+ * 道具不再有跨关库存，每局所选道具共用 2 次，计数只存在于会话快照中。
  * 写入采用"整体覆盖 + 版本号"，避免部分字段写入造成不一致。
  *
  * 失败路径（FR-07 / NFR-14 / AC-11、AC-35）：
@@ -13,9 +13,19 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { SAVE_KEY, SAVE_VERSION } from '../core/constants.js';
+import { SAVE_KEY, SAVE_VERSION, BOOSTERS, BOOSTER_LOADOUT_LIMIT, DEFAULT_BOOSTER_LOADOUT } from '../core/constants.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+function normalizeBoosterLoadout(list) {
+  const out = [];
+  for (const id of Array.isArray(list) ? list : []) {
+    if (!BOOSTERS[id] || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= BOOSTER_LOADOUT_LIMIT) break;
+  }
+  return out;
+}
 
 export function localISO(date = new Date()) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -46,6 +56,7 @@ export function createDefaultSave() {
     player: { nickname: '玩家', totalScore: 0, createdAt: now },
     progress: {},
     settings: defaultSettings(),
+    boosterLoadout: [...DEFAULT_BOOSTER_LOADOUT],
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
@@ -148,6 +159,9 @@ export function normalizeSave(input) {
       })(),
       plainBg: Boolean(settings.plainBg),
     },
+    boosterLoadout: Array.isArray(data.boosterLoadout)
+      ? normalizeBoosterLoadout(data.boosterLoadout)
+      : [...DEFAULT_BOOSTER_LOADOUT],
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
     localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],

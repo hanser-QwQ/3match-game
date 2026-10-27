@@ -40,12 +40,21 @@ export const SCORE = {
 /** 道具定义（FR-12） */
 export const BOOSTERS = {
   shuffle: { id: 'shuffle', name: '洗牌', icon: 'shuffle', desc: '重排整个棋盘' },
-  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素' },
+  hammer: { id: 'hammer', name: '锤子', icon: 'hammer', desc: '敲掉任意一个元素', target: true },
   addMoves: { id: 'addMoves', name: '加三步', icon: 'plus', desc: '本关剩余步数 +3' },
+  rainbow: { id: 'rainbow', name: '彩虹', icon: 'rainbow', desc: '把一个元素变成彩虹', target: true },
+  bomb: { id: 'bomb', name: '炸弹', icon: 'bomb', desc: '把一个元素变成炸弹', target: true },
+  icePick: { id: 'icePick', name: '破冰', icon: 'ice', desc: '削减 3×3 范围内的冰层', target: true },
 };
 
-/** 每关三种道具共用的使用次数（不是每种各 2 次） */
+/** 每局所选道具共用的使用次数（不是每种各 2 次） */
 export const BOOSTER_TOTAL_LIMIT = 2;
+
+/** 每局最多携带的道具数量 */
+export const BOOSTER_LOADOUT_LIMIT = 3;
+
+/** 老存档与默认配置：沿用原来的三件套 */
+export const DEFAULT_BOOSTER_LOADOUT = ['shuffle', 'hammer', 'addMoves'];
 
 /** 会话状态（TB-03） */
 export const SESSION_STATE = {
@@ -60,6 +69,7 @@ export const SCENE = {
   LEVELS: 'levels',
   GAME: 'game',
   RESULT: 'result',
+  BOOSTERS: 'boosters',
   SETTINGS: 'settings',
   RANK: 'rank',
   ACHIEVEMENTS: 'achievements',
