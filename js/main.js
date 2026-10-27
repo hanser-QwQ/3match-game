@@ -55,6 +55,12 @@ async function boot() {
   await controller.boot();
   scenes.refreshHome();
 
+  // 跟随系统主题：系统切换深浅色时重新解析 auto 模式
+  const colorScheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+  colorScheme?.addEventListener?.('change', () => {
+    if (controller.save.settings.themeMode === 'auto') controller.applySettings();
+  });
+
   // 引导完成标记落盘，只影响下次是否重播
   bus.on(EVENTS.TUTORIAL_DONE, () => {
     controller.save.tutorialDone = true;

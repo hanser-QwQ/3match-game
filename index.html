@@ -182,6 +182,24 @@
       </div>
 
       <div class="panel">
+        <div class="panel-title">外观</div>
+        <div class="row row-theme">
+          <span>主题<small>跟随系统或手动选择深浅色</small></span>
+          <div class="segmented" id="set-theme" role="group" aria-label="主题模式">
+            <button type="button" data-theme-mode="auto" aria-pressed="true">跟随系统</button>
+            <button type="button" data-theme-mode="light" aria-pressed="false">浅色</button>
+            <button type="button" data-theme-mode="dark" aria-pressed="false">深色</button>
+          </div>
+        </div>
+        <label class="row row-slider">
+          <span>背景色调<small>拖动后使用纯色背景，文字对比度保持可读</small></span>
+          <input type="range" id="set-bg-hue" min="0" max="360" step="5" value="36" />
+          <output id="set-bg-hue-out">36°</output>
+        </label>
+        <button class="btn btn-ghost btn-sm" id="btn-bg-reset">恢复默认背景</button>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">玩家</div>
         <label class="row row-input">
           <span>昵称</span>
@@ -201,7 +219,7 @@
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.0</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.1</button>
     </div>
   </section>
 

@@ -135,8 +135,9 @@ export class GameController {
     const s = this.save.settings;
     this.audio.setEnabled(s.soundEnabled);
     this.audio.setVolume(s.volume / 100);
-    this.renderer?.setSettings(s);
+    // 先让无障碍层把主题与 CSS 变量写到根节点，渲染器随后读取棋盘调色板
     this.a11y?.applySettings(s);
+    this.renderer?.setSettings(s);
   }
 
   updateSettings(patch) {

@@ -16,6 +16,7 @@ import { goalTasks } from '../js/domain/goals.js';
 import { createBoard } from '../js/domain/boardFactory.js';
 import { RandomSource } from '../js/core/random.js';
 import { SPECIAL, chainMultiplier } from '../js/core/constants.js';
+import { resolveTheme } from '../js/core/theme.js';
 import { LevelRepository } from '../js/infrastructure/levelRepository.js';
 import { GameController } from '../js/application/gameController.js';
 import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal } from '../js/domain/boosterService.js';
@@ -1269,6 +1270,32 @@ test('EX 计时：进入关卡先待开始，第一次操作后才启动，重�
   assert.equal(controller._moveTimerStarted, true, '第一次操作后计时器应启动');
   assert.notEqual(controller._moveTimer, null, '第一次操作后应有计时器在跑');
   controller._stopMoveTimer();
+});
+
+test('设置：主题模式、背景色相与纯色背景可持久化并夹紧', () => {
+  const def = createDefaultSave();
+  assert.equal(def.settings.themeMode, 'auto');
+  assert.equal(def.settings.bgHue, 36);
+  assert.equal(def.settings.plainBg, false);
+
+  const save = normalizeSave({
+    settings: { themeMode: 'dark', bgHue: 725, plainBg: 1 },
+  });
+  assert.equal(save.settings.themeMode, 'dark');
+  assert.equal(save.settings.bgHue, 360);
+  assert.equal(save.settings.plainBg, true);
+
+  const zero = normalizeSave({ settings: { bgHue: 0 } });
+  assert.equal(zero.settings.bgHue, 0, '0 是合法色相，不应回退到默认值');
+
+  const bad = normalizeSave({ settings: { themeMode: 'neon', bgHue: -20 } });
+  assert.equal(bad.settings.themeMode, 'auto');
+  assert.equal(bad.settings.bgHue, 0);
+
+  assert.equal(resolveTheme('light', true), 'light');
+  assert.equal(resolveTheme('dark', false), 'dark');
+  assert.equal(resolveTheme('auto', true), 'dark');
+  assert.equal(resolveTheme('auto', false), 'light');
 });
 
 test('存档：旧版 boosters 库存字段被丢弃，默认存档不再包含库存', () => {

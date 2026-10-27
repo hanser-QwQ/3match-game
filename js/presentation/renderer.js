@@ -113,6 +113,15 @@ export class Renderer {
       colorBlindEnhanced: false,
       showCursor: true,
     };
+    // 棋盘底板调色板：由 CSS 变量驱动，主题/背景色变化时重读
+    this.palette = {
+      boardBg1: '#f7f1e6',
+      boardBg2: '#efe6d7',
+      boardGrid: 'rgba(90, 74, 55, 0.10)',
+      boardBlocked: 'rgba(120, 104, 86, 0.10)',
+      tileShadow: 'rgba(90, 68, 46, 0.16)',
+      boardRing: 'rgba(255, 255, 255, 0.95)',
+    };
     this.hint = null;
     this.selected = null;
     this.cursor = null;
@@ -144,6 +153,35 @@ export class Renderer {
   setSettings(settings) {
     this.settings = { ...this.settings, ...settings };
     if (this.settings.reducedMotion) this.particles = [];
+    this._readPalette();
+  }
+
+  /** 根据根节点的主题与色相计算棋盘底色，保证 Canvas 拿到的是具体颜色值 */
+  _readPalette() {
+    if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return;
+    const root = document.documentElement;
+    const cs = getComputedStyle(root);
+    if (!cs) return;
+    const dark = root.dataset.theme === 'dark';
+    const rawHue = Number(cs.getPropertyValue('--bg-hue').trim());
+    const hue = Number.isFinite(rawHue) ? Math.max(0, Math.min(360, rawHue)) : 36;
+    this.palette = dark
+      ? {
+          boardBg1: `hsl(${hue}, 16%, 10%)`,
+          boardBg2: `hsl(${hue}, 14%, 13%)`,
+          boardGrid: 'rgba(255, 255, 255, 0.08)',
+          boardBlocked: 'rgba(255, 255, 255, 0.06)',
+          tileShadow: 'rgba(0, 0, 0, 0.35)',
+          boardRing: 'rgba(255, 255, 255, 0.95)',
+        }
+      : {
+          boardBg1: `hsl(${hue}, 34%, 95%)`,
+          boardBg2: `hsl(${hue}, 30%, 90%)`,
+          boardGrid: 'rgba(90, 74, 55, 0.10)',
+          boardBlocked: 'rgba(120, 104, 86, 0.10)',
+          tileShadow: 'rgba(90, 68, 46, 0.16)',
+          boardRing: 'rgba(255, 255, 255, 0.95)',
+        };
   }
 
   setBoard(board) {
@@ -549,15 +587,15 @@ export class Renderer {
 
     // 棋盘底板
     const bg = ctx.createLinearGradient(0, 0, size, size);
-    bg.addColorStop(0, '#f7f1e6');
-    bg.addColorStop(1, '#efe6d7');
+    bg.addColorStop(0, this.palette.boardBg1);
+    bg.addColorStop(1, this.palette.boardBg2);
     ctx.fillStyle = bg;
     roundRect(ctx, 0, 0, size, size, this.cell * 0.28);
     ctx.fill();
 
     // 网格
     if (this.settings.showGrid) {
-      ctx.strokeStyle = 'rgba(90, 74, 55, 0.10)';
+      ctx.strokeStyle = this.palette.boardGrid;
       ctx.lineWidth = 1;
       for (let i = 0; i <= 8; i += 1) {
         const p = this.pad + i * this.cell;
@@ -653,7 +691,7 @@ export class Renderer {
     }
 
     // 选中框与键盘光标
-    if (this.selected) this._drawRing(this.selected, 'rgba(255,255,255,0.95)', 4);
+    if (this.selected) this._drawRing(this.selected, this.palette.boardRing, 4);
     if (this.settings.showCursor && this.cursor && this.cursorVisible) this._drawCursor(this.cursor, now);
     ctx.restore();
   }
@@ -662,7 +700,7 @@ export class Renderer {
     const ctx = this.ctx;
     const x = this._x(c);
     const y = this._y(r);
-    ctx.fillStyle = 'rgba(120, 104, 86, 0.10)';
+    ctx.fillStyle = this.palette.boardBlocked;
     roundRect(ctx, x + 4, y + 4, this.cell - 8, this.cell - 8, this.cell * 0.2);
     ctx.fill();
   }
@@ -688,7 +726,7 @@ export class Renderer {
     const radius = s * 0.26;
 
     // 投影
-    ctx.fillStyle = 'rgba(90, 68, 46, 0.16)';
+    ctx.fillStyle = this.palette.tileShadow;
     roundRect(ctx, x, y + s * 0.05, s, s, radius);
     ctx.fill();
 

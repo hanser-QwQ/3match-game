@@ -128,6 +128,10 @@ export class SceneManager {
       setMotion: $('set-motion'),
       setGrid: $('set-grid'),
       setCursor: $('set-cursor'),
+      setTheme: $('set-theme'),
+      setBgHue: $('set-bg-hue'),
+      setBgHueOut: $('set-bg-hue-out'),
+      btnBgReset: $('btn-bg-reset'),
       setNickname: $('set-nickname'),
     };
   }
@@ -311,6 +315,31 @@ export class SceneManager {
     this.el.setCursor.addEventListener('change', (e) => {
       c.updateSettings({ showCursor: e.target.checked });
     });
+
+    this.el.setTheme?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-theme-mode]');
+      if (!btn) return;
+      c.updateSettings({ themeMode: btn.dataset.themeMode });
+      this.syncSettings();
+    });
+
+    // 拖动时实时预览，松手后再落盘，避免每移动 5° 就写一次 localStorage
+    this.el.setBgHue?.addEventListener('input', (e) => {
+      const hue = Number(e.target.value);
+      this.el.setBgHueOut.textContent = `${hue}°`;
+      c.save.settings.bgHue = hue;
+      c.save.settings.plainBg = true;
+      c.applySettings();
+    });
+    this.el.setBgHue?.addEventListener('change', (e) => {
+      c.updateSettings({ bgHue: Number(e.target.value), plainBg: true });
+    });
+    this.el.btnBgReset?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.updateSettings({ bgHue: 36, plainBg: false });
+      this.syncSettings();
+    });
+
     this.el.setNickname.addEventListener('change', (e) => {
       const value = c.setNickname(e.target.value);
       e.target.value = value;
@@ -972,6 +1001,17 @@ export class SceneManager {
     this.el.setMotion.checked = s.reducedMotion;
     this.el.setGrid.checked = s.showGrid;
     this.el.setCursor.checked = s.showCursor;
+
+    const themeMode = s.themeMode || 'auto';
+    this.el.setTheme?.querySelectorAll('[data-theme-mode]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.themeMode === themeMode));
+    });
+    if (this.el.setBgHue) {
+      const hue = Number.isFinite(Number(s.bgHue)) ? s.bgHue : 36;
+      this.el.setBgHue.value = String(hue);
+      this.el.setBgHueOut.textContent = `${hue}°`;
+    }
+
     this.el.setNickname.value = this.controller.save.player.nickname;
   }
 

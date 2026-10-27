@@ -32,6 +32,9 @@ export function defaultSettings() {
     reducedMotion: false,
     showGrid: true,
     showCursor: true,
+    themeMode: 'auto',
+    bgHue: 36,
+    plainBg: false,
   };
 }
 
@@ -138,6 +141,12 @@ export function normalizeSave(input) {
       reducedMotion: Boolean(settings.reducedMotion),
       showGrid: settings.showGrid !== false,
       showCursor: settings.showCursor !== false,
+      themeMode: ['auto', 'light', 'dark'].includes(settings.themeMode) ? settings.themeMode : 'auto',
+      bgHue: (() => {
+        const hue = Number(settings.bgHue);
+        return Number.isFinite(hue) ? clamp(hue, 0, 360) : 36;
+      })(),
+      plainBg: Boolean(settings.plainBg),
     },
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,

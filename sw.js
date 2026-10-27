@@ -6,7 +6,7 @@
  * 首次访问即断网时，导航请求回退到缓存的首页，不出现空白页。
  */
 
-const CACHE_NAME = 'match3-path-v20';
+const CACHE_NAME = 'match3-path-v21';
 const CORE = [
   './',
   './index.html',
@@ -16,6 +16,7 @@ const CORE = [
   './js/core/constants.js',
   './js/core/events.js',
   './js/core/random.js',
+  './js/core/theme.js',
   './js/data/changelog.js',
   './js/data/levels.embedded.js',
   './js/data/achievements.js',

@@ -15,14 +15,16 @@
    ========================================================================= */
 
 :root {
-  --paper: #f6f1e7;
-  --paper-2: #efe7d9;
-  --card: #fffdf8;
+  /* 背景色相由设置页的滑条写入；饱和度和明度在主题里固定，保证对比度 */
+  --bg-hue: 36;
+  --paper: hsl(var(--bg-hue), 32%, 94%);
+  --paper-2: hsl(var(--bg-hue), 30%, 90%);
+  --card: hsl(var(--bg-hue), 50%, 99%);
   --ink: #2a2620;
   --ink-2: #635a50;
   --ink-3: #8d8377;
-  --line: #e4dac9;
-  --line-strong: #d3c5b0;
+  --line: hsl(var(--bg-hue), 22%, 84%);
+  --line-strong: hsl(var(--bg-hue), 20%, 76%);
   --accent: #2f6f5e;
   --accent-ink: #24594b;
   --accent-soft: #e0eee8;
@@ -32,9 +34,31 @@
   --shadow-sm: 0 2px 6px rgba(88, 66, 44, 0.08);
   --shadow: 0 10px 26px rgba(88, 66, 44, 0.12);
   --shadow-lg: 0 22px 60px rgba(70, 52, 34, 0.20);
+  --board-shadow: 0 14px 34px rgba(88, 66, 44, 0.16);
   --radius: 18px;
   --radius-sm: 12px;
   --font: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+[data-theme="dark"] {
+  --paper: hsl(var(--bg-hue), 18%, 9%);
+  --paper-2: hsl(var(--bg-hue), 16%, 13%);
+  --card: hsl(var(--bg-hue), 14%, 16%);
+  --ink: #f1ece3;
+  --ink-2: #c2b9ad;
+  --ink-3: #a39a8e;
+  --line: hsl(var(--bg-hue), 12%, 24%);
+  --line-strong: hsl(var(--bg-hue), 12%, 32%);
+  --accent: #6fbfa4;
+  --accent-ink: #9ad9c1;
+  --accent-soft: hsl(160, 20%, 18%);
+  --warm: #e2a15c;
+  --warm-soft: hsl(30, 24%, 17%);
+  --danger: #e07a72;
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.24);
+  --shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.52);
+  --board-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -59,6 +83,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* 自定义纯色背景时去掉默认光晕，避免出现第二种颜色 */
+body.plain-bg { background-image: none; }
+
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(226, 161, 92, 0.07), transparent 42%),
+    radial-gradient(circle at 88% 92%, rgba(111, 191, 164, 0.07), transparent 46%);
+}
+
+[data-theme="dark"] body.plain-bg { background-image: none; }
 
 .app {
   position: relative;
@@ -296,7 +331,7 @@ body {
 .level-card.current { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.18), var(--shadow-sm); }
 
 .level-card.locked {
-  background: rgba(240, 234, 223, 0.6);
+  background: var(--paper-2);
   color: var(--ink-3);
   box-shadow: none;
   cursor: not-allowed;
@@ -469,7 +504,7 @@ body {
 #board {
   display: block;
   border-radius: 20px;
-  box-shadow: 0 14px 34px rgba(88, 66, 44, 0.16);
+  box-shadow: var(--board-shadow);
   touch-action: none;
   cursor: pointer;
 }
@@ -687,7 +722,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 11px 0;
-  border-top: 1px solid rgba(228, 218, 201, 0.7);
+  border-top: 1px solid var(--line);
   font-size: 15px;
 }
 
@@ -697,14 +732,45 @@ body {
 
 .row-slider { gap: 10px; }
 .row-slider input[type="range"] { flex: 1.2; accent-color: var(--accent); }
-.row-slider output { font-size: 12px; color: var(--ink-2); width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+.row-slider output { font-size: 12px; color: var(--ink-2); width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 外观设置 */
+.row-theme { flex-wrap: wrap; gap: 8px 12px; }
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#set-bg-hue { accent-color: var(--accent); }
+#btn-bg-reset { width: 100%; margin-top: 8px; }
+.btn-sm { padding: 8px 12px; font-size: 13px; }
 
 .switch {
   appearance: none;
   width: 48px;
   height: 28px;
   border-radius: 999px;
-  background: #d9cfbf;
+  background: var(--line-strong);
   position: relative;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -738,7 +804,7 @@ body {
   font-family: inherit;
   font-size: 14px;
   text-align: right;
-  background: #fffefa;
+  background: var(--card);
   color: var(--ink);
 }
 
@@ -1380,6 +1446,69 @@ body {
   .btn, .level-card, .panel { border-width: 2px; }
 }
 
+/* ------------------------------------------------------------------ 深色主题表面修正 */
+
+[data-theme="dark"] .level-card.cleared {
+  background: linear-gradient(180deg, hsl(var(--bg-hue), 14%, 19%), hsl(160, 14%, 14%));
+  border-color: hsl(160, 18%, 26%);
+}
+
+[data-theme="dark"] .level-card.ex {
+  background: linear-gradient(180deg, hsl(var(--bg-hue), 14%, 19%), hsl(30, 18%, 14%));
+  border-color: hsl(30, 18%, 26%);
+}
+
+[data-theme="dark"] .level-card.invalid {
+  background: hsl(0, 18%, 14%);
+  border-color: hsl(0, 24%, 28%);
+}
+
+[data-theme="dark"] .level-card.locked {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--ink-3);
+}
+
+[data-theme="dark"] .btn-ghost {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+[data-theme="dark"] .level-stars,
+[data-theme="dark"] .stars .star {
+  color: #5f5867;
+}
+
+[data-theme="dark"] .goal-chip.done {
+  border-color: hsl(160, 18%, 26%);
+}
+
+[data-theme="dark"] .moves-chip.low {
+  border-color: hsl(0, 24%, 28%);
+}
+
+[data-theme="dark"] .btn-danger {
+  border-color: hsl(0, 24%, 30%);
+}
+
+[data-theme="dark"] .notice-card {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+[data-theme="dark"] .notice-tag.current {
+  background: hsl(160, 18%, 22%);
+  color: #9ad9c1;
+}
+
+[data-theme="dark"] .notice-tag.new {
+  background: hsl(0, 24%, 22%);
+  color: #f0a49d;
+}
+
+[data-theme="dark"] .panel-update {
+  border-color: hsl(30, 30%, 32%);
+  background: hsl(30, 24%, 16%);
+}
+
 </style>
 </head>
 <body>
@@ -1541,6 +1670,24 @@ body {
       </div>
 
       <div class="panel">
+        <div class="panel-title">外观</div>
+        <div class="row row-theme">
+          <span>主题<small>跟随系统或手动选择深浅色</small></span>
+          <div class="segmented" id="set-theme" role="group" aria-label="主题模式">
+            <button type="button" data-theme-mode="auto" aria-pressed="true">跟随系统</button>
+            <button type="button" data-theme-mode="light" aria-pressed="false">浅色</button>
+            <button type="button" data-theme-mode="dark" aria-pressed="false">深色</button>
+          </div>
+        </div>
+        <label class="row row-slider">
+          <span>背景色调<small>拖动后使用纯色背景，文字对比度保持可读</small></span>
+          <input type="range" id="set-bg-hue" min="0" max="360" step="5" value="36" />
+          <output id="set-bg-hue-out">36°</output>
+        </label>
+        <button class="btn btn-ghost btn-sm" id="btn-bg-reset">恢复默认背景</button>
+      </div>
+
+      <div class="panel">
         <div class="panel-title">玩家</div>
         <label class="row row-input">
           <span>昵称</span>
@@ -1560,7 +1707,7 @@ body {
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.0</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.1</button>
     </div>
   </section>
 
@@ -2241,6 +2388,9 @@ function defaultSettings() {
     reducedMotion: false,
     showGrid: true,
     showCursor: true,
+    themeMode: 'auto',
+    bgHue: 36,
+    plainBg: false,
   };
 }
 
@@ -2347,6 +2497,12 @@ function normalizeSave(input) {
       reducedMotion: Boolean(settings.reducedMotion),
       showGrid: settings.showGrid !== false,
       showCursor: settings.showCursor !== false,
+      themeMode: ['auto', 'light', 'dark'].includes(settings.themeMode) ? settings.themeMode : 'auto',
+      bgHue: (() => {
+        const hue = Number(settings.bgHue);
+        return Number.isFinite(hue) ? clamp(hue, 0, 360) : 36;
+      })(),
+      plainBg: Boolean(settings.plainBg),
     },
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
@@ -4768,8 +4924,9 @@ class GameController {
     const s = this.save.settings;
     this.audio.setEnabled(s.soundEnabled);
     this.audio.setVolume(s.volume / 100);
-    this.renderer?.setSettings(s);
+    // 先让无障碍层把主题与 CSS 变量写到根节点，渲染器随后读取棋盘调色板
     this.a11y?.applySettings(s);
+    this.renderer?.setSettings(s);
   }
 
   updateSettings(patch) {
@@ -6056,6 +6213,15 @@ class Renderer {
       colorBlindEnhanced: false,
       showCursor: true,
     };
+    // 棋盘底板调色板：由 CSS 变量驱动，主题/背景色变化时重读
+    this.palette = {
+      boardBg1: '#f7f1e6',
+      boardBg2: '#efe6d7',
+      boardGrid: 'rgba(90, 74, 55, 0.10)',
+      boardBlocked: 'rgba(120, 104, 86, 0.10)',
+      tileShadow: 'rgba(90, 68, 46, 0.16)',
+      boardRing: 'rgba(255, 255, 255, 0.95)',
+    };
     this.hint = null;
     this.selected = null;
     this.cursor = null;
@@ -6087,6 +6253,35 @@ class Renderer {
   setSettings(settings) {
     this.settings = { ...this.settings, ...settings };
     if (this.settings.reducedMotion) this.particles = [];
+    this._readPalette();
+  }
+
+  /** 根据根节点的主题与色相计算棋盘底色，保证 Canvas 拿到的是具体颜色值 */
+  _readPalette() {
+    if (typeof document === 'undefined' || typeof getComputedStyle !== 'function') return;
+    const root = document.documentElement;
+    const cs = getComputedStyle(root);
+    if (!cs) return;
+    const dark = root.dataset.theme === 'dark';
+    const rawHue = Number(cs.getPropertyValue('--bg-hue').trim());
+    const hue = Number.isFinite(rawHue) ? Math.max(0, Math.min(360, rawHue)) : 36;
+    this.palette = dark
+      ? {
+          boardBg1: `hsl(${hue}, 16%, 10%)`,
+          boardBg2: `hsl(${hue}, 14%, 13%)`,
+          boardGrid: 'rgba(255, 255, 255, 0.08)',
+          boardBlocked: 'rgba(255, 255, 255, 0.06)',
+          tileShadow: 'rgba(0, 0, 0, 0.35)',
+          boardRing: 'rgba(255, 255, 255, 0.95)',
+        }
+      : {
+          boardBg1: `hsl(${hue}, 34%, 95%)`,
+          boardBg2: `hsl(${hue}, 30%, 90%)`,
+          boardGrid: 'rgba(90, 74, 55, 0.10)',
+          boardBlocked: 'rgba(120, 104, 86, 0.10)',
+          tileShadow: 'rgba(90, 68, 46, 0.16)',
+          boardRing: 'rgba(255, 255, 255, 0.95)',
+        };
   }
 
   setBoard(board) {
@@ -6492,15 +6687,15 @@ class Renderer {
 
     // 棋盘底板
     const bg = ctx.createLinearGradient(0, 0, size, size);
-    bg.addColorStop(0, '#f7f1e6');
-    bg.addColorStop(1, '#efe6d7');
+    bg.addColorStop(0, this.palette.boardBg1);
+    bg.addColorStop(1, this.palette.boardBg2);
     ctx.fillStyle = bg;
     roundRect(ctx, 0, 0, size, size, this.cell * 0.28);
     ctx.fill();
 
     // 网格
     if (this.settings.showGrid) {
-      ctx.strokeStyle = 'rgba(90, 74, 55, 0.10)';
+      ctx.strokeStyle = this.palette.boardGrid;
       ctx.lineWidth = 1;
       for (let i = 0; i <= 8; i += 1) {
         const p = this.pad + i * this.cell;
@@ -6596,7 +6791,7 @@ class Renderer {
     }
 
     // 选中框与键盘光标
-    if (this.selected) this._drawRing(this.selected, 'rgba(255,255,255,0.95)', 4);
+    if (this.selected) this._drawRing(this.selected, this.palette.boardRing, 4);
     if (this.settings.showCursor && this.cursor && this.cursorVisible) this._drawCursor(this.cursor, now);
     ctx.restore();
   }
@@ -6605,7 +6800,7 @@ class Renderer {
     const ctx = this.ctx;
     const x = this._x(c);
     const y = this._y(r);
-    ctx.fillStyle = 'rgba(120, 104, 86, 0.10)';
+    ctx.fillStyle = this.palette.boardBlocked;
     roundRect(ctx, x + 4, y + 4, this.cell - 8, this.cell - 8, this.cell * 0.2);
     ctx.fill();
   }
@@ -6631,7 +6826,7 @@ class Renderer {
     const radius = s * 0.26;
 
     // 投影
-    ctx.fillStyle = 'rgba(90, 68, 46, 0.16)';
+    ctx.fillStyle = this.palette.tileShadow;
     roundRect(ctx, x, y + s * 0.05, s, s, radius);
     ctx.fill();
 
@@ -7053,14 +7248,33 @@ class InputController {
 exports.InputController = InputController;
 };
 
+__modules["js/core/theme.js"] = function (exports, __req) {
+/**
+ * 主题解析（核心层，纯函数）。
+ *
+ * mode: 'auto' | 'light' | 'dark'
+ * prefersDark: 系统当前是否偏好深色
+ */
+function resolveTheme(mode, prefersDark) {
+  if (mode === 'dark') return 'dark';
+  if (mode === 'light') return 'light';
+  return prefersDark ? 'dark' : 'light';
+}
+
+exports.resolveTheme = resolveTheme;
+};
+
 __modules["js/presentation/a11yService.js"] = function (exports, __req) {
 /**
  * M14 无障碍服务 A11yService（表现层）
  *
  * 视觉：形状标识由渲染器默认绘制，本服务负责把"色觉增强"映射为文档类名；
  * 操作：键盘光标由输入控制器实现，本服务维护 aria-live 播报；
- * 动效：把"动效减弱"映射为文档类名，渲染器同时据此缩短动画时长。
+ * 动效：把"动效减弱"映射为文档类名，渲染器同时据此缩短动画时长；
+ * 主题：把主题模式、背景色相与纯色背景映射为文档属性 / CSS 变量。
  */
+
+const { resolveTheme } = __req("js/core/theme.js");
 
 class A11yService {
   constructor({ bus = null } = {}) {
@@ -7078,6 +7292,18 @@ class A11yService {
     root.classList.toggle('a11y-enhanced', Boolean(settings.colorBlindEnhanced));
     root.classList.toggle('reduced-motion', Boolean(settings.reducedMotion));
     root.style.setProperty('--a11y-glyph', settings.colorBlindEnhanced ? '1.34' : '1');
+
+    // 主题：auto 跟随系统，light / dark 手动指定
+    const prefersDark =
+      typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        : false;
+    root.dataset.theme = resolveTheme(settings.themeMode || 'auto', prefersDark);
+
+    // 背景色相限制在 0~360，饱和度和明度由主题 CSS 统一控制，保证文字对比度
+    const hue = Number(settings.bgHue);
+    root.style.setProperty('--bg-hue', String(Number.isFinite(hue) ? Math.max(0, Math.min(360, hue)) : 36));
+    document.body.classList.toggle('plain-bg', Boolean(settings.plainBg));
   }
 
   /** 关键状态变化播报，节流 1.2 秒，避免频繁打断读屏 */
@@ -7295,13 +7521,22 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.7.0';
+const APP_VERSION = '1.7.1';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.1',
+    date: '2026-10-27',
+    notes: [
+      '新增浅色 / 深色主题，可跟随系统或手动切换',
+      '新增背景色调滑条，可选择纯色背景，文字对比度保持可读',
+      '优化深色模式下棋盘、卡片与按钮的显示效果',
+    ],
+  },
   {
     version: '1.7.0',
     date: '2026-10-26',
@@ -7709,6 +7944,10 @@ class SceneManager {
       setMotion: $('set-motion'),
       setGrid: $('set-grid'),
       setCursor: $('set-cursor'),
+      setTheme: $('set-theme'),
+      setBgHue: $('set-bg-hue'),
+      setBgHueOut: $('set-bg-hue-out'),
+      btnBgReset: $('btn-bg-reset'),
       setNickname: $('set-nickname'),
     };
   }
@@ -7892,6 +8131,31 @@ class SceneManager {
     this.el.setCursor.addEventListener('change', (e) => {
       c.updateSettings({ showCursor: e.target.checked });
     });
+
+    this.el.setTheme?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-theme-mode]');
+      if (!btn) return;
+      c.updateSettings({ themeMode: btn.dataset.themeMode });
+      this.syncSettings();
+    });
+
+    // 拖动时实时预览，松手后再落盘，避免每移动 5° 就写一次 localStorage
+    this.el.setBgHue?.addEventListener('input', (e) => {
+      const hue = Number(e.target.value);
+      this.el.setBgHueOut.textContent = `${hue}°`;
+      c.save.settings.bgHue = hue;
+      c.save.settings.plainBg = true;
+      c.applySettings();
+    });
+    this.el.setBgHue?.addEventListener('change', (e) => {
+      c.updateSettings({ bgHue: Number(e.target.value), plainBg: true });
+    });
+    this.el.btnBgReset?.addEventListener('click', () => {
+      this.audio.play('button');
+      c.updateSettings({ bgHue: 36, plainBg: false });
+      this.syncSettings();
+    });
+
     this.el.setNickname.addEventListener('change', (e) => {
       const value = c.setNickname(e.target.value);
       e.target.value = value;
@@ -8553,6 +8817,17 @@ class SceneManager {
     this.el.setMotion.checked = s.reducedMotion;
     this.el.setGrid.checked = s.showGrid;
     this.el.setCursor.checked = s.showCursor;
+
+    const themeMode = s.themeMode || 'auto';
+    this.el.setTheme?.querySelectorAll('[data-theme-mode]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.themeMode === themeMode));
+    });
+    if (this.el.setBgHue) {
+      const hue = Number.isFinite(Number(s.bgHue)) ? s.bgHue : 36;
+      this.el.setBgHue.value = String(hue);
+      this.el.setBgHueOut.textContent = `${hue}°`;
+    }
+
     this.el.setNickname.value = this.controller.save.player.nickname;
   }
 
@@ -8687,6 +8962,12 @@ async function boot() {
 
   await controller.boot();
   scenes.refreshHome();
+
+  // 跟随系统主题：系统切换深浅色时重新解析 auto 模式
+  const colorScheme = window.matchMedia?.('(prefers-color-scheme: dark)');
+  colorScheme?.addEventListener?.('change', () => {
+    if (controller.save.settings.themeMode === 'auto') controller.applySettings();
+  });
 
   // 引导完成标记落盘，只影响下次是否重播
   bus.on(EVENTS.TUTORIAL_DONE, () => {

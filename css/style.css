@@ -5,14 +5,16 @@
    ========================================================================= */
 
 :root {
-  --paper: #f6f1e7;
-  --paper-2: #efe7d9;
-  --card: #fffdf8;
+  /* 背景色相由设置页的滑条写入；饱和度和明度在主题里固定，保证对比度 */
+  --bg-hue: 36;
+  --paper: hsl(var(--bg-hue), 32%, 94%);
+  --paper-2: hsl(var(--bg-hue), 30%, 90%);
+  --card: hsl(var(--bg-hue), 50%, 99%);
   --ink: #2a2620;
   --ink-2: #635a50;
   --ink-3: #8d8377;
-  --line: #e4dac9;
-  --line-strong: #d3c5b0;
+  --line: hsl(var(--bg-hue), 22%, 84%);
+  --line-strong: hsl(var(--bg-hue), 20%, 76%);
   --accent: #2f6f5e;
   --accent-ink: #24594b;
   --accent-soft: #e0eee8;
@@ -22,9 +24,31 @@
   --shadow-sm: 0 2px 6px rgba(88, 66, 44, 0.08);
   --shadow: 0 10px 26px rgba(88, 66, 44, 0.12);
   --shadow-lg: 0 22px 60px rgba(70, 52, 34, 0.20);
+  --board-shadow: 0 14px 34px rgba(88, 66, 44, 0.16);
   --radius: 18px;
   --radius-sm: 12px;
   --font: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+}
+
+[data-theme="dark"] {
+  --paper: hsl(var(--bg-hue), 18%, 9%);
+  --paper-2: hsl(var(--bg-hue), 16%, 13%);
+  --card: hsl(var(--bg-hue), 14%, 16%);
+  --ink: #f1ece3;
+  --ink-2: #c2b9ad;
+  --ink-3: #a39a8e;
+  --line: hsl(var(--bg-hue), 12%, 24%);
+  --line-strong: hsl(var(--bg-hue), 12%, 32%);
+  --accent: #6fbfa4;
+  --accent-ink: #9ad9c1;
+  --accent-soft: hsl(160, 20%, 18%);
+  --warm: #e2a15c;
+  --warm-soft: hsl(30, 24%, 17%);
+  --danger: #e07a72;
+  --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.24);
+  --shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.52);
+  --board-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -49,6 +73,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* 自定义纯色背景时去掉默认光晕，避免出现第二种颜色 */
+body.plain-bg { background-image: none; }
+
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 12% 8%, rgba(226, 161, 92, 0.07), transparent 42%),
+    radial-gradient(circle at 88% 92%, rgba(111, 191, 164, 0.07), transparent 46%);
+}
+
+[data-theme="dark"] body.plain-bg { background-image: none; }
 
 .app {
   position: relative;
@@ -286,7 +321,7 @@ body {
 .level-card.current { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47, 111, 94, 0.18), var(--shadow-sm); }
 
 .level-card.locked {
-  background: rgba(240, 234, 223, 0.6);
+  background: var(--paper-2);
   color: var(--ink-3);
   box-shadow: none;
   cursor: not-allowed;
@@ -459,7 +494,7 @@ body {
 #board {
   display: block;
   border-radius: 20px;
-  box-shadow: 0 14px 34px rgba(88, 66, 44, 0.16);
+  box-shadow: var(--board-shadow);
   touch-action: none;
   cursor: pointer;
 }
@@ -677,7 +712,7 @@ body {
   align-items: center;
   gap: 12px;
   padding: 11px 0;
-  border-top: 1px solid rgba(228, 218, 201, 0.7);
+  border-top: 1px solid var(--line);
   font-size: 15px;
 }
 
@@ -687,14 +722,45 @@ body {
 
 .row-slider { gap: 10px; }
 .row-slider input[type="range"] { flex: 1.2; accent-color: var(--accent); }
-.row-slider output { font-size: 12px; color: var(--ink-2); width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
+.row-slider output { font-size: 12px; color: var(--ink-2); width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 外观设置 */
+.row-theme { flex-wrap: wrap; gap: 8px 12px; }
+.segmented {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+}
+.segmented button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.segmented button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#set-bg-hue { accent-color: var(--accent); }
+#btn-bg-reset { width: 100%; margin-top: 8px; }
+.btn-sm { padding: 8px 12px; font-size: 13px; }
 
 .switch {
   appearance: none;
   width: 48px;
   height: 28px;
   border-radius: 999px;
-  background: #d9cfbf;
+  background: var(--line-strong);
   position: relative;
   cursor: pointer;
   transition: background 0.2s ease;
@@ -728,7 +794,7 @@ body {
   font-family: inherit;
   font-size: 14px;
   text-align: right;
-  background: #fffefa;
+  background: var(--card);
   color: var(--ink);
 }
 
@@ -1368,4 +1434,67 @@ body {
 @media (prefers-contrast: more) {
   :root { --line: #b9a88f; --ink-2: #4a423a; }
   .btn, .level-card, .panel { border-width: 2px; }
+}
+
+/* ------------------------------------------------------------------ 深色主题表面修正 */
+
+[data-theme="dark"] .level-card.cleared {
+  background: linear-gradient(180deg, hsl(var(--bg-hue), 14%, 19%), hsl(160, 14%, 14%));
+  border-color: hsl(160, 18%, 26%);
+}
+
+[data-theme="dark"] .level-card.ex {
+  background: linear-gradient(180deg, hsl(var(--bg-hue), 14%, 19%), hsl(30, 18%, 14%));
+  border-color: hsl(30, 18%, 26%);
+}
+
+[data-theme="dark"] .level-card.invalid {
+  background: hsl(0, 18%, 14%);
+  border-color: hsl(0, 24%, 28%);
+}
+
+[data-theme="dark"] .level-card.locked {
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--ink-3);
+}
+
+[data-theme="dark"] .btn-ghost {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+[data-theme="dark"] .level-stars,
+[data-theme="dark"] .stars .star {
+  color: #5f5867;
+}
+
+[data-theme="dark"] .goal-chip.done {
+  border-color: hsl(160, 18%, 26%);
+}
+
+[data-theme="dark"] .moves-chip.low {
+  border-color: hsl(0, 24%, 28%);
+}
+
+[data-theme="dark"] .btn-danger {
+  border-color: hsl(0, 24%, 30%);
+}
+
+[data-theme="dark"] .notice-card {
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+[data-theme="dark"] .notice-tag.current {
+  background: hsl(160, 18%, 22%);
+  color: #9ad9c1;
+}
+
+[data-theme="dark"] .notice-tag.new {
+  background: hsl(0, 24%, 22%);
+  color: #f0a49d;
+}
+
+[data-theme="dark"] .panel-update {
+  border-color: hsl(30, 30%, 32%);
+  background: hsl(30, 24%, 16%);
 }
