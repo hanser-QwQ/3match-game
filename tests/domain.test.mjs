@@ -940,6 +940,46 @@ test('道具配置：去重、过滤未知道具、最多 3 个、允许为空',
   assert.deepEqual(sanitizeBoosterLoadout(null), []);
 });
 
+test('道具：取消等待目标的道具不消耗次数，并恢复计时速度', () => {
+  const controller = Object.create(GameController.prototype);
+  let armed = 'unset';
+  controller.boosterArmed = 'hammer';
+  controller.renderer = { setArmedTarget: (v) => { armed = v; } };
+  controller.emitSession = () => {};
+  controller.toast = () => {};
+
+  assert.deepEqual(controller.cancelBooster(), { ok: true });
+  assert.equal(controller.boosterArmed, null);
+  assert.equal(armed, null, '取消后应清除准星');
+  assert.deepEqual(controller.cancelBooster(), { ok: false }, '没有待选道具时取消应无操作');
+});
+
+test('EX 计时：手持目标道具时按 0.5 倍速消耗', () => {
+  const controller = Object.create(GameController.prototype);
+  controller.session = { state: 'in_progress' };
+  controller.busy = false;
+  controller.emitSession = () => {};
+  controller._stopMoveTimer = () => {};
+
+  controller.boosterArmed = 'hammer';
+  controller._moveRemaining = 7000;
+  controller._moveLastTick = performance.now() - 1000;
+  controller._tickMoveTimer();
+  assert.ok(
+    controller._moveRemaining > 6400 && controller._moveRemaining < 6600,
+    `手持道具应只消耗约 500ms，实际 ${controller._moveRemaining}`
+  );
+
+  controller.boosterArmed = null;
+  controller._moveRemaining = 7000;
+  controller._moveLastTick = performance.now() - 1000;
+  controller._tickMoveTimer();
+  assert.ok(
+    controller._moveRemaining > 5900 && controller._moveRemaining < 6100,
+    `取消后应恢复正常速度，实际 ${controller._moveRemaining}`
+  );
+});
+
 test('道具配置：未携带的道具不可用，新道具需要点选目标', () => {
   const notLoaded = checkBooster('rainbow', { usedTotal: 0, state: 'in_progress', loadout: ['shuffle'] });
   assert.equal(notLoaded.ok, false);

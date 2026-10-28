@@ -923,8 +923,8 @@ export class SceneManager {
         this.el.moveTimerFill.style.width = `${Math.max(0, pct)}%`;
         this.el.moveTimerFill.classList.toggle('low', started && pct <= 30);
         this.el.moveTimerText.textContent = started
-          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s`
-          : '待开始';
+          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s${vm.moveTimer.slow ? ' · 0.5×' : ''}`
+          : (vm.moveTimer.slow ? '待开始 · 0.5×' : '待开始');
       }
     }
 

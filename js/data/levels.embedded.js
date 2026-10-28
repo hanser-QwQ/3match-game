@@ -323,7 +323,7 @@ export const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -352,7 +352,7 @@ export const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -381,7 +381,7 @@ export const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -413,7 +413,7 @@ export const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -553,12 +553,12 @@ export const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "freezeAreaEveryNMoves": 5,
+      "freezeAreaEveryNMoves": 3,
       "freezeAreaSize": 2,
-      "freezeAreaCells": 2,
-      "freezeAreaMaxIce": 8
+      "freezeAreaCells": 4,
+      "freezeAreaMaxIce": 24
     },
-    "tutorialHint": "每 5 步，随机 2×2 区域中的 2 格结霜；场上最多 8 格冰"
+    "tutorialHint": "每 3 步，随机 2×2 区域全部结霜；场上最多 24 格冰"
   },
   {
     "schemaVersion": 1,

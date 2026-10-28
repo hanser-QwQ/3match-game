@@ -1849,7 +1849,7 @@ body.plain-bg { background-image: none; }
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.3</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.4</button>
     </div>
   </section>
 
@@ -1935,6 +1935,7 @@ body.plain-bg { background-image: none; }
           <dt>破冰</dt><dd>削减目标周围 3×3 范围内每格一层冰。</dd>
         </dl>
         <p class="rule-text">每局最多携带 3 个道具，所有道具共用 2 次使用机会；可以不带道具。配置入口在首页「道具」或关卡说明里的「调整」。</p>
+        <p class="rule-text">需要选择目标的道具在瞄准时，倒计时按 0.5 倍速；右键可以取消。</p>
       </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
@@ -5448,7 +5449,8 @@ class GameController {
     const now = performance.now();
     const delta = now - this._moveLastTick;
     this._moveLastTick = now;
-    this._moveRemaining -= delta;
+    // 手中拿着需要选目标的道具时，思考时间按 0.5 倍速消耗
+    this._moveRemaining -= delta * (this.boosterArmed ? 0.5 : 1);
     if (this._moveRemaining <= 0) {
       this._moveRemaining = 0;
       this._stopMoveTimer();
@@ -5461,6 +5463,8 @@ class GameController {
   async autoPlayMove() {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
+    // 思考时间耗尽时，未选目标的道具不应继续挂在手上
+    if (this.boosterArmed) this.cancelBooster({ silent: true });
     this._stopMoveTimer();
 
     // 优先使用合法的可行交换（会 respecting EX-5 冷却等规则）
@@ -5704,7 +5708,7 @@ class GameController {
       }
       if (!cells.length) return;
 
-      // 区域内随机挑几格结霜，避免一次冻住整片 2×2
+      // 按 freezeAreaCells 决定结霜格数；EX-8 现在配置为整片 2×2 结霜
       for (let i = cells.length - 1; i > 0; i -= 1) {
         const j = this.rng.int(i + 1);
         [cells[i], cells[j]] = [cells[j], cells[i]];
@@ -6025,6 +6029,16 @@ class GameController {
 
   // ---------------------------------------------------------------- 道具
 
+  /** 取消正在等待目标的道具；不消耗使用次数 */
+  cancelBooster({ silent = false } = {}) {
+    if (!this.boosterArmed) return { ok: false };
+    this.boosterArmed = null;
+    this.renderer?.setArmedTarget(null);
+    if (!silent) this.toast('已取消道具', 'info');
+    this.emitSession();
+    return { ok: true };
+  }
+
   armBooster(id) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
@@ -6224,6 +6238,7 @@ class GameController {
           limit: this._moveTimeLimitMs(),
           remaining: Math.max(0, Math.round(this._moveRemaining)),
           started: this._moveTimerStarted,
+          slow: Boolean(this.boosterArmed),
         }
         : null,
     };
@@ -7394,6 +7409,7 @@ class InputController {
     this._move = this._onPointerMove.bind(this);
     this._up = this._onPointerUp.bind(this);
     this._key = this._onKeyDown.bind(this);
+    this._context = this._onContextMenu.bind(this);
   }
 
   attach() {
@@ -7402,6 +7418,7 @@ class InputController {
     this.canvas.addEventListener('pointerup', this._up);
     this.canvas.addEventListener('pointercancel', this._up);
     window.addEventListener('keydown', this._key);
+    window.addEventListener('contextmenu', this._context);
   }
 
   detach() {
@@ -7410,6 +7427,7 @@ class InputController {
     this.canvas.removeEventListener('pointerup', this._up);
     this.canvas.removeEventListener('pointercancel', this._up);
     window.removeEventListener('keydown', this._key);
+    window.removeEventListener('contextmenu', this._context);
   }
 
   get locked() {
@@ -7423,6 +7441,12 @@ class InputController {
   }
 
   _onPointerDown(event) {
+    // 右键取消正在选目标的道具，避免把右键当成普通点击
+    if (event.button === 2) {
+      event.preventDefault();
+      if (this.controller.boosterArmed) this.controller.cancelBooster();
+      return;
+    }
     const cell = this.renderer.cellFromPoint(event.clientX, event.clientY);
     if (!cell) return;
     event.preventDefault();
@@ -7500,6 +7524,13 @@ class InputController {
     this.drag = null;
   }
 
+  /** 右键：游戏场景内屏蔽浏览器菜单；手中有道具时取消 */
+  _onContextMenu(event) {
+    if (!document.querySelector('[data-scene="game"].active')) return;
+    event.preventDefault();
+    if (this.controller.boosterArmed) this.controller.cancelBooster();
+  }
+
   _onKeyDown(event) {
     const scene = document.querySelector('[data-scene="game"].active');
     if (!scene) return;
@@ -7513,6 +7544,10 @@ class InputController {
       // 关卡说明打开时，Esc 先收起说明，不要直接暂停到说明背后
       if (this.controller.introOpen) {
         this.bus?.emit('ui:intro-close', {});
+        return;
+      }
+      if (this.controller.boosterArmed) {
+        this.controller.cancelBooster();
         return;
       }
       if (s.state === 'paused') this.bus?.emit('ui:resume-request', {});
@@ -7854,13 +7889,23 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.7.3';
+const APP_VERSION = '1.7.4';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.4',
+    date: '2026-10-28',
+    notes: [
+      '修正 EX-1 至 EX-4 的棋盘颜色数量，统一为 6 色',
+      'EX-8 霜潮改为每 3 步让整块 2×2 结霜，冰上限调整为 24 格',
+      '使用锤子、破冰、彩虹、炸弹瞄准时，倒计时减速为 0.5 倍',
+      '瞄准道具时右键可以取消，不消耗使用次数',
+    ],
+  },
   {
     version: '1.7.3',
     date: '2026-10-27',
@@ -9093,8 +9138,8 @@ class SceneManager {
         this.el.moveTimerFill.style.width = `${Math.max(0, pct)}%`;
         this.el.moveTimerFill.classList.toggle('low', started && pct <= 30);
         this.el.moveTimerText.textContent = started
-          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s`
-          : '待开始';
+          ? `${(vm.moveTimer.remaining / 1000).toFixed(1)}s${vm.moveTimer.slow ? ' · 0.5×' : ''}`
+          : (vm.moveTimer.slow ? '待开始 · 0.5×' : '待开始');
       }
     }
 
@@ -9931,7 +9976,7 @@ const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -9960,7 +10005,7 @@ const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -9989,7 +10034,7 @@ const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -10021,7 +10066,7 @@ const LEVELS = [
     "board": {
       "rows": 8,
       "cols": 8,
-      "elementTypes": 5,
+      "elementTypes": 6,
       "iceCells": [],
       "blockedCells": []
     },
@@ -10161,12 +10206,12 @@ const LEVELS = [
     "disabledBoosters": [],
     "rules": {
       "moveTimeLimit": 7,
-      "freezeAreaEveryNMoves": 5,
+      "freezeAreaEveryNMoves": 3,
       "freezeAreaSize": 2,
-      "freezeAreaCells": 2,
-      "freezeAreaMaxIce": 8
+      "freezeAreaCells": 4,
+      "freezeAreaMaxIce": 24
     },
-    "tutorialHint": "每 5 步，随机 2×2 区域中的 2 格结霜；场上最多 8 格冰"
+    "tutorialHint": "每 3 步，随机 2×2 区域全部结霜；场上最多 24 格冰"
   },
   {
     "schemaVersion": 1,

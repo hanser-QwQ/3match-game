@@ -6,7 +6,7 @@
   "board": {
     "rows": 8,
     "cols": 8,
-    "elementTypes": 5,
+    "elementTypes": 6,
     "iceCells": [],
     "blockedCells": []
   },

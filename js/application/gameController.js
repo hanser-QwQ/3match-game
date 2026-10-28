@@ -435,7 +435,8 @@ export class GameController {
     const now = performance.now();
     const delta = now - this._moveLastTick;
     this._moveLastTick = now;
-    this._moveRemaining -= delta;
+    // 手中拿着需要选目标的道具时，思考时间按 0.5 倍速消耗
+    this._moveRemaining -= delta * (this.boosterArmed ? 0.5 : 1);
     if (this._moveRemaining <= 0) {
       this._moveRemaining = 0;
       this._stopMoveTimer();
@@ -448,6 +449,8 @@ export class GameController {
   async autoPlayMove() {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return;
+    // 思考时间耗尽时，未选目标的道具不应继续挂在手上
+    if (this.boosterArmed) this.cancelBooster({ silent: true });
     this._stopMoveTimer();
 
     // 优先使用合法的可行交换（会 respecting EX-5 冷却等规则）
@@ -691,7 +694,7 @@ export class GameController {
       }
       if (!cells.length) return;
 
-      // 区域内随机挑几格结霜，避免一次冻住整片 2×2
+      // 按 freezeAreaCells 决定结霜格数；EX-8 现在配置为整片 2×2 结霜
       for (let i = cells.length - 1; i > 0; i -= 1) {
         const j = this.rng.int(i + 1);
         [cells[i], cells[j]] = [cells[j], cells[i]];
@@ -1012,6 +1015,16 @@ export class GameController {
 
   // ---------------------------------------------------------------- 道具
 
+  /** 取消正在等待目标的道具；不消耗使用次数 */
+  cancelBooster({ silent = false } = {}) {
+    if (!this.boosterArmed) return { ok: false };
+    this.boosterArmed = null;
+    this.renderer?.setArmedTarget(null);
+    if (!silent) this.toast('已取消道具', 'info');
+    this.emitSession();
+    return { ok: true };
+  }
+
   armBooster(id) {
     const s = this.session;
     if (!s || s.state !== SESSION_STATE.IN_PROGRESS || this.busy) return { ok: false };
@@ -1211,6 +1224,7 @@ export class GameController {
           limit: this._moveTimeLimitMs(),
           remaining: Math.max(0, Math.round(this._moveRemaining)),
           started: this._moveTimerStarted,
+          slow: Boolean(this.boosterArmed),
         }
         : null,
     };

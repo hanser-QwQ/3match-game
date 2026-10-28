@@ -20,6 +20,7 @@ export class InputController {
     this._move = this._onPointerMove.bind(this);
     this._up = this._onPointerUp.bind(this);
     this._key = this._onKeyDown.bind(this);
+    this._context = this._onContextMenu.bind(this);
   }
 
   attach() {
@@ -28,6 +29,7 @@ export class InputController {
     this.canvas.addEventListener('pointerup', this._up);
     this.canvas.addEventListener('pointercancel', this._up);
     window.addEventListener('keydown', this._key);
+    window.addEventListener('contextmenu', this._context);
   }
 
   detach() {
@@ -36,6 +38,7 @@ export class InputController {
     this.canvas.removeEventListener('pointerup', this._up);
     this.canvas.removeEventListener('pointercancel', this._up);
     window.removeEventListener('keydown', this._key);
+    window.removeEventListener('contextmenu', this._context);
   }
 
   get locked() {
@@ -49,6 +52,12 @@ export class InputController {
   }
 
   _onPointerDown(event) {
+    // 右键取消正在选目标的道具，避免把右键当成普通点击
+    if (event.button === 2) {
+      event.preventDefault();
+      if (this.controller.boosterArmed) this.controller.cancelBooster();
+      return;
+    }
     const cell = this.renderer.cellFromPoint(event.clientX, event.clientY);
     if (!cell) return;
     event.preventDefault();
@@ -126,6 +135,13 @@ export class InputController {
     this.drag = null;
   }
 
+  /** 右键：游戏场景内屏蔽浏览器菜单；手中有道具时取消 */
+  _onContextMenu(event) {
+    if (!document.querySelector('[data-scene="game"].active')) return;
+    event.preventDefault();
+    if (this.controller.boosterArmed) this.controller.cancelBooster();
+  }
+
   _onKeyDown(event) {
     const scene = document.querySelector('[data-scene="game"].active');
     if (!scene) return;
@@ -139,6 +155,10 @@ export class InputController {
       // 关卡说明打开时，Esc 先收起说明，不要直接暂停到说明背后
       if (this.controller.introOpen) {
         this.bus?.emit('ui:intro-close', {});
+        return;
+      }
+      if (this.controller.boosterArmed) {
+        this.controller.cancelBooster();
         return;
       }
       if (s.state === 'paused') this.bus?.emit('ui:resume-request', {});
