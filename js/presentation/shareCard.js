@@ -95,11 +95,17 @@ export function drawShareCard(canvas, result) {
   ctx.font = '800 56px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
   ctx.fillText(result.levelName || '', W / 2, 440);
 
-  // 星级
+  // 星级：EX 关卡额外绘制第 4 颗突袭白星
   const starY = 572;
-  for (let i = 0; i < 3; i += 1) {
-    const cx = W / 2 + (i - 1) * 136;
-    drawStar(ctx, cx, starY, 56, i < result.stars ? '#e0a020' : '#e3d9c7');
+  const starCount = result.isEx ? 4 : 3;
+  const gap = result.isEx ? 108 : 136;
+  const startX = W / 2 - ((starCount - 1) / 2) * gap;
+  for (let i = 0; i < starCount; i += 1) {
+    const cx = startX + i * gap;
+    let color = '#e3d9c7';
+    if (i < 3 && i < result.stars) color = '#e0a020';
+    if (i === 3 && (result.raidCleared || (result.isRaid && result.cleared))) color = '#ffffff';
+    drawStar(ctx, cx, starY, 56, color);
   }
 
   // 分数
@@ -175,7 +181,7 @@ export function downloadShareCard(canvas, result) {
 export function shareText(result) {
   return [
     `三消小径 · 第 ${result.levelId} 关 ${result.levelName}`,
-    `得分 ${result.finalScore}（${'★'.repeat(result.stars)}）`,
+    `得分 ${result.finalScore}（${'★'.repeat(Math.min(3, result.stars))}${result.isEx && (result.raidCleared || (result.isRaid && result.cleared)) ? '☆' : ''}）`,
     `剩余 ${result.movesLeft} 步，最高 ${result.chainBest} 连`,
   ].join('\n');
 }

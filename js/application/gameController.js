@@ -10,7 +10,7 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL } from '../core/constants.js';
+import { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL, ELEMENTS } from '../core/constants.js';
 import { Board } from '../domain/board.js';
 import { createBoard } from '../domain/boardFactory.js';
 import { isAdjacent, isValidSwap, planSpecialSwap } from '../domain/matchEngine.js';
@@ -23,7 +23,7 @@ import { ACHIEVEMENTS } from '../data/achievements.js';
 import { buildAchievementStats, evaluateAchievements, achievementProgress } from '../domain/achievements.js';
 import { GameSession } from './gameSession.js';
 import { sanitizeNickname } from './nickname.js';
-import { createDefaultSave, localISO } from '../infrastructure/storageService.js';
+import { createDefaultSave, createCareerStats, localISO } from '../infrastructure/storageService.js';
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -147,12 +147,120 @@ export class GameController {
     this.emitSession();
   }
 
+  /** 生涯统计：只从新版本开始累计，不从历史成绩反推 */
+  careerStats() {
+    const base = createCareerStats();
+    const current = this.save.career && typeof this.save.career === 'object'
+      ? this.save.career
+      : {};
+    this.save.career = {
+      ...base,
+      ...current,
+      specials: { ...base.specials, ...(current.specials || {}) },
+      boosterUses: { ...base.boosterUses, ...(current.boosterUses || {}) },
+      tileClears: { ...base.tileClears, ...(current.tileClears || {}) },
+    };
+    return this.save.career;
+  }
+
+  recordCareerCascade(result) {
+    const career = this.careerStats();
+    career.maxChain = Math.max(career.maxChain, Math.max(0, Number(result?.chainCount) || 0));
+
+    for (const step of result?.sequence || []) {
+      for (const item of step.cleared || []) {
+        // 只统计普通方块颜色；特殊方块本身不计入颜色
+        if (item.special) continue;
+        const key = String(item.type);
+        if (Object.prototype.hasOwnProperty.call(career.tileClears, key)) {
+          career.tileClears[key] += 1;
+        }
+      }
+    }
+
+    for (const [special, count] of Object.entries(result?.specialsByType || {})) {
+      if (Object.prototype.hasOwnProperty.call(career.specials, special)) {
+        career.specials[special] += Math.max(0, Number(count) || 0);
+      }
+    }
+  }
+
+  recordCareerSpecial(special, count = 1) {
+    const career = this.careerStats();
+    if (Object.prototype.hasOwnProperty.call(career.specials, special)) {
+      career.specials[special] += Math.max(0, Number(count) || 0);
+    }
+  }
+
+  recordCareerBooster(id) {
+    const career = this.careerStats();
+    if (Object.prototype.hasOwnProperty.call(career.boosterUses, id)) {
+      career.boosterUses[id] += 1;
+    }
+  }
+
+  careerView() {
+    const career = this.careerStats();
+    const specials = [
+      ['stripe_h', '横条纹'],
+      ['stripe_v', '竖条纹'],
+      ['bomb', '炸弹'],
+      ['rainbow', '彩虹'],
+    ].map(([key, name]) => ({ key, name, count: career.specials[key] || 0 }));
+
+    const boosters = Object.values(BOOSTERS).map((def) => ({
+      id: def.id,
+      name: def.name,
+      count: career.boosterUses[def.id] || 0,
+    }));
+    const colors = ELEMENTS.map((element, type) => ({
+      type,
+      name: element.name,
+      color: element.color,
+      count: career.tileClears[String(type)] || 0,
+    }));
+
+    const bestBooster = boosters.reduce(
+      (best, item) => (item.count > best.count ? item : best),
+      { count: 0, id: null, name: '' }
+    );
+    const bestColor = colors.reduce(
+      (best, item) => (item.count > best.count ? item : best),
+      { count: 0, type: null, name: '', color: '' }
+    );
+
+    return {
+      maxChain: career.maxChain,
+      specials,
+      boosters,
+      topBooster: bestBooster.count > 0 ? bestBooster : null,
+      colors,
+      topColor: bestColor.count > 0 ? bestColor : null,
+    };
+  }
+
+  careerPreview() {
+    const view = this.careerView();
+    const parts = [];
+    if (view.topBooster) parts.push(`${view.topBooster.name} ${view.topBooster.count} 次`);
+    if (view.topColor) parts.push(`${view.topColor.name} ${view.topColor.count} 个`);
+    return {
+      maxChain: view.maxChain,
+      summary: parts.length ? parts.join(' · ') : '尚无记录',
+    };
+  }
+
   /** 修改本局携带的道具；关卡说明阶段（尚未操作）会同步到当前会话 */
   setBoosterLoadout(ids) {
     const loadout = sanitizeBoosterLoadout(ids);
     this.save.boosterLoadout = loadout;
     const s = this.session;
-    if (s && !s.isResumed && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)) {
+    if (
+      s
+      && !s.isResumed
+      && !s.isRaid
+      && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)
+    ) {
       // 新开的一局可以改；续玩是同一局，外部配置只留给下一局
       s.boosterLoadout = [...loadout];
     }
@@ -191,26 +299,56 @@ export class GameController {
     if (snap && Number.isInteger(snapId) && Array.isArray(snap.board) && snap.board.length) {
       const level = this.levels.get(snapId);
       if (level && level.valid && !level.hidden) {
-        return { levelId: snapId, resume: true };
+        return { levelId: snapId, resume: true, raid: Boolean(snap.isRaid) };
       }
     }
-    return { levelId: this.nextLevelId(), resume: false };
+    return { levelId: this.nextLevelId(), resume: false, raid: false };
   }
 
-  startLevel(levelId, { resume = false } = {}) {
+  startLevel(levelId, { resume = false, raid = false } = {}) {
     // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
     if (this.busy) return false;
-    const level = this.levels.get(levelId);
-    if (!level || !level.valid) {
+    const baseLevel = this.levels.get(levelId);
+    if (!baseLevel || !baseLevel.valid) {
       this.toast('该关卡数据异常，暂时无法进入', 'warn');
       this.navigate(SCENE.LEVELS);
       return false;
     }
-    if (level.hidden) {
+    if (baseLevel.hidden) {
       this.toast('该关卡暂时下线，敬请期待', 'info');
       this.navigate(SCENE.LEVELS);
       return false;
     }
+    if (raid) {
+      const normalStars = Math.max(0, Number(this.save.progress[String(levelId)]?.stars) || 0);
+      if (!baseLevel.isEx || normalStars < 3) {
+        this.toast('普通三星后才能挑战突袭', 'warn');
+        this.navigate(SCENE.LEVELS);
+        return false;
+      }
+    }
+
+    // 突袭是用普通三星分数线做通关目标，且不允许携带道具
+    const raidThreshold = raid
+      ? (Number(baseLevel.starThresholds?.[2]) || Number(baseLevel.goal?.amount) || 0)
+      : 0;
+    if (raid && raidThreshold <= 0) {
+      this.toast('该关卡暂未配置突袭目标', 'warn');
+      this.navigate(SCENE.LEVELS);
+      return false;
+    }
+    const level = raid
+      ? {
+        ...baseLevel,
+        name: `${baseLevel.name} · 突袭`,
+        goal: { type: 'score', amount: raidThreshold },
+        starThresholds: [raidThreshold, raidThreshold, raidThreshold],
+        disabledBoosters: Object.keys(BOOSTERS),
+        isRaid: true,
+        raidThreshold,
+        tutorialHint: `突袭：不可使用道具，达到 ${raidThreshold} 分即通关，获得第 4 颗星`,
+      }
+      : baseLevel;
 
     // 换关时先收起上一个会话的引导，避免气泡跨关卡残留
     this.tutorial?.stop();
@@ -218,8 +356,9 @@ export class GameController {
     const snap = this.save.interruptedSession;
     let board = null;
     let resumed = null;
+    const sameMode = snap ? Boolean(snap.isRaid) === Boolean(raid) : false;
 
-    if (resume && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
+    if (resume && sameMode && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
       try {
         board = Board.deserialize(
           {
@@ -240,7 +379,7 @@ export class GameController {
            * 否则会出现“道具次数被扣了、步数却没加”的问题。
            * 上限按“初始步数 + 全部道具都用在加三步”计算，仅用于防御异常存档。
            */
-          const maxMoves = level.moves + 3 * boosterLimit();
+          const maxMoves = level.moves + (raid ? 0 : 3 * boosterLimit());
           const restoredLeft = Math.max(0, Math.min(Number(snap.movesLeft) || 0, maxMoves));
           const restoredTotalRaw = Number(snap.movesTotal);
           const restoredTotal = Number.isFinite(restoredTotalRaw) && restoredTotalRaw >= restoredLeft
@@ -278,7 +417,7 @@ export class GameController {
       level,
       board,
       resumed,
-      loadout: this.save.boosterLoadout,
+      loadout: raid ? [] : this.save.boosterLoadout,
     });
     this.sessionCounter += 1;
     this.introOpen = false;
@@ -499,6 +638,7 @@ export class GameController {
         s.board.swap(from, to);
         s.board.setType(to.r, to.c, s.board.typeAt(to.r, to.c), SPECIAL.RAINBOW);
         s.board.setType(from.r, from.c, s.board.typeAt(from.r, from.c));
+        this.recordCareerSpecial(SPECIAL.RAINBOW);
         s.spendMove();
         s.pendingFreeze = true;
         this.renderer?.syncBoard(s.board);
@@ -547,6 +687,7 @@ export class GameController {
   async runCascade(options) {
     const s = this.session;
     const result = resolveCascade(s.board, { rng: this.rng, ...options });
+    this.recordCareerCascade(result);
     this.bus.emit(EVENTS.CASCADE_START, { levelId: s.level.levelId });
     for (const step of result.sequence) {
       s.applyStep(step);
@@ -733,6 +874,7 @@ export class GameController {
     const roll = this.rng.next();
     let special;
     let label;
+
     if (roll < 0.5) {
       special = this.rng.next() < 0.5 ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
       label = '条纹';
@@ -745,6 +887,7 @@ export class GameController {
     }
 
     s.board.setType(cell.r, cell.c, s.board.typeAt(cell.r, cell.c), special);
+    this.recordCareerSpecial(special);
     this.renderer?.syncBoard(s.board);
     this.audio?.play('special');
     this.toast(`祭典赠礼：生成了一颗${label}`, 'good');
@@ -773,14 +916,22 @@ export class GameController {
       remainingMoves: s.movesLeft,
       cleared,
     });
-    const stars = cleared ? Math.max(1, judgeStars(finalScore, s.level.starThresholds)) : 0;
+    const isRaid = Boolean(s.isRaid);
+    // 突袭通关直接获得第 4 颗星；普通关仍按 1~3 星判定
+    const stars = isRaid
+      ? (cleared ? 4 : 0)
+      : (cleared ? Math.max(1, judgeStars(finalScore, s.level.starThresholds)) : 0);
     const prev = this.save.progress[String(s.level.levelId)] || null;
     const previousBest = prev?.highScore || 0;
+    const prevRaidCleared = Boolean(prev?.raidCleared);
 
     s.result = {
       levelId: s.level.levelId,
       levelName: s.level.name,
       isEx: Boolean(s.level.isEx),
+      isRaid,
+      raidThreshold: Number(s.level.raidThreshold) || null,
+      raidCleared: isRaid ? Boolean(cleared) : prevRaidCleared,
       cleared,
       baseScore,
       bonusScore,
@@ -796,7 +947,7 @@ export class GameController {
       at: localISO(),
       previousBest,
       isNewBest: cleared && finalScore > previousBest,
-      firstClear: cleared && !prev?.cleared,
+      firstClear: isRaid ? (cleared && !prevRaidCleared) : (cleared && !prev?.cleared),
     };
 
     if (cleared) this.applyProgress(s.result);
@@ -819,14 +970,23 @@ export class GameController {
       unlocked: true,
       cleared: false,
       stars: 0,
+      raidCleared: false,
       highScore: 0,
       clearedAt: null,
     };
-    // 仅当本次星级更高时才更新星级记录（AC-08）
+    const prevStars = Math.max(0, Number(prev.stars) || 0);
+    // 突袭通关是独立的记录；普通成绩只能保留 1~3 星
+    const raidCleared = result.isRaid ? Boolean(result.cleared) : Boolean(prev.raidCleared);
+    const normalPrevStars = raidCleared ? Math.min(4, prevStars) : Math.min(3, prevStars);
+    const stars = result.isRaid
+      ? (result.cleared ? 4 : prevStars)
+      : Math.max(normalPrevStars, Math.min(3, Number(result.stars) || 0));
+    // 仅当本次星级更高时才更新星级记录；突袭通关固定为第 4 颗星（AC-08）
     this.save.progress[id] = {
       unlocked: true,
       cleared: true,
-      stars: Math.max(prev.stars, result.stars),
+      stars,
+      raidCleared,
       highScore: Math.max(prev.highScore, result.finalScore),
       clearedAt: prev.clearedAt || result.at,
     };
@@ -845,19 +1005,20 @@ export class GameController {
       this.save.progress[nextId] = nx;
     }
 
-    // 本地成绩记录
+    // 本地成绩记录；突袭即使分数没有超过历史最高分，也必须记下第 4 颗星
     const best = this.save.localBest.find((x) => x.levelId === result.levelId);
+    const earnedStars = result.isRaid && result.cleared ? 4 : (Number(result.stars) || 0);
     if (best) {
+      best.stars = Math.max(Number(best.stars) || 0, earnedStars);
       if (result.finalScore > best.score) {
         best.score = result.finalScore;
-        best.stars = Math.max(best.stars, result.stars);
         best.clearedAt = best.clearedAt || result.at;
       }
     } else {
       this.save.localBest.push({
         levelId: result.levelId,
         score: result.finalScore,
-        stars: result.stars,
+        stars: earnedStars,
         clearedAt: result.at,
       });
       this.save.localBest.sort((a, b) => a.levelId - b.levelId);
@@ -977,9 +1138,11 @@ export class GameController {
     const s = this.session;
     if (!s) return { ok: false };
     const levelId = s.level.levelId;
+    const raid = Boolean(s.isRaid);
     this.save.interruptedSession = null;
     this.tutorial?.stop();
-    this.startLevel(levelId, { resume: false });
+    // 突袭局重开仍是突袭，不能退回普通关
+    this.startLevel(levelId, { resume: false, raid });
     this.storage.write(this.save);
     return { ok: true };
   }
@@ -1096,6 +1259,7 @@ export class GameController {
 
     const consumed = consumeBooster(id, { used: s.boosterUsage[id] });
     s.boosterUsage[id] = consumed.used;
+    this.recordCareerBooster(id);
     this.boosterArmed = null;
     this.renderer?.setArmedTarget(null);
     this.audio.play('booster');
@@ -1117,6 +1281,7 @@ export class GameController {
       } else if (id === 'rainbow' || id === 'bomb') {
         const special = id === 'rainbow' ? SPECIAL.RAINBOW : SPECIAL.BOMB;
         s.board.setType(target.r, target.c, s.board.typeAt(target.r, target.c), special);
+        this.recordCareerSpecial(special);
         this.renderer?.syncBoard(s.board);
         this.audio.play('special');
         this.toast(id === 'rainbow' ? '彩虹已就位' : '炸弹已就位', 'good');
@@ -1202,6 +1367,7 @@ export class GameController {
       level: s.level,
       levelId: s.level.levelId,
       levelName: s.level.name,
+      isRaid: s.isRaid,
       hint: s.level.tutorialHint || goalSummary(s.level.goal),
       board: s.board,
       state: s.state,
@@ -1244,6 +1410,9 @@ export class GameController {
       } else {
         unlocked = Boolean(p?.unlocked) || lv.levelId === 1;
       }
+      const raidCleared = Boolean(lv.isEx && p?.raidCleared);
+      const rawStars = Math.max(0, Math.min(4, Number(p?.stars) || 0));
+      const stars = lv.isEx ? (raidCleared ? 4 : Math.min(3, rawStars)) : Math.min(3, rawStars);
       return {
         levelId: lv.levelId,
         name: lv.name,
@@ -1252,7 +1421,10 @@ export class GameController {
         errors: lv.errors,
         unlocked,
         cleared: Boolean(p?.cleared),
-        stars: p?.stars || 0,
+        stars,
+        raidUnlocked: Boolean(lv.isEx && stars >= 3),
+        raidCleared,
+        raidThreshold: lv.isEx ? (Number(lv.starThresholds?.[2]) || Number(lv.goal?.amount) || 0) : null,
         highScore: p?.highScore || 0,
         goal: goalSummary(lv.goal),
         moves: lv.moves,
@@ -1270,11 +1442,12 @@ export class GameController {
       .map((lv) => {
         const p = this.save.progress[String(lv.levelId)];
         const b = best.get(lv.levelId);
+        const raidCleared = Boolean(p?.raidCleared);
         return {
           levelId: lv.levelId,
           name: lv.name,
           score: p?.highScore || b?.score || 0,
-          stars: p?.stars || b?.stars || 0,
+          stars: raidCleared ? 4 : Math.min(3, Math.max(Number(p?.stars) || 0, Number(b?.stars) || 0)),
           clearedAt: p?.clearedAt || b?.clearedAt || null,
         };
       })

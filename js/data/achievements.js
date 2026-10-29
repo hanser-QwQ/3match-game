@@ -62,6 +62,15 @@ export const ACHIEVEMENTS = [
     target: 10,
   },
   {
+    id: 'first_raid',
+    name: '突袭者',
+    desc: '通关任意一个 EX 突袭关卡',
+    icon: 'gem',
+    tier: 'platinum',
+    metric: 'raidClearedCount',
+    target: 1,
+  },
+  {
     id: 'first_3star',
     name: '初见锋芒',
     desc: '首次获得 3 星评价',

@@ -17,6 +17,8 @@ export class GameSession {
     this.state = SESSION_STATE.IN_PROGRESS;
     // 续玩是同一局：道具配置与剩余次数都以快照为准，不能被外部配置改动
     this.isResumed = Boolean(resumed);
+    // 突袭模式：不可使用任何道具
+    this.isRaid = Boolean(level.isRaid || resumed?.isRaid);
     this.movesLeft = resumed?.movesLeft ?? level.moves;
     /*
      * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
@@ -28,17 +30,19 @@ export class GameSession {
       : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
     const rawLoadout = Array.isArray(resumed?.boosterLoadout) ? resumed.boosterLoadout : loadout;
-    this.boosterLoadout = Array.isArray(rawLoadout)
-      ? sanitizeBoosterLoadout(rawLoadout)
-      : [...DEFAULT_BOOSTER_LOADOUT];
-    this.boosterUsage = resumed?.boosterUsage ?? {
-      shuffle: 0,
-      hammer: 0,
-      addMoves: 0,
-      rainbow: 0,
-      bomb: 0,
-      icePick: 0,
-    };
+    this.boosterLoadout = this.isRaid
+      ? []
+      : (Array.isArray(rawLoadout) ? sanitizeBoosterLoadout(rawLoadout) : [...DEFAULT_BOOSTER_LOADOUT]);
+    this.boosterUsage = this.isRaid
+      ? { shuffle: 0, hammer: 0, addMoves: 0, rainbow: 0, bomb: 0, icePick: 0 }
+      : (resumed?.boosterUsage ?? {
+        shuffle: 0,
+        hammer: 0,
+        addMoves: 0,
+        rainbow: 0,
+        bomb: 0,
+        icePick: 0,
+      });
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
     this.turnCount = resumed?.turnCount ?? 0;
@@ -100,6 +104,7 @@ export class GameSession {
     const boardData = this.board.serialize();
     return {
       levelId: this.level.levelId,
+      isRaid: this.isRaid,
       board: boardData.board,
       specials: boardData.specials,
       specialActive: boardData.specialActive,

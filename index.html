@@ -49,6 +49,11 @@
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
         <button class="btn btn-ghost home-boosters" data-action="boosters"><span class="ico">✚</span>道具</button>
+        <button class="btn home-stats" data-action="stats" aria-label="查看生涯统计">
+          <span class="home-stats-kicker">生涯统计</span>
+          <span class="home-stats-main" id="home-stat-chain">最高 0 连</span>
+          <span class="home-stats-sub" id="home-stat-preview">尚无记录</span>
+        </button>
       </div>
     </div>
     <div class="home-foot">
@@ -88,6 +93,41 @@
         <button class="btn btn-primary" id="btn-loadout-done">保存并返回</button>
       </div>
       <p class="fine-print">配置保存在本机；修改后对新开的一局生效，续玩中的对局会保持原配置和剩余次数。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 生涯统计 ============================ -->
+  <section id="scene-stats" class="scene" data-scene="stats">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>生涯统计</h2>
+      <span class="topbar-meta">本地记录</span>
+    </header>
+    <div class="scroll-area">
+      <div class="stats-hero">
+        <span class="stats-hero-label">最大连续消除</span>
+        <span class="stats-hero-value" id="stats-max-chain">0</span>
+        <span class="stats-hero-unit">连</span>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">特殊方块生成</div>
+        <div class="stats-special-grid" id="stats-specials"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">最常用道具</div>
+        <div class="stats-highlight" id="stats-top-booster"></div>
+        <div class="stats-list" id="stats-boosters"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">消除最多的普通方块</div>
+        <div class="stats-highlight" id="stats-top-color"></div>
+        <div class="stats-list" id="stats-colors"></div>
+      </div>
+
+      <p class="fine-print">从本版本开始记录，只保存在本机。</p>
     </div>
   </section>
 
@@ -239,7 +279,7 @@
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.4</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.5</button>
     </div>
   </section>
 
@@ -327,6 +367,10 @@
         <p class="rule-text">每局最多携带 3 个道具，所有道具共用 2 次使用机会；可以不带道具。配置入口在首页「道具」或关卡说明里的「调整」。</p>
         <p class="rule-text">需要选择目标的道具在瞄准时，倒计时按 0.5 倍速；右键可以取消。</p>
       </div>
+      <div class="panel">
+        <div class="panel-title">EX 突袭</div>
+        <p class="rule-text">EX 关卡有普通和突袭两种难度。普通通关并达到 3 星后解锁突袭；突袭不可使用道具，达到普通三星分数线即通关，获得第 4 颗白星。EX 关卡一共 4 颗星。</p>
+      </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
   </section>
@@ -385,6 +429,9 @@
         <div class="level-intro-star-row"><span>★</span><b id="level-intro-star1"></b></div>
         <div class="level-intro-star-row"><span>★★</span><b id="level-intro-star2"></b></div>
         <div class="level-intro-star-row"><span>★★★</span><b id="level-intro-star3"></b></div>
+        <div class="level-intro-star-row raid-row hidden" id="level-intro-star4-row">
+          <span class="raid-star">★</span><b id="level-intro-star4"></b>
+        </div>
       </div>
 
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
@@ -399,6 +446,31 @@
       </div>
 
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
+    </div>
+  </div>
+
+  <!-- ============================ EX 难度选择 ============================ -->
+  <div id="ex-mode" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ex-mode-title">
+    <div class="overlay-card ex-mode-card">
+      <p class="level-intro-kicker" id="ex-mode-kicker">EX 关卡</p>
+      <h2 id="ex-mode-title">EX-1</h2>
+      <div class="ex-mode-stars" id="ex-mode-stars"></div>
+      <p class="ex-mode-earned" id="ex-mode-earned"></p>
+
+      <div class="ex-mode-options">
+        <button class="ex-mode-option" id="btn-ex-normal" type="button">
+          <span class="ex-mode-option-kicker">普通</span>
+          <span class="ex-mode-option-title">开始普通</span>
+          <span class="ex-mode-option-desc" id="ex-normal-desc"></span>
+        </button>
+        <button class="ex-mode-option raid" id="btn-ex-raid" type="button">
+          <span class="ex-mode-option-kicker">突袭</span>
+          <span class="ex-mode-option-title">挑战突袭</span>
+          <span class="ex-mode-option-desc" id="ex-raid-desc"></span>
+        </button>
+      </div>
+
+      <button class="btn btn-ghost" id="btn-ex-mode-close" type="button">取消</button>
     </div>
   </div>
 

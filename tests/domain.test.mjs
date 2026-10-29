@@ -22,7 +22,7 @@ import { GameController } from '../js/application/gameController.js';
 import { checkBooster, consumeBooster, boosterLimit, boosterUsedTotal, sanitizeBoosterLoadout } from '../js/domain/boosterService.js';
 import { GameSession } from '../js/application/gameSession.js';
 import { readFileSync } from 'node:fs';
-import { createDefaultSave, normalizeSave } from '../js/infrastructure/storageService.js';
+import { createDefaultSave, createCareerStats, normalizeSave } from '../js/infrastructure/storageService.js';
 import { buildAchievementStats, evaluateAchievements } from '../js/domain/achievements.js';
 
 const MAP = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 };
@@ -262,6 +262,11 @@ test('冰块：特殊方块落点旁边的冰块也会削减耐久', () => {
   board.setIce(1, 2, 1);
   const res = resolveCascade(board, { rng: rng(21) });
   assert.ok(res.specialsCreated >= 1, '四连应生成特殊方块');
+  assert.equal(
+    Object.values(res.specialsByType).reduce((sum, n) => sum + n, 0),
+    res.specialsCreated,
+    '特殊方块分类统计应与生成总数一致'
+  );
   assert.ok(res.iceCleared >= 1, '落点旁边的冰块应被削减');
   assert.equal(board.iceAt(1, 2), 0);
 });
@@ -894,16 +899,39 @@ test('首页入口：继续按钮显示的关卡与点击进入的关卡一致',
   });
   controller.save = { progress: { 1: { cleared: true } }, interruptedSession: null };
 
-  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: false }, '没有中断会话时进入下一未通关普通关');
+  assert.deepEqual(
+    controller.homeEntry(),
+    { levelId: 2, resume: false, raid: false },
+    '没有中断会话时进入下一未通关普通关'
+  );
 
   controller.save.interruptedSession = { levelId: 101, board: [[1]] };
-  assert.deepEqual(controller.homeEntry(), { levelId: 101, resume: true }, '暂停在 EX 关时应续玩 EX 关，而不是下一普通关');
+  assert.deepEqual(
+    controller.homeEntry(),
+    { levelId: 101, resume: true, raid: false },
+    '暂停在 EX 普通关时应续玩普通关'
+  );
+
+  controller.save.interruptedSession = { levelId: 101, board: [[1]], isRaid: true };
+  assert.deepEqual(
+    controller.homeEntry(),
+    { levelId: 101, resume: true, raid: true },
+    '暂停在 EX 突袭时应继续保存的突袭对局'
+  );
 
   controller.save.interruptedSession = { levelId: 2, board: [[1]] };
-  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: true }, '暂停在普通关时应续玩该关');
+  assert.deepEqual(
+    controller.homeEntry(),
+    { levelId: 2, resume: true, raid: false },
+    '暂停在普通关时应续玩该关'
+  );
 
   controller.save.interruptedSession = { levelId: 105, board: [[1]] };
-  assert.deepEqual(controller.homeEntry(), { levelId: 2, resume: false }, '隐藏关卡的中断会话应回退到下一普通关');
+  assert.deepEqual(
+    controller.homeEntry(),
+    { levelId: 2, resume: false, raid: false },
+    '隐藏关卡的中断会话应回退到下一普通关'
+  );
 });
 
 test('道具：每关三种道具共用 2 次，不再有库存概念', () => {
@@ -1011,6 +1039,25 @@ test('会话：快照保存本局道具配置', () => {
   assert.deepEqual(session.snapshot().boosterLoadout, ['bomb', 'rainbow']);
 });
 
+test('突袭：会话强制空道具，并记录突袭模式', () => {
+  const session = new GameSession({
+    level: {
+      levelId: 101,
+      isEx: true,
+      isRaid: true,
+      moves: 20,
+      goal: { type: 'score', amount: 4000 },
+      starThresholds: [2000, 3000, 4000],
+    },
+    board: new Board(8, 8, 6),
+    loadout: ['shuffle', 'hammer', 'addMoves'],
+  });
+  assert.equal(session.isRaid, true);
+  assert.deepEqual(session.boosterLoadout, [], '突袭不允许携带道具');
+  assert.equal(session.boosterUsedTotal, 0);
+  assert.equal(session.snapshot().isRaid, true);
+});
+
 test('续玩：改道具组后使用新配置，已用次数保留', () => {
   const level = {
     levelId: 1,
@@ -1056,6 +1103,154 @@ test('续玩：改道具组后使用新配置，已用次数保留', () => {
   );
   assert.equal(controller.session.isResumed, true);
   assert.equal(controller.session.boosterUsedTotal, 1, '续玩不应重置已用次数');
+});
+
+test('突袭：普通三星才可进入，目标取普通三星线且不带道具', () => {
+  const level = {
+    levelId: 101,
+    name: 'EX-1 升阶',
+    isEx: true,
+    valid: true,
+    hidden: false,
+    moves: 20,
+    goal: { type: 'score', amount: 2000 },
+    board: { rows: 8, cols: 8, elementTypes: 6, iceCells: [], blockedCells: [] },
+    rules: {},
+    disabledBoosters: [],
+    starThresholds: [2000, 3000, 4000],
+  };
+  const controller = new GameController({
+    bus: { emit() {} },
+    storage: { read: () => null, write: () => ({ ok: true }) },
+    levels: {
+      get: (id) => (Number(id) === 101 ? level : null),
+      list: () => [level],
+      playable: () => [level],
+    },
+    audio: { setEnabled() {}, setVolume() {}, play() {} },
+    renderer: null,
+    tutorial: null,
+    rng: new RandomSource(3),
+    navigate() {},
+    toast() {},
+  });
+  controller.save = {
+    ...createDefaultSave(),
+    progress: { 101: { cleared: true, stars: 2, highScore: 3000, raidCleared: false } },
+    boosterLoadout: ['shuffle', 'hammer'],
+  };
+
+  assert.equal(controller.startLevel(101, { raid: true }), false, '普通未三星不能进突袭');
+  controller.save.progress['101'].stars = 3;
+  assert.equal(controller.startLevel(101, { raid: true }), true);
+  assert.equal(controller.session.isRaid, true);
+  assert.equal(controller.session.level.goal.amount, 4000, '突袭目标应取普通三星线');
+  assert.equal(controller.session.level.name, 'EX-1 升阶 · 突袭');
+  assert.deepEqual(controller.session.boosterLoadout, [], '突袭不能带道具');
+});
+
+test('突袭结算：通关固定为第 4 颗星并写入进度', async () => {
+  const level = {
+    levelId: 101,
+    name: 'EX-1 升阶',
+    isEx: true,
+    isRaid: true,
+    moves: 20,
+    goal: { type: 'score', amount: 3300 },
+    starThresholds: [2000, 2800, 3300],
+    raidThreshold: 3300,
+  };
+  const controller = Object.create(GameController.prototype);
+  controller.levels = {
+    get: (id) => (Number(id) === 101 ? level : null),
+    list: () => [level],
+  };
+  controller.save = {
+    ...createDefaultSave(),
+    progress: { 101: { cleared: true, stars: 3, raidCleared: false, highScore: 3200 } },
+  };
+  controller.session = {
+    level,
+    state: 'in_progress',
+    counters: { score: 4000, collected: {}, iceLeft: 0, initialIce: 0 },
+    movesLeft: 5,
+    movesTotal: 20,
+    chainBest: 2,
+    tilesCleared: 30,
+    boosterUsedTotal: 0,
+    goalTasks: [{ label: '分数', cleared: 4000, total: 3300, done: true }],
+    goalDone: true,
+    isRaid: true,
+    result: null,
+  };
+  controller.storage = { write: () => ({ ok: true }) };
+  controller.bus = { emit() {} };
+  controller.audio = { play() {} };
+  controller.tutorial = { stop() {} };
+  controller.navigate = () => {};
+  controller.emitSession = () => {};
+  controller._stopMoveTimer = () => {};
+
+  await controller.finish(true);
+  assert.equal(controller.session.result.stars, 4);
+  assert.equal(controller.session.result.isRaid, true);
+  assert.equal(controller.save.progress['101'].stars, 4);
+  assert.equal(controller.save.progress['101'].raidCleared, true);
+  assert.ok(controller.session.result.achievements.some((a) => a.id === 'first_raid'));
+});
+
+test('重新开始：突袭局保持突袭，不退回普通关', () => {
+  const controller = Object.create(GameController.prototype);
+  let called = null;
+  controller.session = {
+    level: { levelId: 101 },
+    isRaid: true,
+    state: 'in_progress',
+  };
+  controller.save = { interruptedSession: {} };
+  controller.storage = { write() {} };
+  controller.tutorial = null;
+  controller.startLevel = (id, options) => {
+    called = { id, options };
+    return true;
+  };
+
+  assert.deepEqual(controller.restart(), { ok: true });
+  assert.deepEqual(called, { id: 101, options: { resume: false, raid: true } });
+  assert.equal(controller.save.interruptedSession, null);
+});
+
+test('突袭：通关记第 4 颗星，之后普通低星不会覆盖', () => {
+  const controller = Object.create(GameController.prototype);
+  controller.levels = { get: () => null };
+  controller.save = { progress: {}, localBest: [], player: { totalScore: 0 } };
+
+  controller.applyProgress({
+    levelId: 101,
+    isEx: true,
+    isRaid: true,
+    raidCleared: true,
+    cleared: true,
+    stars: 4,
+    finalScore: 4500,
+    at: '2026-10-29T00:00:00+08:00',
+  });
+  assert.equal(controller.save.progress['101'].stars, 4);
+  assert.equal(controller.save.progress['101'].raidCleared, true);
+  assert.equal(controller.save.localBest[0].stars, 4);
+
+  controller.applyProgress({
+    levelId: 101,
+    isEx: true,
+    isRaid: false,
+    raidCleared: true,
+    cleared: true,
+    stars: 2,
+    finalScore: 3000,
+    at: '2026-10-29T00:10:00+08:00',
+  });
+  assert.equal(controller.save.progress['101'].stars, 4, '普通低星不能覆盖第 4 颗星');
+  assert.equal(controller.save.progress['101'].raidCleared, true);
 });
 
 test('道具配置：修改会同步到当前会话，续玩不重置已用次数', () => {
@@ -1211,6 +1406,27 @@ test('成就：统计通关数、星数与最高分，识别可回溯成就', ()
   assert.equal(ids.includes('clear_20'), false);
   assert.equal(ids.includes('all_ex'), false);
   assert.equal(ids.includes('chain_5'), false);
+});
+
+test('成就：突袭通关计入突袭成就与第 4 颗星', () => {
+  const levels = [{ levelId: 101, isEx: true }];
+  const progress = { 101: { cleared: true, stars: 4, raidCleared: true, highScore: 6000 } };
+  const stats = buildAchievementStats(
+    { progress, player: { totalScore: 6000 } },
+    { list: () => levels }
+  );
+  assert.equal(stats.raidClearedCount, 1);
+  assert.equal(stats.totalStars, 4);
+  const ids = evaluateAchievements(stats).map((a) => a.id);
+  assert.ok(ids.includes('first_raid'));
+
+  const legacy = buildAchievementStats(
+    { progress: { 101: { cleared: true, stars: 4, highScore: 6000 } }, player: {} },
+    { list: () => levels }
+  );
+  assert.equal(legacy.raidClearedCount, 0, '没有突袭记录不能算突袭通关');
+  assert.equal(legacy.totalStars, 3, '没有突袭记录时星数最多按 3 星计');
+  assert.ok(!evaluateAchievements(legacy).map((a) => a.id).includes('first_raid'));
 });
 
 test('成就：本局连锁、剩余步数与无道具 EX 判定', () => {
@@ -1494,6 +1710,87 @@ test('设置：主题模式、背景色相与纯色背景可持久化并夹紧',
   assert.equal(resolveTheme('dark', false), 'dark');
   assert.equal(resolveTheme('auto', true), 'dark');
   assert.equal(resolveTheme('auto', false), 'light');
+});
+
+test('存档：第 4 颗星只认突袭通关记录，不从历史星级反推', () => {
+  const explicit = normalizeSave({
+    progress: {
+      101: { cleared: true, stars: 3, raidCleared: true, highScore: 6000 },
+    },
+    localBest: [{ levelId: 101, score: 6000, stars: 4, clearedAt: null }],
+  });
+  assert.equal(explicit.progress['101'].stars, 4, '有突袭记录时应补成 4 星');
+  assert.equal(explicit.progress['101'].raidCleared, true);
+  assert.equal(explicit.localBest[0].stars, 4);
+
+  const legacy = normalizeSave({
+    progress: {
+      101: { cleared: true, stars: 4, highScore: 6000 },
+    },
+    localBest: [{ levelId: 101, score: 6000, stars: 4, clearedAt: null }],
+  });
+  assert.equal(legacy.progress['101'].stars, 3, '没有突袭记录时最多保留 3 星');
+  assert.equal(legacy.progress['101'].raidCleared, false);
+  assert.equal(legacy.localBest[0].stars, 3, '历史成绩不能反推第 4 颗星');
+});
+
+test('生涯统计：默认全零，旧存档不从历史成绩反推', () => {
+  const fresh = createDefaultSave().career;
+  assert.equal(fresh.maxChain, 0);
+  assert.equal(fresh.specials.bomb, 0);
+  assert.equal(fresh.boosterUses.shuffle, 0);
+  assert.equal(fresh.tileClears['0'], 0);
+
+  const old = normalizeSave({
+    progress: { 1: { cleared: true, stars: 3, highScore: 9999 } },
+  });
+  assert.equal(old.career.maxChain, 0, '旧存档的生涯统计应从零开始');
+  assert.equal(old.career.tileClears['0'], 0);
+
+  const dirty = normalizeSave({
+    career: {
+      maxChain: '5',
+      specials: { bomb: '3', rainbow: -1 },
+      boosterUses: { hammer: 2, unknownBooster: 9 },
+      tileClears: { 0: 4, 9: 7 },
+    },
+  });
+  assert.equal(dirty.career.maxChain, 5);
+  assert.equal(dirty.career.specials.bomb, 3);
+  assert.equal(dirty.career.specials.rainbow, 0);
+  assert.equal(dirty.career.boosterUses.hammer, 2);
+  assert.equal(dirty.career.boosterUses.unknownBooster, undefined);
+  assert.equal(dirty.career.tileClears['0'], 4);
+  assert.equal(dirty.career.tileClears['9'], undefined);
+});
+
+test('生涯统计：累计最大连锁、特殊、道具与普通颜色', () => {
+  const controller = Object.create(GameController.prototype);
+  controller.save = { career: createCareerStats() };
+
+  controller.recordCareerCascade({
+    chainCount: 4,
+    sequence: [
+      { cleared: [{ type: 0 }, { type: 0 }, { type: 2, special: 'bomb' }] },
+      { cleared: [{ type: 0 }, { type: 1 }] },
+    ],
+    specialsByType: { stripe_h: 1, bomb: 1, rainbow: 2 },
+  });
+  controller.recordCareerBooster('shuffle');
+  controller.recordCareerBooster('shuffle');
+  controller.recordCareerBooster('hammer');
+  controller.recordCareerSpecial(SPECIAL.BOMB);
+
+  const view = controller.careerView();
+  assert.equal(view.maxChain, 4);
+  assert.equal(view.specials.find((x) => x.key === 'bomb').count, 2);
+  assert.equal(view.specials.find((x) => x.key === 'rainbow').count, 2);
+  assert.equal(view.specials.find((x) => x.key === 'stripe_h').count, 1);
+  assert.equal(view.topBooster.id, 'shuffle');
+  assert.equal(view.topBooster.count, 2);
+  assert.equal(view.topColor.type, 0);
+  assert.equal(view.topColor.count, 3, '特殊方块本身不计入普通颜色');
+  assert.equal(controller.careerPreview().maxChain, 4);
 });
 
 test('存档：旧版 boosters 库存字段被丢弃，默认存档不再包含库存', () => {

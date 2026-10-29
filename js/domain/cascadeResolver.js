@@ -26,6 +26,8 @@ export function resolveCascade(board, options = {}) {
   const instantSpecials = Boolean(board?.rules?.instantSpecials);
   let totalScore = 0;
   let specialsCreated = 0;
+  // 生涯统计：按实际生成的特殊方块类型累计（含 EX-9 立即引爆的特殊方块）
+  const specialsByType = { stripe_h: 0, stripe_v: 0, bomb: 0, rainbow: 0 };
   let iceCleared = 0;
   let overflow = false;
 
@@ -57,6 +59,9 @@ export function resolveCascade(board, options = {}) {
       if (!matches.length) break;
       // EX-5 限量规则的实现位置：配额用完的类型不再进入生成计划（该次匹配只消除、不生成）
       plans = planSpecials(board, matches, preferred, rng).filter((plan) => board.canGenerateSpecial(plan.special));
+      for (const plan of plans) {
+        specialsByType[plan.special] = (specialsByType[plan.special] || 0) + 1;
+      }
       if (instantSpecials) {
         /*
          * EX-9 禁术·咒发：把特殊方块直接放在匹配落点上并立刻引爆，
@@ -231,6 +236,7 @@ export function resolveCascade(board, options = {}) {
     totalScore,
     collected,
     specialsCreated,
+    specialsByType,
     iceCleared,
     overflow,
   };

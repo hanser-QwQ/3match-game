@@ -13,7 +13,14 @@
  */
 
 import { EVENTS } from '../core/events.js';
-import { SAVE_KEY, SAVE_VERSION, BOOSTERS, BOOSTER_LOADOUT_LIMIT, DEFAULT_BOOSTER_LOADOUT } from '../core/constants.js';
+import {
+  SAVE_KEY,
+  SAVE_VERSION,
+  BOOSTERS,
+  BOOSTER_LOADOUT_LIMIT,
+  DEFAULT_BOOSTER_LOADOUT,
+  ELEMENTS,
+} from '../core/constants.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -48,6 +55,35 @@ export function defaultSettings() {
   };
 }
 
+export function createCareerStats() {
+  return {
+    maxChain: 0,
+    specials: { stripe_h: 0, stripe_v: 0, bomb: 0, rainbow: 0 },
+    boosterUses: Object.fromEntries(Object.keys(BOOSTERS).map((id) => [id, 0])),
+    tileClears: Object.fromEntries(ELEMENTS.map((_, index) => [String(index), 0])),
+  };
+}
+
+function normalizeCareer(input) {
+  const base = createCareerStats();
+  if (!input || typeof input !== 'object') return base;
+
+  const maxChain = Math.max(0, Math.floor(Number(input.maxChain) || 0));
+  const specials = { ...base.specials };
+  for (const id of Object.keys(specials)) {
+    specials[id] = Math.max(0, Math.floor(Number(input.specials?.[id]) || 0));
+  }
+  const boosterUses = { ...base.boosterUses };
+  for (const id of Object.keys(boosterUses)) {
+    boosterUses[id] = Math.max(0, Math.floor(Number(input.boosterUses?.[id]) || 0));
+  }
+  const tileClears = { ...base.tileClears };
+  for (const id of Object.keys(tileClears)) {
+    tileClears[id] = Math.max(0, Math.floor(Number(input.tileClears?.[id]) || 0));
+  }
+  return { maxChain, specials, boosterUses, tileClears };
+}
+
 export function createDefaultSave() {
   const now = localISO();
   return {
@@ -57,6 +93,7 @@ export function createDefaultSave() {
     progress: {},
     settings: defaultSettings(),
     boosterLoadout: [...DEFAULT_BOOSTER_LOADOUT],
+    career: createCareerStats(),
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
@@ -109,15 +146,23 @@ export function normalizeSave(input) {
   const progress = {};
   for (const [id, lv] of Object.entries(data.progress || {})) {
     if (!/^\d+$/.test(id) || !lv) continue;
+    // 第 4 颗星必须来自单独的突袭通关记录，不能从历史星级反推
+    const raidCleared = Boolean(lv.raidCleared);
+    const rawStars = clamp(Number(lv.stars) || 0, 0, 4);
+    const stars = raidCleared ? 4 : Math.min(3, rawStars);
     progress[id] = {
       unlocked: Boolean(lv.unlocked),
-      cleared: Boolean(lv.cleared),
-      stars: clamp(Number(lv.stars) || 0, 0, 3),
+      cleared: Boolean(lv.cleared) || stars > 0,
+      stars,
+      raidCleared,
       highScore: Math.max(0, Number(lv.highScore) || 0),
       clearedAt: lv.clearedAt ?? null,
     };
   }
-  progress['1'] = { ...(progress['1'] || { cleared: false, stars: 0, highScore: 0, clearedAt: null }), unlocked: true };
+  progress['1'] = {
+    ...(progress['1'] || { cleared: false, stars: 0, raidCleared: false, highScore: 0, clearedAt: null }),
+    unlocked: true,
+  };
   // 解锁链：第 n 关由第 n−1 关的 cleared 决定
   const ids = Object.keys(progress).map(Number).sort((a, b) => a - b);
   for (const id of ids) {
@@ -162,9 +207,21 @@ export function normalizeSave(input) {
     boosterLoadout: Array.isArray(data.boosterLoadout)
       ? normalizeBoosterLoadout(data.boosterLoadout)
       : [...DEFAULT_BOOSTER_LOADOUT],
+    // 生涯统计从本版本开始记录；旧存档没有 career 时补零，不做历史反推
+    career: normalizeCareer(data.career),
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
-    localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
+    localBest: Array.isArray(data.localBest)
+      ? data.localBest
+        .filter((x) => x && Number.isInteger(x.levelId))
+        .map((item) => {
+          const raidCleared = Boolean(progress[String(item.levelId)]?.raidCleared);
+          return {
+            ...item,
+            stars: raidCleared ? 4 : Math.min(3, Math.max(0, Number(item.stars) || 0)),
+          };
+        })
+      : [],
     achievements,
   };
 }

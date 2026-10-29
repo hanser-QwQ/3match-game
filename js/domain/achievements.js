@@ -22,6 +22,7 @@ export function buildAchievementStats(save, levels, result = null) {
     clearedCount: 0,
     clearedNormalCount: 0,
     clearedExCount: 0,
+    raidClearedCount: 0,
     totalStars: 0,
     threeStarCount: 0,
     normalThreeStarCount: 0,
@@ -36,15 +37,20 @@ export function buildAchievementStats(save, levels, result = null) {
     if (level.valid === false) continue;
     const p = progress[String(level.levelId)];
     if (!p?.cleared) continue;
-    const stars = Math.max(0, Math.min(3, Number(p.stars) || 0));
+    // 第 4 颗星只认突袭通关记录，不从历史星级反推
+    const stars = p.raidCleared ? 4 : Math.max(0, Math.min(3, Number(p.stars) || 0));
     stats.clearedCount += 1;
     stats.totalStars += stars;
     if (stars >= 3) {
       stats.threeStarCount += 1;
       if (!level.isEx) stats.normalThreeStarCount += 1;
     }
-    if (level.isEx) stats.clearedExCount += 1;
-    else stats.clearedNormalCount += 1;
+    if (level.isEx) {
+      stats.clearedExCount += 1;
+      if (p.raidCleared) stats.raidClearedCount += 1;
+    } else {
+      stats.clearedNormalCount += 1;
+    }
     stats.maxHighScore = Math.max(stats.maxHighScore, Math.max(0, Number(p.highScore) || 0));
   }
 

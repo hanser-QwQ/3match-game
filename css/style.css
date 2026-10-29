@@ -680,7 +680,15 @@ body.plain-bg { background-image: none; }
 }
 
 .result-detail dt { color: var(--ink-2); margin: 0; }
-.result-detail dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.result-detail dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
+
+/* 深色模式下明细区不能继续用浅色底，否则浅字会看不清 */
+[data-theme="dark"] .result-detail {
+  background: var(--paper-2);
+  border-color: var(--line);
+}
+[data-theme="dark"] .result-detail dt { color: var(--ink-2); }
+[data-theme="dark"] .result-detail dd { color: var(--ink); }
 
 .result-actions { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
 .result-actions .btn { width: 100%; }
@@ -1507,7 +1515,7 @@ body.plain-bg { background-image: none; }
 
 /* ------------------------------------------------------------------ 道具配置 */
 
-.home-boosters { grid-column: span 3; }
+.home-boosters { grid-column: span 1; }
 
 .loadout-grid {
   display: grid;
@@ -1619,4 +1627,233 @@ body.plain-bg { background-image: none; }
   color: var(--ink-3);
   font-size: 12px;
   margin: 8px 0 0;
+}
+
+/* ------------------------------------------------------------------ EX 突袭 */
+
+.raid-star,
+.level-stars .star.raid,
+.stars .star.raid,
+.ex-mode-stars .star.raid {
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+}
+
+/* 未获得的第 4 星是灰色空心星，只有拿到才变白 */
+.level-stars .star.raid:not(.on) {
+  color: #cdbfa9;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  opacity: 1;
+}
+
+.stars .star.raid:not(.on),
+.ex-mode-stars .star.raid:not(.on) {
+  color: #e6dccb;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  opacity: 1;
+}
+
+/* 深色主题下已获得的突袭星保持白色 */
+[data-theme="dark"] .stars .star.raid.on,
+[data-theme="dark"] .level-stars .star.raid.on,
+[data-theme="dark"] .ex-mode-stars .star.raid.on {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .level-stars .star.raid:not(.on),
+[data-theme="dark"] .stars .star.raid:not(.on),
+[data-theme="dark"] .ex-mode-stars .star.raid:not(.on) {
+  color: #5f5867;
+}
+
+.level-intro-star-row .raid-star {
+  font-size: 13px;
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+}
+
+.ex-mode-card { max-width: 380px; }
+.ex-mode-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+  font-size: 32px;
+  line-height: 1;
+}
+.ex-mode-stars .star { color: #e6dccb; opacity: 0.6; }
+.ex-mode-stars .star.on { color: #e0a020; opacity: 1; }
+.ex-mode-earned {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.ex-mode-options { display: grid; gap: 10px; margin: 12px 0; }
+
+.ex-mode-option {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  padding: 12px 14px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.ex-mode-option:not(:disabled):active { transform: scale(0.99); }
+.ex-mode-option.raid { border-color: #c9bda8; background: linear-gradient(135deg, #fffdf7, #f2eadb); }
+[data-theme="dark"] .ex-mode-option.raid { background: linear-gradient(135deg, #2a2722, #211f1c); }
+
+.ex-mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.ex-mode-option-kicker {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--warm, #a06a3a);
+  margin-bottom: 2px;
+}
+.ex-mode-option-title { display: block; font-size: 16px; font-weight: 800; }
+.ex-mode-option-desc { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+
+/* 突袭第 4 星优先级最高：弹窗/结算/关卡卡都必须是白色 */
+.ex-mode-stars .star.raid.on,
+.stars .star.raid.on,
+.level-stars .star.raid.on {
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ 生涯统计 */
+
+.home-stats {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 14px;
+  min-height: 58px;
+}
+
+.home-stats-kicker {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+.home-stats-main { font-size: 15px; font-weight: 800; color: var(--ink); }
+.home-stats-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.stats-hero {
+  margin-bottom: 12px;
+  padding: 18px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.stats-hero-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.stats-hero-value {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stats-hero-unit { margin-left: 4px; font-size: 13px; color: var(--ink-3); }
+
+.stats-section { margin-bottom: 14px; }
+
+.stats-special-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.stats-special {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.stats-special-label { display: block; font-size: 11px; color: var(--ink-3); }
+.stats-special-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-highlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.stats-highlight-empty { font-size: 12px; color: var(--ink-3); }
+.stats-highlight-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.stats-highlight-count { font-size: 13px; font-weight: 800; color: var(--accent-ink); }
+
+.stats-list { display: grid; gap: 2px; margin-top: 6px; }
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.stats-row .stats-name { display: flex; align-items: center; gap: 6px; }
+.stats-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.stats-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex: 0 0 auto;
 }

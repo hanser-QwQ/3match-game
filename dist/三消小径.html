@@ -690,7 +690,15 @@ body.plain-bg { background-image: none; }
 }
 
 .result-detail dt { color: var(--ink-2); margin: 0; }
-.result-detail dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.result-detail dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
+
+/* 深色模式下明细区不能继续用浅色底，否则浅字会看不清 */
+[data-theme="dark"] .result-detail {
+  background: var(--paper-2);
+  border-color: var(--line);
+}
+[data-theme="dark"] .result-detail dt { color: var(--ink-2); }
+[data-theme="dark"] .result-detail dd { color: var(--ink); }
 
 .result-actions { margin-top: 18px; display: flex; flex-direction: column; gap: 9px; }
 .result-actions .btn { width: 100%; }
@@ -1517,7 +1525,7 @@ body.plain-bg { background-image: none; }
 
 /* ------------------------------------------------------------------ 道具配置 */
 
-.home-boosters { grid-column: span 3; }
+.home-boosters { grid-column: span 1; }
 
 .loadout-grid {
   display: grid;
@@ -1631,6 +1639,235 @@ body.plain-bg { background-image: none; }
   margin: 8px 0 0;
 }
 
+/* ------------------------------------------------------------------ EX 突袭 */
+
+.raid-star,
+.level-stars .star.raid,
+.stars .star.raid,
+.ex-mode-stars .star.raid {
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+}
+
+/* 未获得的第 4 星是灰色空心星，只有拿到才变白 */
+.level-stars .star.raid:not(.on) {
+  color: #cdbfa9;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  opacity: 1;
+}
+
+.stars .star.raid:not(.on),
+.ex-mode-stars .star.raid:not(.on) {
+  color: #e6dccb;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  opacity: 1;
+}
+
+/* 深色主题下已获得的突袭星保持白色 */
+[data-theme="dark"] .stars .star.raid.on,
+[data-theme="dark"] .level-stars .star.raid.on,
+[data-theme="dark"] .ex-mode-stars .star.raid.on {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .level-stars .star.raid:not(.on),
+[data-theme="dark"] .stars .star.raid:not(.on),
+[data-theme="dark"] .ex-mode-stars .star.raid:not(.on) {
+  color: #5f5867;
+}
+
+.level-intro-star-row .raid-star {
+  font-size: 13px;
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+}
+
+.ex-mode-card { max-width: 380px; }
+.ex-mode-stars {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+  font-size: 32px;
+  line-height: 1;
+}
+.ex-mode-stars .star { color: #e6dccb; opacity: 0.6; }
+.ex-mode-stars .star.on { color: #e0a020; opacity: 1; }
+.ex-mode-earned {
+  margin: 0 0 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.ex-mode-options { display: grid; gap: 10px; margin: 12px 0; }
+
+.ex-mode-option {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  padding: 12px 14px;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+.ex-mode-option:not(:disabled):active { transform: scale(0.99); }
+.ex-mode-option.raid { border-color: #c9bda8; background: linear-gradient(135deg, #fffdf7, #f2eadb); }
+[data-theme="dark"] .ex-mode-option.raid { background: linear-gradient(135deg, #2a2722, #211f1c); }
+
+.ex-mode-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.ex-mode-option-kicker {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--warm, #a06a3a);
+  margin-bottom: 2px;
+}
+.ex-mode-option-title { display: block; font-size: 16px; font-weight: 800; }
+.ex-mode-option-desc { display: block; margin-top: 4px; font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+
+/* 突袭第 4 星优先级最高：弹窗/结算/关卡卡都必须是白色 */
+.ex-mode-stars .star.raid.on,
+.stars .star.raid.on,
+.level-stars .star.raid.on {
+  color: #ffffff;
+  -webkit-text-stroke: 1px rgba(60, 48, 32, 0.35);
+  text-shadow: 0 1px 2px rgba(40, 30, 20, 0.18);
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ 生涯统计 */
+
+.home-stats {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  text-align: left;
+  padding: 10px 14px;
+  min-height: 58px;
+}
+
+.home-stats-kicker {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+.home-stats-main { font-size: 15px; font-weight: 800; color: var(--ink); }
+.home-stats-sub {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+.stats-hero {
+  margin-bottom: 12px;
+  padding: 18px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--card);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+.stats-hero-label {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--ink-3);
+}
+.stats-hero-value {
+  font-size: 44px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.stats-hero-unit { margin-left: 4px; font-size: 13px; color: var(--ink-3); }
+
+.stats-section { margin-bottom: 14px; }
+
+.stats-special-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.stats-special {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+}
+.stats-special-label { display: block; font-size: 11px; color: var(--ink-3); }
+.stats-special-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-highlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+}
+.stats-highlight-empty { font-size: 12px; color: var(--ink-3); }
+.stats-highlight-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.stats-highlight-count { font-size: 13px; font-weight: 800; color: var(--accent-ink); }
+
+.stats-list { display: grid; gap: 2px; margin-top: 6px; }
+.stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 2px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.stats-row .stats-name { display: flex; align-items: center; gap: 6px; }
+.stats-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.stats-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex: 0 0 auto;
+}
+
 </style>
 </head>
 <body>
@@ -1659,6 +1896,11 @@ body.plain-bg { background-image: none; }
         <button class="btn btn-ghost btn-notice" data-action="notice"><span class="ico">✦</span>公告<span class="reddot hidden" id="notice-dot"></span></button>
         <button class="btn btn-ghost" data-action="settings"><span class="ico">⚙</span>设置</button>
         <button class="btn btn-ghost home-boosters" data-action="boosters"><span class="ico">✚</span>道具</button>
+        <button class="btn home-stats" data-action="stats" aria-label="查看生涯统计">
+          <span class="home-stats-kicker">生涯统计</span>
+          <span class="home-stats-main" id="home-stat-chain">最高 0 连</span>
+          <span class="home-stats-sub" id="home-stat-preview">尚无记录</span>
+        </button>
       </div>
     </div>
     <div class="home-foot">
@@ -1698,6 +1940,41 @@ body.plain-bg { background-image: none; }
         <button class="btn btn-primary" id="btn-loadout-done">保存并返回</button>
       </div>
       <p class="fine-print">配置保存在本机；修改后对新开的一局生效，续玩中的对局会保持原配置和剩余次数。</p>
+    </div>
+  </section>
+
+  <!-- ============================ 生涯统计 ============================ -->
+  <section id="scene-stats" class="scene" data-scene="stats">
+    <header class="topbar">
+      <button class="icon-btn" data-back="home" aria-label="返回首页">←</button>
+      <h2>生涯统计</h2>
+      <span class="topbar-meta">本地记录</span>
+    </header>
+    <div class="scroll-area">
+      <div class="stats-hero">
+        <span class="stats-hero-label">最大连续消除</span>
+        <span class="stats-hero-value" id="stats-max-chain">0</span>
+        <span class="stats-hero-unit">连</span>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">特殊方块生成</div>
+        <div class="stats-special-grid" id="stats-specials"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">最常用道具</div>
+        <div class="stats-highlight" id="stats-top-booster"></div>
+        <div class="stats-list" id="stats-boosters"></div>
+      </div>
+
+      <div class="stats-section">
+        <div class="panel-title">消除最多的普通方块</div>
+        <div class="stats-highlight" id="stats-top-color"></div>
+        <div class="stats-list" id="stats-colors"></div>
+      </div>
+
+      <p class="fine-print">从本版本开始记录，只保存在本机。</p>
     </div>
   </section>
 
@@ -1849,7 +2126,7 @@ body.plain-bg { background-image: none; }
         <p class="fine-print">清空后所有关卡星级、最高分与成就都会重置，操作不可撤销。</p>
       </div>
 
-      <button class="fine-print version-line" id="version-line">三消小径 v1.7.4</button>
+      <button class="fine-print version-line" id="version-line">三消小径 v1.7.5</button>
     </div>
   </section>
 
@@ -1937,6 +2214,10 @@ body.plain-bg { background-image: none; }
         <p class="rule-text">每局最多携带 3 个道具，所有道具共用 2 次使用机会；可以不带道具。配置入口在首页「道具」或关卡说明里的「调整」。</p>
         <p class="rule-text">需要选择目标的道具在瞄准时，倒计时按 0.5 倍速；右键可以取消。</p>
       </div>
+      <div class="panel">
+        <div class="panel-title">EX 突袭</div>
+        <p class="rule-text">EX 关卡有普通和突袭两种难度。普通通关并达到 3 星后解锁突袭；突袭不可使用道具，达到普通三星分数线即通关，获得第 4 颗白星。EX 关卡一共 4 颗星。</p>
+      </div>
       <p class="fine-print">进度保存在浏览器本地，断网也能玩。</p>
     </div>
   </section>
@@ -1995,6 +2276,9 @@ body.plain-bg { background-image: none; }
         <div class="level-intro-star-row"><span>★</span><b id="level-intro-star1"></b></div>
         <div class="level-intro-star-row"><span>★★</span><b id="level-intro-star2"></b></div>
         <div class="level-intro-star-row"><span>★★★</span><b id="level-intro-star3"></b></div>
+        <div class="level-intro-star-row raid-row hidden" id="level-intro-star4-row">
+          <span class="raid-star">★</span><b id="level-intro-star4"></b>
+        </div>
       </div>
 
       <p class="level-intro-mechanic hidden" id="level-intro-mechanic"></p>
@@ -2009,6 +2293,31 @@ body.plain-bg { background-image: none; }
       </div>
 
       <button class="btn btn-primary" id="btn-level-start">开始挑战</button>
+    </div>
+  </div>
+
+  <!-- ============================ EX 难度选择 ============================ -->
+  <div id="ex-mode" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="ex-mode-title">
+    <div class="overlay-card ex-mode-card">
+      <p class="level-intro-kicker" id="ex-mode-kicker">EX 关卡</p>
+      <h2 id="ex-mode-title">EX-1</h2>
+      <div class="ex-mode-stars" id="ex-mode-stars"></div>
+      <p class="ex-mode-earned" id="ex-mode-earned"></p>
+
+      <div class="ex-mode-options">
+        <button class="ex-mode-option" id="btn-ex-normal" type="button">
+          <span class="ex-mode-option-kicker">普通</span>
+          <span class="ex-mode-option-title">开始普通</span>
+          <span class="ex-mode-option-desc" id="ex-normal-desc"></span>
+        </button>
+        <button class="ex-mode-option raid" id="btn-ex-raid" type="button">
+          <span class="ex-mode-option-kicker">突袭</span>
+          <span class="ex-mode-option-title">挑战突袭</span>
+          <span class="ex-mode-option-desc" id="ex-raid-desc"></span>
+        </button>
+      </div>
+
+      <button class="btn btn-ghost" id="btn-ex-mode-close" type="button">取消</button>
     </div>
   </div>
 
@@ -2271,6 +2580,7 @@ const SCENE = {
   SETTINGS: 'settings',
   RANK: 'rank',
   ACHIEVEMENTS: 'achievements',
+  STATS: 'stats',
   RULES: 'rules',
   NOTICE: 'notice',
 };
@@ -2536,7 +2846,7 @@ __modules["js/infrastructure/storageService.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { SAVE_KEY, SAVE_VERSION, BOOSTERS, BOOSTER_LOADOUT_LIMIT, DEFAULT_BOOSTER_LOADOUT } = __req("js/core/constants.js");
+const { SAVE_KEY, SAVE_VERSION, BOOSTERS, BOOSTER_LOADOUT_LIMIT, DEFAULT_BOOSTER_LOADOUT, ELEMENTS, } = __req("js/core/constants.js");
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
@@ -2571,6 +2881,35 @@ function defaultSettings() {
   };
 }
 
+function createCareerStats() {
+  return {
+    maxChain: 0,
+    specials: { stripe_h: 0, stripe_v: 0, bomb: 0, rainbow: 0 },
+    boosterUses: Object.fromEntries(Object.keys(BOOSTERS).map((id) => [id, 0])),
+    tileClears: Object.fromEntries(ELEMENTS.map((_, index) => [String(index), 0])),
+  };
+}
+
+function normalizeCareer(input) {
+  const base = createCareerStats();
+  if (!input || typeof input !== 'object') return base;
+
+  const maxChain = Math.max(0, Math.floor(Number(input.maxChain) || 0));
+  const specials = { ...base.specials };
+  for (const id of Object.keys(specials)) {
+    specials[id] = Math.max(0, Math.floor(Number(input.specials?.[id]) || 0));
+  }
+  const boosterUses = { ...base.boosterUses };
+  for (const id of Object.keys(boosterUses)) {
+    boosterUses[id] = Math.max(0, Math.floor(Number(input.boosterUses?.[id]) || 0));
+  }
+  const tileClears = { ...base.tileClears };
+  for (const id of Object.keys(tileClears)) {
+    tileClears[id] = Math.max(0, Math.floor(Number(input.tileClears?.[id]) || 0));
+  }
+  return { maxChain, specials, boosterUses, tileClears };
+}
+
 function createDefaultSave() {
   const now = localISO();
   return {
@@ -2580,6 +2919,7 @@ function createDefaultSave() {
     progress: {},
     settings: defaultSettings(),
     boosterLoadout: [...DEFAULT_BOOSTER_LOADOUT],
+    career: createCareerStats(),
     tutorialDone: false,
     interruptedSession: null,
     localBest: [],
@@ -2632,15 +2972,23 @@ function normalizeSave(input) {
   const progress = {};
   for (const [id, lv] of Object.entries(data.progress || {})) {
     if (!/^\d+$/.test(id) || !lv) continue;
+    // 第 4 颗星必须来自单独的突袭通关记录，不能从历史星级反推
+    const raidCleared = Boolean(lv.raidCleared);
+    const rawStars = clamp(Number(lv.stars) || 0, 0, 4);
+    const stars = raidCleared ? 4 : Math.min(3, rawStars);
     progress[id] = {
       unlocked: Boolean(lv.unlocked),
-      cleared: Boolean(lv.cleared),
-      stars: clamp(Number(lv.stars) || 0, 0, 3),
+      cleared: Boolean(lv.cleared) || stars > 0,
+      stars,
+      raidCleared,
       highScore: Math.max(0, Number(lv.highScore) || 0),
       clearedAt: lv.clearedAt ?? null,
     };
   }
-  progress['1'] = { ...(progress['1'] || { cleared: false, stars: 0, highScore: 0, clearedAt: null }), unlocked: true };
+  progress['1'] = {
+    ...(progress['1'] || { cleared: false, stars: 0, raidCleared: false, highScore: 0, clearedAt: null }),
+    unlocked: true,
+  };
   // 解锁链：第 n 关由第 n−1 关的 cleared 决定
   const ids = Object.keys(progress).map(Number).sort((a, b) => a - b);
   for (const id of ids) {
@@ -2685,9 +3033,21 @@ function normalizeSave(input) {
     boosterLoadout: Array.isArray(data.boosterLoadout)
       ? normalizeBoosterLoadout(data.boosterLoadout)
       : [...DEFAULT_BOOSTER_LOADOUT],
+    // 生涯统计从本版本开始记录；旧存档没有 career 时补零，不做历史反推
+    career: normalizeCareer(data.career),
     tutorialDone: Boolean(data.tutorialDone),
     interruptedSession: data.interruptedSession && typeof data.interruptedSession === 'object' ? data.interruptedSession : null,
-    localBest: Array.isArray(data.localBest) ? data.localBest.filter((x) => x && Number.isInteger(x.levelId)) : [],
+    localBest: Array.isArray(data.localBest)
+      ? data.localBest
+        .filter((x) => x && Number.isInteger(x.levelId))
+        .map((item) => {
+          const raidCleared = Boolean(progress[String(item.levelId)]?.raidCleared);
+          return {
+            ...item,
+            stars: raidCleared ? 4 : Math.min(3, Math.max(0, Number(item.stars) || 0)),
+          };
+        })
+      : [],
     achievements,
   };
 }
@@ -2802,6 +3162,7 @@ class StorageService {
 
 exports.localISO = localISO;
 exports.defaultSettings = defaultSettings;
+exports.createCareerStats = createCareerStats;
 exports.createDefaultSave = createDefaultSave;
 exports.migrateV1 = migrateV1;
 exports.normalizeSave = normalizeSave;
@@ -4136,6 +4497,8 @@ function resolveCascade(board, options = {}) {
   const instantSpecials = Boolean(board?.rules?.instantSpecials);
   let totalScore = 0;
   let specialsCreated = 0;
+  // 生涯统计：按实际生成的特殊方块类型累计（含 EX-9 立即引爆的特殊方块）
+  const specialsByType = { stripe_h: 0, stripe_v: 0, bomb: 0, rainbow: 0 };
   let iceCleared = 0;
   let overflow = false;
 
@@ -4167,6 +4530,9 @@ function resolveCascade(board, options = {}) {
       if (!matches.length) break;
       // EX-5 限量规则的实现位置：配额用完的类型不再进入生成计划（该次匹配只消除、不生成）
       plans = planSpecials(board, matches, preferred, rng).filter((plan) => board.canGenerateSpecial(plan.special));
+      for (const plan of plans) {
+        specialsByType[plan.special] = (specialsByType[plan.special] || 0) + 1;
+      }
       if (instantSpecials) {
         /*
          * EX-9 禁术·咒发：把特殊方块直接放在匹配落点上并立刻引爆，
@@ -4341,6 +4707,7 @@ function resolveCascade(board, options = {}) {
     totalScore,
     collected,
     specialsCreated,
+    specialsByType,
     iceCleared,
     overflow,
   };
@@ -4676,6 +5043,15 @@ const ACHIEVEMENTS = [
     target: 10,
   },
   {
+    id: 'first_raid',
+    name: '突袭者',
+    desc: '通关任意一个 EX 突袭关卡',
+    icon: 'gem',
+    tier: 'platinum',
+    metric: 'raidClearedCount',
+    target: 1,
+  },
+  {
     id: 'first_3star',
     name: '初见锋芒',
     desc: '首次获得 3 星评价',
@@ -4788,6 +5164,7 @@ function buildAchievementStats(save, levels, result = null) {
     clearedCount: 0,
     clearedNormalCount: 0,
     clearedExCount: 0,
+    raidClearedCount: 0,
     totalStars: 0,
     threeStarCount: 0,
     normalThreeStarCount: 0,
@@ -4802,15 +5179,20 @@ function buildAchievementStats(save, levels, result = null) {
     if (level.valid === false) continue;
     const p = progress[String(level.levelId)];
     if (!p?.cleared) continue;
-    const stars = Math.max(0, Math.min(3, Number(p.stars) || 0));
+    // 第 4 颗星只认突袭通关记录，不从历史星级反推
+    const stars = p.raidCleared ? 4 : Math.max(0, Math.min(3, Number(p.stars) || 0));
     stats.clearedCount += 1;
     stats.totalStars += stars;
     if (stars >= 3) {
       stats.threeStarCount += 1;
       if (!level.isEx) stats.normalThreeStarCount += 1;
     }
-    if (level.isEx) stats.clearedExCount += 1;
-    else stats.clearedNormalCount += 1;
+    if (level.isEx) {
+      stats.clearedExCount += 1;
+      if (p.raidCleared) stats.raidClearedCount += 1;
+    } else {
+      stats.clearedNormalCount += 1;
+    }
     stats.maxHighScore = Math.max(stats.maxHighScore, Math.max(0, Number(p.highScore) || 0));
   }
 
@@ -4864,6 +5246,8 @@ class GameSession {
     this.state = SESSION_STATE.IN_PROGRESS;
     // 续玩是同一局：道具配置与剩余次数都以快照为准，不能被外部配置改动
     this.isResumed = Boolean(resumed);
+    // 突袭模式：不可使用任何道具
+    this.isRaid = Boolean(level.isRaid || resumed?.isRaid);
     this.movesLeft = resumed?.movesLeft ?? level.moves;
     /*
      * 加三步会同时增加 movesLeft 与 movesTotal，续玩时必须把两者都恢复，
@@ -4875,17 +5259,19 @@ class GameSession {
       : Math.max(level.moves, this.movesLeft);
     this.counters = resumed?.counters ?? createCounters(board);
     const rawLoadout = Array.isArray(resumed?.boosterLoadout) ? resumed.boosterLoadout : loadout;
-    this.boosterLoadout = Array.isArray(rawLoadout)
-      ? sanitizeBoosterLoadout(rawLoadout)
-      : [...DEFAULT_BOOSTER_LOADOUT];
-    this.boosterUsage = resumed?.boosterUsage ?? {
-      shuffle: 0,
-      hammer: 0,
-      addMoves: 0,
-      rainbow: 0,
-      bomb: 0,
-      icePick: 0,
-    };
+    this.boosterLoadout = this.isRaid
+      ? []
+      : (Array.isArray(rawLoadout) ? sanitizeBoosterLoadout(rawLoadout) : [...DEFAULT_BOOSTER_LOADOUT]);
+    this.boosterUsage = this.isRaid
+      ? { shuffle: 0, hammer: 0, addMoves: 0, rainbow: 0, bomb: 0, icePick: 0 }
+      : (resumed?.boosterUsage ?? {
+        shuffle: 0,
+        hammer: 0,
+        addMoves: 0,
+        rainbow: 0,
+        bomb: 0,
+        icePick: 0,
+      });
     this.chainBest = resumed?.chainBest ?? 0;
     this.tilesCleared = resumed?.tilesCleared ?? 0;
     this.turnCount = resumed?.turnCount ?? 0;
@@ -4947,6 +5333,7 @@ class GameSession {
     const boardData = this.board.serialize();
     return {
       levelId: this.level.levelId,
+      isRaid: this.isRaid,
       board: boardData.board,
       specials: boardData.specials,
       specialActive: boardData.specialActive,
@@ -5024,7 +5411,7 @@ __modules["js/application/gameController.js"] = function (exports, __req) {
  */
 
 const { EVENTS } = __req("js/core/events.js");
-const { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL } = __req("js/core/constants.js");
+const { BOOSTERS, SESSION_STATE, SCENE, SCORE, SPECIAL, ELEMENTS } = __req("js/core/constants.js");
 const { Board } = __req("js/domain/board.js");
 const { createBoard } = __req("js/domain/boardFactory.js");
 const { isAdjacent, isValidSwap, planSpecialSwap } = __req("js/domain/matchEngine.js");
@@ -5037,7 +5424,7 @@ const { ACHIEVEMENTS } = __req("js/data/achievements.js");
 const { buildAchievementStats, evaluateAchievements, achievementProgress } = __req("js/domain/achievements.js");
 const { GameSession } = __req("js/application/gameSession.js");
 const { sanitizeNickname } = __req("js/application/nickname.js");
-const { createDefaultSave, localISO } = __req("js/infrastructure/storageService.js");
+const { createDefaultSave, createCareerStats, localISO } = __req("js/infrastructure/storageService.js");
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -5161,12 +5548,120 @@ class GameController {
     this.emitSession();
   }
 
+  /** 生涯统计：只从新版本开始累计，不从历史成绩反推 */
+  careerStats() {
+    const base = createCareerStats();
+    const current = this.save.career && typeof this.save.career === 'object'
+      ? this.save.career
+      : {};
+    this.save.career = {
+      ...base,
+      ...current,
+      specials: { ...base.specials, ...(current.specials || {}) },
+      boosterUses: { ...base.boosterUses, ...(current.boosterUses || {}) },
+      tileClears: { ...base.tileClears, ...(current.tileClears || {}) },
+    };
+    return this.save.career;
+  }
+
+  recordCareerCascade(result) {
+    const career = this.careerStats();
+    career.maxChain = Math.max(career.maxChain, Math.max(0, Number(result?.chainCount) || 0));
+
+    for (const step of result?.sequence || []) {
+      for (const item of step.cleared || []) {
+        // 只统计普通方块颜色；特殊方块本身不计入颜色
+        if (item.special) continue;
+        const key = String(item.type);
+        if (Object.prototype.hasOwnProperty.call(career.tileClears, key)) {
+          career.tileClears[key] += 1;
+        }
+      }
+    }
+
+    for (const [special, count] of Object.entries(result?.specialsByType || {})) {
+      if (Object.prototype.hasOwnProperty.call(career.specials, special)) {
+        career.specials[special] += Math.max(0, Number(count) || 0);
+      }
+    }
+  }
+
+  recordCareerSpecial(special, count = 1) {
+    const career = this.careerStats();
+    if (Object.prototype.hasOwnProperty.call(career.specials, special)) {
+      career.specials[special] += Math.max(0, Number(count) || 0);
+    }
+  }
+
+  recordCareerBooster(id) {
+    const career = this.careerStats();
+    if (Object.prototype.hasOwnProperty.call(career.boosterUses, id)) {
+      career.boosterUses[id] += 1;
+    }
+  }
+
+  careerView() {
+    const career = this.careerStats();
+    const specials = [
+      ['stripe_h', '横条纹'],
+      ['stripe_v', '竖条纹'],
+      ['bomb', '炸弹'],
+      ['rainbow', '彩虹'],
+    ].map(([key, name]) => ({ key, name, count: career.specials[key] || 0 }));
+
+    const boosters = Object.values(BOOSTERS).map((def) => ({
+      id: def.id,
+      name: def.name,
+      count: career.boosterUses[def.id] || 0,
+    }));
+    const colors = ELEMENTS.map((element, type) => ({
+      type,
+      name: element.name,
+      color: element.color,
+      count: career.tileClears[String(type)] || 0,
+    }));
+
+    const bestBooster = boosters.reduce(
+      (best, item) => (item.count > best.count ? item : best),
+      { count: 0, id: null, name: '' }
+    );
+    const bestColor = colors.reduce(
+      (best, item) => (item.count > best.count ? item : best),
+      { count: 0, type: null, name: '', color: '' }
+    );
+
+    return {
+      maxChain: career.maxChain,
+      specials,
+      boosters,
+      topBooster: bestBooster.count > 0 ? bestBooster : null,
+      colors,
+      topColor: bestColor.count > 0 ? bestColor : null,
+    };
+  }
+
+  careerPreview() {
+    const view = this.careerView();
+    const parts = [];
+    if (view.topBooster) parts.push(`${view.topBooster.name} ${view.topBooster.count} 次`);
+    if (view.topColor) parts.push(`${view.topColor.name} ${view.topColor.count} 个`);
+    return {
+      maxChain: view.maxChain,
+      summary: parts.length ? parts.join(' · ') : '尚无记录',
+    };
+  }
+
   /** 修改本局携带的道具；关卡说明阶段（尚未操作）会同步到当前会话 */
   setBoosterLoadout(ids) {
     const loadout = sanitizeBoosterLoadout(ids);
     this.save.boosterLoadout = loadout;
     const s = this.session;
-    if (s && !s.isResumed && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)) {
+    if (
+      s
+      && !s.isResumed
+      && !s.isRaid
+      && (s.state === SESSION_STATE.IN_PROGRESS || s.state === SESSION_STATE.PAUSED)
+    ) {
       // 新开的一局可以改；续玩是同一局，外部配置只留给下一局
       s.boosterLoadout = [...loadout];
     }
@@ -5205,26 +5700,56 @@ class GameController {
     if (snap && Number.isInteger(snapId) && Array.isArray(snap.board) && snap.board.length) {
       const level = this.levels.get(snapId);
       if (level && level.valid && !level.hidden) {
-        return { levelId: snapId, resume: true };
+        return { levelId: snapId, resume: true, raid: Boolean(snap.isRaid) };
       }
     }
-    return { levelId: this.nextLevelId(), resume: false };
+    return { levelId: this.nextLevelId(), resume: false, raid: false };
   }
 
-  startLevel(levelId, { resume = false } = {}) {
+  startLevel(levelId, { resume = false, raid = false } = {}) {
     // 连锁结算进行中不允许换关：否则上一局的异步结算会继续作用到新的会话上
     if (this.busy) return false;
-    const level = this.levels.get(levelId);
-    if (!level || !level.valid) {
+    const baseLevel = this.levels.get(levelId);
+    if (!baseLevel || !baseLevel.valid) {
       this.toast('该关卡数据异常，暂时无法进入', 'warn');
       this.navigate(SCENE.LEVELS);
       return false;
     }
-    if (level.hidden) {
+    if (baseLevel.hidden) {
       this.toast('该关卡暂时下线，敬请期待', 'info');
       this.navigate(SCENE.LEVELS);
       return false;
     }
+    if (raid) {
+      const normalStars = Math.max(0, Number(this.save.progress[String(levelId)]?.stars) || 0);
+      if (!baseLevel.isEx || normalStars < 3) {
+        this.toast('普通三星后才能挑战突袭', 'warn');
+        this.navigate(SCENE.LEVELS);
+        return false;
+      }
+    }
+
+    // 突袭是用普通三星分数线做通关目标，且不允许携带道具
+    const raidThreshold = raid
+      ? (Number(baseLevel.starThresholds?.[2]) || Number(baseLevel.goal?.amount) || 0)
+      : 0;
+    if (raid && raidThreshold <= 0) {
+      this.toast('该关卡暂未配置突袭目标', 'warn');
+      this.navigate(SCENE.LEVELS);
+      return false;
+    }
+    const level = raid
+      ? {
+        ...baseLevel,
+        name: `${baseLevel.name} · 突袭`,
+        goal: { type: 'score', amount: raidThreshold },
+        starThresholds: [raidThreshold, raidThreshold, raidThreshold],
+        disabledBoosters: Object.keys(BOOSTERS),
+        isRaid: true,
+        raidThreshold,
+        tutorialHint: `突袭：不可使用道具，达到 ${raidThreshold} 分即通关，获得第 4 颗星`,
+      }
+      : baseLevel;
 
     // 换关时先收起上一个会话的引导，避免气泡跨关卡残留
     this.tutorial?.stop();
@@ -5232,8 +5757,9 @@ class GameController {
     const snap = this.save.interruptedSession;
     let board = null;
     let resumed = null;
+    const sameMode = snap ? Boolean(snap.isRaid) === Boolean(raid) : false;
 
-    if (resume && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
+    if (resume && sameMode && snap && Number(snap.levelId) === Number(levelId) && Array.isArray(snap.board)) {
       try {
         board = Board.deserialize(
           {
@@ -5254,7 +5780,7 @@ class GameController {
            * 否则会出现“道具次数被扣了、步数却没加”的问题。
            * 上限按“初始步数 + 全部道具都用在加三步”计算，仅用于防御异常存档。
            */
-          const maxMoves = level.moves + 3 * boosterLimit();
+          const maxMoves = level.moves + (raid ? 0 : 3 * boosterLimit());
           const restoredLeft = Math.max(0, Math.min(Number(snap.movesLeft) || 0, maxMoves));
           const restoredTotalRaw = Number(snap.movesTotal);
           const restoredTotal = Number.isFinite(restoredTotalRaw) && restoredTotalRaw >= restoredLeft
@@ -5292,7 +5818,7 @@ class GameController {
       level,
       board,
       resumed,
-      loadout: this.save.boosterLoadout,
+      loadout: raid ? [] : this.save.boosterLoadout,
     });
     this.sessionCounter += 1;
     this.introOpen = false;
@@ -5513,6 +6039,7 @@ class GameController {
         s.board.swap(from, to);
         s.board.setType(to.r, to.c, s.board.typeAt(to.r, to.c), SPECIAL.RAINBOW);
         s.board.setType(from.r, from.c, s.board.typeAt(from.r, from.c));
+        this.recordCareerSpecial(SPECIAL.RAINBOW);
         s.spendMove();
         s.pendingFreeze = true;
         this.renderer?.syncBoard(s.board);
@@ -5561,6 +6088,7 @@ class GameController {
   async runCascade(options) {
     const s = this.session;
     const result = resolveCascade(s.board, { rng: this.rng, ...options });
+    this.recordCareerCascade(result);
     this.bus.emit(EVENTS.CASCADE_START, { levelId: s.level.levelId });
     for (const step of result.sequence) {
       s.applyStep(step);
@@ -5747,6 +6275,7 @@ class GameController {
     const roll = this.rng.next();
     let special;
     let label;
+
     if (roll < 0.5) {
       special = this.rng.next() < 0.5 ? SPECIAL.STRIPE_H : SPECIAL.STRIPE_V;
       label = '条纹';
@@ -5759,6 +6288,7 @@ class GameController {
     }
 
     s.board.setType(cell.r, cell.c, s.board.typeAt(cell.r, cell.c), special);
+    this.recordCareerSpecial(special);
     this.renderer?.syncBoard(s.board);
     this.audio?.play('special');
     this.toast(`祭典赠礼：生成了一颗${label}`, 'good');
@@ -5787,14 +6317,22 @@ class GameController {
       remainingMoves: s.movesLeft,
       cleared,
     });
-    const stars = cleared ? Math.max(1, judgeStars(finalScore, s.level.starThresholds)) : 0;
+    const isRaid = Boolean(s.isRaid);
+    // 突袭通关直接获得第 4 颗星；普通关仍按 1~3 星判定
+    const stars = isRaid
+      ? (cleared ? 4 : 0)
+      : (cleared ? Math.max(1, judgeStars(finalScore, s.level.starThresholds)) : 0);
     const prev = this.save.progress[String(s.level.levelId)] || null;
     const previousBest = prev?.highScore || 0;
+    const prevRaidCleared = Boolean(prev?.raidCleared);
 
     s.result = {
       levelId: s.level.levelId,
       levelName: s.level.name,
       isEx: Boolean(s.level.isEx),
+      isRaid,
+      raidThreshold: Number(s.level.raidThreshold) || null,
+      raidCleared: isRaid ? Boolean(cleared) : prevRaidCleared,
       cleared,
       baseScore,
       bonusScore,
@@ -5810,7 +6348,7 @@ class GameController {
       at: localISO(),
       previousBest,
       isNewBest: cleared && finalScore > previousBest,
-      firstClear: cleared && !prev?.cleared,
+      firstClear: isRaid ? (cleared && !prevRaidCleared) : (cleared && !prev?.cleared),
     };
 
     if (cleared) this.applyProgress(s.result);
@@ -5833,14 +6371,23 @@ class GameController {
       unlocked: true,
       cleared: false,
       stars: 0,
+      raidCleared: false,
       highScore: 0,
       clearedAt: null,
     };
-    // 仅当本次星级更高时才更新星级记录（AC-08）
+    const prevStars = Math.max(0, Number(prev.stars) || 0);
+    // 突袭通关是独立的记录；普通成绩只能保留 1~3 星
+    const raidCleared = result.isRaid ? Boolean(result.cleared) : Boolean(prev.raidCleared);
+    const normalPrevStars = raidCleared ? Math.min(4, prevStars) : Math.min(3, prevStars);
+    const stars = result.isRaid
+      ? (result.cleared ? 4 : prevStars)
+      : Math.max(normalPrevStars, Math.min(3, Number(result.stars) || 0));
+    // 仅当本次星级更高时才更新星级记录；突袭通关固定为第 4 颗星（AC-08）
     this.save.progress[id] = {
       unlocked: true,
       cleared: true,
-      stars: Math.max(prev.stars, result.stars),
+      stars,
+      raidCleared,
       highScore: Math.max(prev.highScore, result.finalScore),
       clearedAt: prev.clearedAt || result.at,
     };
@@ -5859,19 +6406,20 @@ class GameController {
       this.save.progress[nextId] = nx;
     }
 
-    // 本地成绩记录
+    // 本地成绩记录；突袭即使分数没有超过历史最高分，也必须记下第 4 颗星
     const best = this.save.localBest.find((x) => x.levelId === result.levelId);
+    const earnedStars = result.isRaid && result.cleared ? 4 : (Number(result.stars) || 0);
     if (best) {
+      best.stars = Math.max(Number(best.stars) || 0, earnedStars);
       if (result.finalScore > best.score) {
         best.score = result.finalScore;
-        best.stars = Math.max(best.stars, result.stars);
         best.clearedAt = best.clearedAt || result.at;
       }
     } else {
       this.save.localBest.push({
         levelId: result.levelId,
         score: result.finalScore,
-        stars: result.stars,
+        stars: earnedStars,
         clearedAt: result.at,
       });
       this.save.localBest.sort((a, b) => a.levelId - b.levelId);
@@ -5991,9 +6539,11 @@ class GameController {
     const s = this.session;
     if (!s) return { ok: false };
     const levelId = s.level.levelId;
+    const raid = Boolean(s.isRaid);
     this.save.interruptedSession = null;
     this.tutorial?.stop();
-    this.startLevel(levelId, { resume: false });
+    // 突袭局重开仍是突袭，不能退回普通关
+    this.startLevel(levelId, { resume: false, raid });
     this.storage.write(this.save);
     return { ok: true };
   }
@@ -6110,6 +6660,7 @@ class GameController {
 
     const consumed = consumeBooster(id, { used: s.boosterUsage[id] });
     s.boosterUsage[id] = consumed.used;
+    this.recordCareerBooster(id);
     this.boosterArmed = null;
     this.renderer?.setArmedTarget(null);
     this.audio.play('booster');
@@ -6131,6 +6682,7 @@ class GameController {
       } else if (id === 'rainbow' || id === 'bomb') {
         const special = id === 'rainbow' ? SPECIAL.RAINBOW : SPECIAL.BOMB;
         s.board.setType(target.r, target.c, s.board.typeAt(target.r, target.c), special);
+        this.recordCareerSpecial(special);
         this.renderer?.syncBoard(s.board);
         this.audio.play('special');
         this.toast(id === 'rainbow' ? '彩虹已就位' : '炸弹已就位', 'good');
@@ -6216,6 +6768,7 @@ class GameController {
       level: s.level,
       levelId: s.level.levelId,
       levelName: s.level.name,
+      isRaid: s.isRaid,
       hint: s.level.tutorialHint || goalSummary(s.level.goal),
       board: s.board,
       state: s.state,
@@ -6258,6 +6811,9 @@ class GameController {
       } else {
         unlocked = Boolean(p?.unlocked) || lv.levelId === 1;
       }
+      const raidCleared = Boolean(lv.isEx && p?.raidCleared);
+      const rawStars = Math.max(0, Math.min(4, Number(p?.stars) || 0));
+      const stars = lv.isEx ? (raidCleared ? 4 : Math.min(3, rawStars)) : Math.min(3, rawStars);
       return {
         levelId: lv.levelId,
         name: lv.name,
@@ -6266,7 +6822,10 @@ class GameController {
         errors: lv.errors,
         unlocked,
         cleared: Boolean(p?.cleared),
-        stars: p?.stars || 0,
+        stars,
+        raidUnlocked: Boolean(lv.isEx && stars >= 3),
+        raidCleared,
+        raidThreshold: lv.isEx ? (Number(lv.starThresholds?.[2]) || Number(lv.goal?.amount) || 0) : null,
         highScore: p?.highScore || 0,
         goal: goalSummary(lv.goal),
         moves: lv.moves,
@@ -6284,11 +6843,12 @@ class GameController {
       .map((lv) => {
         const p = this.save.progress[String(lv.levelId)];
         const b = best.get(lv.levelId);
+        const raidCleared = Boolean(p?.raidCleared);
         return {
           levelId: lv.levelId,
           name: lv.name,
           score: p?.highScore || b?.score || 0,
-          stars: p?.stars || b?.stars || 0,
+          stars: raidCleared ? 4 : Math.min(3, Math.max(Number(p?.stars) || 0, Number(b?.stars) || 0)),
           clearedAt: p?.clearedAt || b?.clearedAt || null,
         };
       })
@@ -7789,11 +8349,17 @@ function drawShareCard(canvas, result) {
   ctx.font = '800 56px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
   ctx.fillText(result.levelName || '', W / 2, 440);
 
-  // 星级
+  // 星级：EX 关卡额外绘制第 4 颗突袭白星
   const starY = 572;
-  for (let i = 0; i < 3; i += 1) {
-    const cx = W / 2 + (i - 1) * 136;
-    drawStar(ctx, cx, starY, 56, i < result.stars ? '#e0a020' : '#e3d9c7');
+  const starCount = result.isEx ? 4 : 3;
+  const gap = result.isEx ? 108 : 136;
+  const startX = W / 2 - ((starCount - 1) / 2) * gap;
+  for (let i = 0; i < starCount; i += 1) {
+    const cx = startX + i * gap;
+    let color = '#e3d9c7';
+    if (i < 3 && i < result.stars) color = '#e0a020';
+    if (i === 3 && (result.raidCleared || (result.isRaid && result.cleared))) color = '#ffffff';
+    drawStar(ctx, cx, starY, 56, color);
   }
 
   // 分数
@@ -7869,7 +8435,7 @@ function downloadShareCard(canvas, result) {
 function shareText(result) {
   return [
     `三消小径 · 第 ${result.levelId} 关 ${result.levelName}`,
-    `得分 ${result.finalScore}（${'★'.repeat(result.stars)}）`,
+    `得分 ${result.finalScore}（${'★'.repeat(Math.min(3, result.stars))}${result.isEx && (result.raidCleared || (result.isRaid && result.cleared)) ? '☆' : ''}）`,
     `剩余 ${result.movesLeft} 步，最高 ${result.chainBest} 连`,
   ].join('\n');
 }
@@ -7889,13 +8455,24 @@ __modules["js/data/changelog.js"] = function (exports, __req) {
  * 红点并提示手动刷新；刷新加载新版本后红点自动消失。
  */
 
-const APP_VERSION = '1.7.4';
+const APP_VERSION = '1.7.5';
 
 /**
  * 更新公告，按版本从新到旧排列。
  * date 为发布日期（YYYY-MM-DD），notes 为面向玩家的更新说明。
  */
 const CHANGELOG = [
+  {
+    version: '1.7.5',
+    date: '2026-10-29',
+    notes: [
+      'EX 关卡新增“突袭”难度：普通三星后解锁，不可使用道具，达到普通三星分数线即通关',
+      'EX 关卡扩展为 4 颗星，第 4 颗为突袭白星；关卡列表可选择普通或突袭，并新增突袭成就',
+      '新增生涯统计：最大连续消除、特殊方块生成、最常用道具与最多消除颜色',
+      '首页道具入口改为三分之一宽，右侧新增生涯统计预览',
+      '修复深色结算明细看不清、突袭第 4 星显示异常、突袭重开退回普通关等问题',
+    ],
+  },
   {
     version: '1.7.4',
     date: '2026-10-28',
@@ -8255,6 +8832,9 @@ class SceneManager {
     this.updateAvailable = false;
     // 道具配置页的返回目标：home 或 intro（关卡说明）
     this.loadoutReturn = null;
+    // EX 难度选择弹窗
+    this.exModeOpen = false;
+    this.exModeLevel = null;
     this.el = {};
     this._onGlobalKeyDown = this._onGlobalKeyDown.bind(this);
   }
@@ -8278,6 +8858,13 @@ class SceneManager {
   _onGlobalKeyDown(event) {
     if (event.key !== 'Escape' || event.defaultPrevented) return;
     if (!this.current || this.current === SCENE.HOME || this.current === SCENE.GAME) return;
+
+    if (this.exModeOpen) {
+      event.preventDefault();
+      this.audio.play('button');
+      this.hideExMode();
+      return;
+    }
 
     if (this.current === SCENE.BOOSTERS) {
       event.preventDefault();
@@ -8324,6 +8911,14 @@ class SceneManager {
     this.el = {
       homeProgress: $('home-progress'),
       btnContinue: $('btn-continue'),
+      homeStatChain: $('home-stat-chain'),
+      homeStatPreview: $('home-stat-preview'),
+      statsMaxChain: $('stats-max-chain'),
+      statsSpecials: $('stats-specials'),
+      statsTopBooster: $('stats-top-booster'),
+      statsBoosters: $('stats-boosters'),
+      statsTopColor: $('stats-top-color'),
+      statsColors: $('stats-colors'),
       levelGrid: $('level-grid'),
       levelsMeta: $('levels-meta'),
       levelName: $('game-level-name'),
@@ -8370,12 +8965,24 @@ class SceneManager {
       levelIntroStar1: $('level-intro-star1'),
       levelIntroStar2: $('level-intro-star2'),
       levelIntroStar3: $('level-intro-star3'),
+      levelIntroStar4Row: $('level-intro-star4-row'),
+      levelIntroStar4: $('level-intro-star4'),
       levelIntroMechanic: $('level-intro-mechanic'),
       levelIntroTimer: $('level-intro-timer'),
       introBoosters: $('level-intro-boosters'),
       btnIntroBoosters: $('btn-intro-boosters'),
       introLoadoutTitle: $('intro-loadout-title'),
       btnLevelStart: $('btn-level-start'),
+      exMode: $('ex-mode'),
+      exModeKicker: $('ex-mode-kicker'),
+      exModeTitle: $('ex-mode-title'),
+      exModeStars: $('ex-mode-stars'),
+      exModeEarned: $('ex-mode-earned'),
+      btnExNormal: $('btn-ex-normal'),
+      btnExRaid: $('btn-ex-raid'),
+      exNormalDesc: $('ex-normal-desc'),
+      exRaidDesc: $('ex-raid-desc'),
+      btnExModeClose: $('btn-ex-mode-close'),
       boostersMeta: $('boosters-meta'),
       loadoutGrid: $('loadout-grid'),
       btnBoostersBack: $('btn-boosters-back'),
@@ -8470,12 +9077,43 @@ class SceneManager {
       this.openLoadout('intro');
     });
 
+    this.el.btnExModeClose?.addEventListener('click', () => {
+      this.audio.play('button');
+      this.hideExMode();
+    });
+    this.el.exMode?.addEventListener('click', (event) => {
+      if (event.target === this.el.exMode) this.hideExMode();
+    });
+    this.el.btnExNormal?.addEventListener('click', () => {
+      const lv = this.exModeLevel;
+      if (!lv) return;
+      this.audio.play('button');
+      this.hideExMode();
+      const snap = this.controller.save.interruptedSession;
+      const resume = Boolean(snap && Number(snap.levelId) === lv.levelId && !snap.isRaid);
+      this.controller.startLevel(lv.levelId, { resume });
+    });
+    this.el.btnExRaid?.addEventListener('click', () => {
+      const lv = this.exModeLevel;
+      if (!lv || !lv.raidUnlocked || this.el.btnExRaid.disabled) return;
+      this.audio.play('button');
+      this.hideExMode();
+      const snap = this.controller.save.interruptedSession;
+      const resume = Boolean(snap && Number(snap.levelId) === lv.levelId && snap.isRaid);
+      this.controller.startLevel(lv.levelId, { raid: true, resume });
+    });
+
     this.el.btnContinue.addEventListener('click', () => {
       this.audio.play('button');
       // 与首页标签共用同一个入口，避免显示与点击进入的关卡不一致
       const entry = c.homeEntry();
-      // 首页固定为入口后，新手引导在玩家点击开始时再播放
-      if (c.startLevel(entry.levelId, { resume: entry.resume }) && !entry.resume && c.shouldStartTutorial(entry.levelId)) {
+      // 首页固定为入口后，新手引导在玩家点击开始时再播放；
+      // 续玩直接恢复保存的对局（普通或突袭），不经过难度选择
+      if (
+        c.startLevel(entry.levelId, { resume: entry.resume, raid: Boolean(entry.raid) })
+        && !entry.resume
+        && c.shouldStartTutorial(entry.levelId)
+      ) {
         c.tutorial?.begin();
       }
     });
@@ -8485,8 +9123,13 @@ class SceneManager {
       if (!card || card.disabled) return;
       this.audio.play('button');
       const id = Number(card.dataset.level);
+      const entry = c.levelList().find((lv) => lv.levelId === id);
+      if (entry?.isEx) {
+        this.openExMode(entry);
+        return;
+      }
       const snap = c.save.interruptedSession;
-      const resume = Boolean(snap && Number(snap.levelId) === id);
+      const resume = Boolean(snap && Number(snap.levelId) === id && !snap.isRaid);
       if (c.startLevel(id, { resume }) && !resume && c.shouldStartTutorial(id)) {
         c.tutorial?.begin();
       }
@@ -8553,7 +9196,8 @@ class SceneManager {
       const r = this.lastResult;
       if (!r) return;
       if (!r.cleared) {
-        c.startLevel(r.levelId);
+        // 突袭失败后“再试一次”仍是突袭
+        c.startLevel(r.levelId, { raid: Boolean(r.isRaid) });
         return;
       }
       const nextLevel = c.levels.get(r.levelId + 1);
@@ -8570,7 +9214,9 @@ class SceneManager {
 
     this.el.resultRetry.addEventListener('click', () => {
       this.audio.play('button');
-      if (this.lastResult) c.startLevel(this.lastResult.levelId);
+      if (this.lastResult) {
+        c.startLevel(this.lastResult.levelId, { raid: Boolean(this.lastResult.isRaid) });
+      }
     });
 
     this.el.resultLevels.addEventListener('click', () => {
@@ -8829,6 +9475,7 @@ class SceneManager {
 
     if (scene === SCENE.LEVELS) this.renderLevels();
     if (scene === SCENE.ACHIEVEMENTS) this.renderAchievements();
+    if (scene === SCENE.STATS) this.renderStats();
     if (scene === SCENE.RANK) this.renderRank();
     if (scene === SCENE.SETTINGS) this.syncSettings();
     if (scene === SCENE.NOTICE) this.renderNotice();
@@ -8848,6 +9495,56 @@ class SceneManager {
     } else if (this.tutorialStep) {
       this.showTutorial(this.tutorialStep);
     }
+  }
+
+  openExMode(lv) {
+    if (!this.el.exMode || !lv) return;
+    this.exModeLevel = lv;
+    this.exModeOpen = true;
+
+    this.el.exModeKicker.textContent = `EX-${lv.levelId - 100}`;
+    this.el.exModeTitle.textContent = lv.name;
+    this.el.exModeStars.textContent = '';
+    for (let i = 0; i < 4; i += 1) {
+      const s = document.createElement('span');
+      s.className = 'star' + (i === 3 ? ' raid' : '');
+      if (i < 3 && i < Math.min(3, lv.stars)) s.classList.add('on');
+      if (i === 3 && lv.raidCleared) s.classList.add('on');
+      // 未获得的第 4 星用空心星，避免看起来像已经通关突袭
+      s.textContent = (i === 3 && !lv.raidCleared) ? '☆' : STAR;
+      this.el.exModeStars.appendChild(s);
+    }
+    this.el.exModeEarned.textContent = lv.raidCleared
+      ? `已获得 ${lv.stars} / 4 颗星 · 突袭已通关`
+      : `已获得 ${lv.stars} / 4 颗星`;
+
+    const snap = this.controller.save.interruptedSession;
+    const canResumeNormal = Boolean(
+      snap && Number(snap.levelId) === lv.levelId && !snap.isRaid
+    );
+    const canResumeRaid = Boolean(
+      snap && Number(snap.levelId) === lv.levelId && snap.isRaid
+    );
+    this.el.btnExNormal.querySelector('.ex-mode-option-title').textContent = canResumeNormal
+      ? '继续普通'
+      : '开始普通';
+    this.el.btnExNormal.querySelector('.ex-mode-option-desc').textContent = `${lv.goal}；可使用道具`;
+    this.el.btnExRaid.querySelector('.ex-mode-option-title').textContent = canResumeRaid
+      ? '继续突袭'
+      : '挑战突袭';
+    this.el.btnExRaid.disabled = !lv.raidUnlocked;
+    this.el.btnExRaid.classList.toggle('locked', !lv.raidUnlocked);
+    this.el.exRaidDesc.textContent = lv.raidUnlocked
+      ? `不可使用道具，达到 ${lv.raidThreshold} 分获得第 4 颗星`
+      : '普通三星后解锁';
+
+    this.el.exMode.classList.remove('hidden');
+  }
+
+  hideExMode() {
+    this.exModeOpen = false;
+    this.exModeLevel = null;
+    this.el.exMode?.classList.add('hidden');
   }
 
   openLoadout(returnTo = 'home') {
@@ -8928,9 +9625,29 @@ class SceneManager {
       : `第 ${level.levelId} 关 · ${level.name}`;
     this.el.levelIntroGoal.textContent = goalSummary(level.goal) || '完成本关目标';
     this.el.levelIntroMoves.textContent = `${level.moves} 步`;
-    this.el.levelIntroStar1.textContent = stars[0] ? `${stars[0]} 分` : '-';
-    this.el.levelIntroStar2.textContent = stars[1] ? `${stars[1]} 分` : '-';
-    this.el.levelIntroStar3.textContent = stars[2] ? `${stars[2]} 分` : '-';
+    if (level.isRaid) {
+      this.el.levelIntroStar1.textContent = '已获得';
+      this.el.levelIntroStar2.textContent = '已获得';
+      this.el.levelIntroStar3.textContent = '已获得';
+    } else {
+      this.el.levelIntroStar1.textContent = stars[0] ? `${stars[0]} 分` : '-';
+      this.el.levelIntroStar2.textContent = stars[1] ? `${stars[1]} 分` : '-';
+      this.el.levelIntroStar3.textContent = stars[2] ? `${stars[2]} 分` : '-';
+    }
+
+    if (isEx) {
+      this.el.levelIntroStar4Row.classList.remove('hidden');
+      const p = this.controller.save.progress[String(level.levelId)];
+      if (level.isRaid) {
+        this.el.levelIntroStar4.textContent = `通关即获得（目标 ${level.goal.amount} 分）`;
+      } else {
+        this.el.levelIntroStar4.textContent = p?.raidCleared
+          ? '已获得'
+          : '突袭通关获得';
+      }
+    } else {
+      this.el.levelIntroStar4Row.classList.add('hidden');
+    }
 
     if (isEx) {
       this.el.levelIntroMechanic.textContent = level.tutorialHint || '本关有额外的特殊规则，请留意。';
@@ -8948,10 +9665,12 @@ class SceneManager {
     this.renderIntroBoosters(level);
     // 新开的一局可以调整；续玩是同一局，道具配置已固定
     const active = this.controller.session;
-    const canAdjust = !active || !active.isResumed;
+    const canAdjust = !active || (!active.isResumed && !active.isRaid);
     this.el.btnIntroBoosters?.classList.toggle('hidden', !canAdjust);
     if (this.el.introLoadoutTitle) {
-      this.el.introLoadoutTitle.textContent = canAdjust ? '本局道具' : '本局道具（已固定）';
+      this.el.introLoadoutTitle.textContent = active?.isRaid
+        ? '本局道具（突袭禁用）'
+        : (canAdjust ? '本局道具' : '本局道具（已固定）');
     }
     this.el.levelIntro.classList.remove('hidden');
     this.el.btnLevelStart?.focus({ preventScroll: true });
@@ -8964,6 +9683,14 @@ class SceneManager {
       || [];
     const blocked = new Set(level?.disabledBoosters || []);
     this.el.introBoosters.textContent = '';
+
+    if (level?.isRaid) {
+      const empty = document.createElement('span');
+      empty.className = 'intro-booster-empty';
+      empty.textContent = '突袭模式不可使用道具';
+      this.el.introBoosters.appendChild(empty);
+      return;
+    }
 
     if (!loadout.length) {
       const empty = document.createElement('span');
@@ -9010,6 +9737,10 @@ class SceneManager {
     const cleared = Object.entries(save.progress).filter(([id, p]) => p.cleared && visibleIds.has(id)).length;
     const total = visible.length || 20;
     // 标签与点击共用 homeEntry()，保证“显示哪一关就进哪一关”
+    const career = this.controller.careerPreview();
+    if (this.el.homeStatChain) this.el.homeStatChain.textContent = `最高 ${career.maxChain} 连`;
+    if (this.el.homeStatPreview) this.el.homeStatPreview.textContent = career.summary;
+
     const entry = this.controller.homeEntry();
     const nextId = entry.levelId;
     const nextLevel = this.controller.levels.get(nextId);
@@ -9021,8 +9752,13 @@ class SceneManager {
       sub.textContent = '四个元素连成一线';
     } else {
       label.textContent = `继续 ${levelLabel}`;
-      const goal = nextLevel ? goalSummary(nextLevel.goal) : '';
-      sub.textContent = nextLevel ? `${nextLevel.name} · ${goal}` : '全部关卡已通关';
+      if (entry.raid && nextLevel) {
+        const threshold = Number(nextLevel.starThresholds?.[2]) || Number(nextLevel.goal?.amount) || 0;
+        sub.textContent = `${nextLevel.name} · 突袭 ${threshold} 分`;
+      } else {
+        const goal = nextLevel ? goalSummary(nextLevel.goal) : '';
+        sub.textContent = nextLevel ? `${nextLevel.name} · ${goal}` : '全部关卡已通关';
+      }
     }
     this.el.homeProgress.textContent = cleared
       ? `已通关 ${cleared} / ${total} · 累计 ${save.player.totalScore} 分`
@@ -9092,6 +9828,9 @@ class SceneManager {
     const hasBoosters = vm.boosters.length > 0;
     this.el.boosterBar.classList.toggle('hidden', !hasBoosters);
     this.el.boosterEmpty?.classList.toggle('hidden', hasBoosters);
+    if (this.el.boosterEmpty) {
+      this.el.boosterEmpty.textContent = vm.isRaid ? '突袭模式不可使用道具' : '本局未携带道具';
+    }
 
     const seen = new Set();
     for (const b of vm.boosters) {
@@ -9191,13 +9930,14 @@ class SceneManager {
       const stars = document.createElement('span');
       stars.className = 'level-stars';
       if (lv.valid && lv.unlocked) {
-        stars.textContent = STAR.repeat(lv.stars) + STAR.repeat(Math.max(0, 3 - lv.stars));
-        // 已获得的星用高亮色，未获得的用浅色
-        stars.textContent = '';
-        for (let i = 0; i < 3; i += 1) {
+        // EX 关卡有第 4 颗突袭白星；普通关仍只有 3 颗
+        const count = lv.isEx ? 4 : 3;
+        for (let i = 0; i < count; i += 1) {
           const s = document.createElement('span');
-          s.textContent = STAR;
-          if (i < lv.stars) s.className = 'on';
+          s.className = 'star' + (i === 3 ? ' raid' : '');
+          if (i < lv.stars) s.classList.add('on');
+          // 第 4 星未获得时显示空心星，避免误以为已经拿到突袭星
+          s.textContent = (i === 3 && !lv.raidCleared) ? '☆' : STAR;
           stars.appendChild(s);
         }
       } else if (!lv.valid) {
@@ -9209,7 +9949,7 @@ class SceneManager {
       btn.append(no, stars);
       if (lv.valid && lv.unlocked) {
         btn.title = lv.isEx
-          ? `${lv.name}：${lv.goal}`
+          ? `${lv.name}：${lv.goal}${lv.raidCleared ? ' · 突袭已通关' : ''}`
           : `第 ${lv.levelId} 关 ${lv.name}：${lv.goal}`;
       }
       this.el.levelGrid.appendChild(btn);
@@ -9221,14 +9961,24 @@ class SceneManager {
     this.el.resultKicker.textContent = result.levelId >= 100
       ? result.levelName
       : `第 ${String(result.levelId).padStart(2, '0')} 关 · ${result.levelName}`;
-    this.el.resultTitle.textContent = result.cleared ? (result.stars === 3 ? '完美通关' : '通关') : '未达成目标';
+    if (!result.cleared) {
+      this.el.resultTitle.textContent = result.isRaid ? '突袭未达成' : '未达成目标';
+    } else if (result.isRaid) {
+      this.el.resultTitle.textContent = '突袭通关';
+    } else {
+      this.el.resultTitle.textContent = result.stars === 3 ? '完美通关' : '通关';
+    }
     this.el.resultCard.classList.toggle('failed', !result.cleared);
 
     this.el.resultStars.textContent = '';
-    for (let i = 0; i < 3; i += 1) {
+    const starCount = result.isEx ? 4 : 3;
+    const raidStarOn = Boolean(result.raidCleared || (result.isRaid && result.cleared));
+    for (let i = 0; i < starCount; i += 1) {
       const s = document.createElement('span');
-      s.className = 'star' + (i < result.stars ? ' on' : '');
-      s.textContent = STAR;
+      s.className = 'star' + (i === 3 ? ' raid' : '');
+      if (i < 3 && i < result.stars) s.classList.add('on');
+      if (i === 3 && raidStarOn) s.classList.add('on');
+      s.textContent = (i === 3 && !raidStarOn) ? '☆' : STAR;
       s.style.animationDelay = `${120 + i * 130}ms`;
       this.el.resultStars.appendChild(s);
     }
@@ -9308,6 +10058,93 @@ class SceneManager {
     this.el.btnAchievementOk?.focus({ preventScroll: true });
   }
 
+  _statsHighlight(container, item, unit) {
+    if (!container) return;
+    container.textContent = '';
+    if (!item) {
+      const empty = document.createElement('span');
+      empty.className = 'stats-highlight-empty';
+      empty.textContent = '尚无记录';
+      container.appendChild(empty);
+      return;
+    }
+    const name = document.createElement('span');
+    name.className = 'stats-highlight-name';
+    if (item.color) {
+      const swatch = document.createElement('i');
+      swatch.className = 'stats-swatch';
+      swatch.style.background = item.color;
+      name.appendChild(swatch);
+    }
+    const nameText = document.createElement('span');
+    nameText.textContent = item.name;
+    name.appendChild(nameText);
+
+    const count = document.createElement('span');
+    count.className = 'stats-highlight-count';
+    count.textContent = `${item.count} ${unit}`;
+    container.append(name, count);
+  }
+
+  _statsRow(name, countText, color = null) {
+    const row = document.createElement('div');
+    row.className = 'stats-row';
+    const left = document.createElement('span');
+    left.className = 'stats-name';
+    if (color) {
+      const swatch = document.createElement('i');
+      swatch.className = 'stats-swatch';
+      swatch.style.background = color;
+      left.appendChild(swatch);
+    }
+    const label = document.createElement('span');
+    label.textContent = name;
+    left.appendChild(label);
+    const value = document.createElement('b');
+    value.textContent = countText;
+    row.append(left, value);
+    return row;
+  }
+
+  renderStats() {
+    const view = this.controller.careerView();
+    if (this.el.statsMaxChain) this.el.statsMaxChain.textContent = String(view.maxChain);
+
+    if (this.el.statsSpecials) {
+      this.el.statsSpecials.textContent = '';
+      for (const item of view.specials) {
+        const card = document.createElement('div');
+        card.className = 'stats-special';
+        const label = document.createElement('span');
+        label.className = 'stats-special-label';
+        label.textContent = item.name;
+        const value = document.createElement('strong');
+        value.className = 'stats-special-value';
+        value.textContent = String(item.count);
+        card.append(label, value);
+        this.el.statsSpecials.appendChild(card);
+      }
+    }
+
+    this._statsHighlight(this.el.statsTopBooster, view.topBooster, '次');
+    if (this.el.statsBoosters) {
+      this.el.statsBoosters.textContent = '';
+      for (const item of view.boosters) {
+        this.el.statsBoosters.appendChild(this._statsRow(item.name, `${item.count} 次`));
+      }
+    }
+
+    this._statsHighlight(this.el.statsTopColor, view.topColor, '个');
+    if (this.el.statsColors) {
+      this.el.statsColors.textContent = '';
+      for (const item of view.colors) {
+        this.el.statsColors.appendChild(
+          this._statsRow(item.name, `${item.count} 个`, item.color)
+        );
+      }
+    }
+  }
+
   renderRank() {
     const view = this.controller.rankView();
     this.el.rankName.textContent = view.nickname || '玩家';
@@ -9339,7 +10176,7 @@ class SceneManager {
       score.className = 'rank-score';
       score.textContent = String(row.score);
       const st = document.createElement('small');
-      st.textContent = STAR.repeat(row.stars);
+      st.textContent = STAR.repeat(Math.min(3, row.stars)) + (row.stars >= 4 ? '☆' : '');
       score.appendChild(st);
       item.append(idx, mid, score);
       this.el.rankList.appendChild(item);
