@@ -45,5 +45,5 @@
     2750
   ],
   "disabledBoosters": [],
-  "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"
+  "tutorialHint": "在冰块旁边消除，冰块的耐久会减1"
 }

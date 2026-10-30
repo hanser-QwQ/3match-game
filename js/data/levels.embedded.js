@@ -27,7 +27,7 @@ export const LEVELS = [
       2800
     ],
     "disabledBoosters": [],
-    "tutorialHint": "交换相邻的两个元素，连成三个即可消除"
+    "tutorialHint": "交换相邻的两个元素，连成三个同色元素即可消除"
   },
   {
     "schemaVersion": 1,
@@ -51,7 +51,7 @@ export const LEVELS = [
       2950
     ],
     "disabledBoosters": [],
-    "tutorialHint": "一次消除四个，会得到更强的条纹元素"
+    "tutorialHint": "一次消除四个同色元素，会得到更强的条纹元素"
   },
   {
     "schemaVersion": 1,
@@ -125,7 +125,7 @@ export const LEVELS = [
       2950
     ],
     "disabledBoosters": [],
-    "tutorialHint": "优先消除目标元素，边上留出的空位会带来连锁"
+    "tutorialHint": "优先消除目标元素，边上留出的空位可能会带来连锁消除"
   },
   {
     "schemaVersion": 1,
@@ -150,7 +150,7 @@ export const LEVELS = [
       2900
     ],
     "disabledBoosters": [],
-    "tutorialHint": "连锁的倍率会一路涨到三倍，尽量制造连续消除"
+    "tutorialHint": "连续消除时，连锁的倍率会一路涨到三倍，请尽量制造连续消除"
   },
   {
     "schemaVersion": 1,
@@ -175,7 +175,7 @@ export const LEVELS = [
       2900
     ],
     "disabledBoosters": [],
-    "tutorialHint": "元素种类变多，找准一处能连带的位置再动手"
+    "tutorialHint": "元素种类增加，请找准一处能连带的位置再动手"
   },
   {
     "schemaVersion": 1,
@@ -256,7 +256,7 @@ export const LEVELS = [
       2750
     ],
     "disabledBoosters": [],
-    "tutorialHint": "在冰块旁边消除，冰块的耐久会随之减少"
+    "tutorialHint": "在冰块旁边消除，冰块的耐久会减1"
   },
   {
     "schemaVersion": 1,
@@ -313,7 +313,7 @@ export const LEVELS = [
       2750
     ],
     "disabledBoosters": [],
-    "tutorialHint": "条纹元素可以整行或整列清除，用来破冰最有效"
+    "tutorialHint": "条纹元素可以将整行或整列清除，用来破冰很有效"
   },
   {
     "schemaVersion": 1,
@@ -342,7 +342,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "stripePairToRainbow": true
     },
-    "tutorialHint": "两个条纹交换可以合成为彩虹，合成的彩虹会留在棋盘上"
+    "tutorialHint": "两个条纹交换可以合成为彩虹，请善加利用"
   },
   {
     "schemaVersion": 1,
@@ -371,7 +371,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "freezeEveryNMoves": 2
     },
-    "tutorialHint": "每走 2 步会随机冻住 1~4 个元素，抓紧时间"
+    "tutorialHint": "每走 2 步会随机冻住 1~4 个元素"
   },
   {
     "schemaVersion": 1,
@@ -403,7 +403,7 @@ export const LEVELS = [
       "rainbowRandomClear": true,
       "rainbowRandomCount": 8
     },
-    "tutorialHint": "炸弹更容易生成，但只会炸周围 4 格；彩虹改为随机消除同色方块"
+    "tutorialHint": "炸弹会更容易生成，但效果降低为周围 4 格；彩虹削弱为随机消除同色方块"
   },
   {
     "schemaVersion": 1,
@@ -432,7 +432,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "initialDoubleIce": 18
     },
-    "tutorialHint": "开局棋盘上随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
+    "tutorialHint": "开局棋盘上会随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
   },
   {
     "schemaVersion": 1,
@@ -494,7 +494,7 @@ export const LEVELS = [
       "moveTimeLimit": 7,
       "refundMoveOnSpecial": 1
     },
-    "tutorialHint": "每生成一个特殊方块返还 1 步，单次最多返还 2 步"
+    "tutorialHint": "每生成一个特殊方块返还 1 步数，单次最多返还 2 步数"
   },
   {
     "schemaVersion": 1,
@@ -526,7 +526,7 @@ export const LEVELS = [
       "bombChainAll": true,
       "bombBonus": 100
     },
-    "tutorialHint": "四连及以上只会生成炸弹，炸弹范围扩大到 7×7 菱形；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
+    "tutorialHint": "四连及以上改为生成炸弹，炸弹范围扩大到 7×7 菱形；任意炸弹引爆会连锁引爆全场炸弹，并额外获得分数"
   },
   {
     "schemaVersion": 1,
@@ -558,7 +558,7 @@ export const LEVELS = [
       "freezeAreaCells": 4,
       "freezeAreaMaxIce": 24
     },
-    "tutorialHint": "每 3 步，随机 2×2 区域全部结霜；场上最多 24 格冰"
+    "tutorialHint": "每 3 步，随机 2×2 区域全部结冰；场上最多 24 格冰"
   },
   {
     "schemaVersion": 1,
@@ -588,7 +588,7 @@ export const LEVELS = [
       "instantSpecials": true,
       "maxChainMultiplier": 4
     },
-    "tutorialHint": "棋盘只有 5 种颜色；特殊方块不再留下，四连立刻释放条纹，五连立刻清掉一种颜色，拐角匹配立刻爆炸"
+    "tutorialHint": "棋盘只有 5 种颜色；特殊方块产生即使用：四连立刻释放条纹，五连立刻清掉一种颜色，L型或T型匹配立刻爆炸"
   },
   {
     "schemaVersion": 1,
@@ -653,7 +653,7 @@ export const LEVELS = [
       2700
     ],
     "disabledBoosters": [],
-    "tutorialHint": "冰块与收集同时进行，注意角落里的冰"
+    "tutorialHint": "碎冰与收集同时进行，尤其要注意角落里的冰"
   },
   {
     "schemaVersion": 1,
@@ -747,7 +747,7 @@ export const LEVELS = [
       2700
     ],
     "disabledBoosters": [],
-    "tutorialHint": "被困住的元素不能交换，先清掉它旁边的位置"
+    "tutorialHint": "被冻住的元素不能交换，先清掉它旁边的位置"
   },
   {
     "schemaVersion": 1,
@@ -892,7 +892,7 @@ export const LEVELS = [
       2400
     ],
     "disabledBoosters": [],
-    "tutorialHint": "边缘的冰块更难触及，必要时用锤子敲开"
+    "tutorialHint": "边缘的冰块更难触及，必要时可以用锤子或者碎冰敲开"
   },
   {
     "schemaVersion": 1,
@@ -1088,7 +1088,7 @@ export const LEVELS = [
       2450
     ],
     "disabledBoosters": [],
-    "tutorialHint": "彩虹元素与条纹交换，可以清掉同色的全部元素"
+    "tutorialHint": "彩虹元素与条纹交换，可以将所有同色元素变为条纹并清除"
   },
   {
     "schemaVersion": 1,
@@ -1162,7 +1162,7 @@ export const LEVELS = [
       2400
     ],
     "disabledBoosters": [],
-    "tutorialHint": "先破中间的冰，棋盘的通路会顺畅很多"
+    "tutorialHint": "先破最中间的冰，棋盘的通路会顺畅很多"
   },
   {
     "schemaVersion": 1,
@@ -1316,6 +1316,6 @@ export const LEVELS = [
       2400
     ],
     "disabledBoosters": [],
-    "tutorialHint": "最后一步之前，先算清剩余的冰与分数"
+    "tutorialHint": "最后一步之前，请先算清剩余的冰与分数"
   }
 ];

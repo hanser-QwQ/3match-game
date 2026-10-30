@@ -28,5 +28,5 @@
     "rainbowRandomClear": true,
     "rainbowRandomCount": 8
   },
-  "tutorialHint": "炸弹更容易生成，但只会炸周围 4 格；彩虹改为随机消除同色方块"
+  "tutorialHint": "炸弹会更容易生成，但效果降低为周围 4 格；彩虹削弱为随机消除同色方块"
 }

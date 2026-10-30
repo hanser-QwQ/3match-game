@@ -25,5 +25,5 @@
     "moveTimeLimit": 7,
     "refundMoveOnSpecial": 1
   },
-  "tutorialHint": "每生成一个特殊方块返还 1 步，单次最多返还 2 步"
+  "tutorialHint": "每生成一个特殊方块返还 1 步数，单次最多返还 2 步数"
 }

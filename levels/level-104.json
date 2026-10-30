@@ -25,5 +25,5 @@
     "moveTimeLimit": 7,
     "initialDoubleIce": 18
   },
-  "tutorialHint": "开局棋盘上随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
+  "tutorialHint": "开局棋盘上会随机生成大量双层冰，需要两次相邻的消除才能彻底敲碎"
 }

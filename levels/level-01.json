@@ -20,5 +20,5 @@
     2800
   ],
   "disabledBoosters": [],
-  "tutorialHint": "交换相邻的两个元素，连成三个即可消除"
+  "tutorialHint": "交换相邻的两个元素，连成三个同色元素即可消除"
 }

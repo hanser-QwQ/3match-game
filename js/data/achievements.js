@@ -55,7 +55,7 @@ export const ACHIEVEMENTS = [
   {
     id: 'all_ex_10',
     name: '十重试炼',
-    desc: '通关全部 10 个 EX 关卡',
+    desc: '通关 10 个 EX 关卡',
     icon: 'gem',
     tier: 'platinum',
     metric: 'clearedExCount',
