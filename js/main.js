@@ -30,6 +30,7 @@ async function boot() {
   const renderer = new Renderer(canvas, { bus });
   const a11y = new A11yService({ bus });
   const tutorial = new TutorialService({ bus });
+  const offline = new OfflineService({ bus });
 
   let scenes = null;
   const controller = new GameController({
@@ -49,7 +50,7 @@ async function boot() {
     toast: (text, type) => scenes?.toast(text, type),
   });
 
-  scenes = new SceneManager({ bus, controller, renderer, audio, a11y });
+  scenes = new SceneManager({ bus, controller, renderer, audio, a11y, offline });
   scenes.init();
 
   await controller.boot();
@@ -91,7 +92,6 @@ async function boot() {
 
   // 离线能力：仅在 https 或 localhost 下注册，file:// 打开时跳过
   if (!window.__M3_STANDALONE__) {
-    const offline = new OfflineService({ bus });
     offline.register();
   }
 
@@ -113,7 +113,7 @@ async function boot() {
   }
 
   // 调试入口：便于手工排查与端到端验证，不参与任何业务逻辑
-  window.__M3__ = { controller, scenes, renderer, audio, storage, levels, bus };
+  window.__M3__ = { controller, scenes, renderer, audio, storage, levels, bus, offline };
 }
 
 const start = () => {

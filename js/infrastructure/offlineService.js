@@ -45,10 +45,105 @@ export class OfflineService {
     }
   }
 
-  /** 有新版本时由界面触发：重新加载即可拿到新缓存 */
-  applyUpdate() {
+  /**
+   * 有新版本时由界面触发。
+   *
+   * 不能直接 location.reload()：旧 Service Worker 可能仍在控制页面，
+   * 缓存优先策略会继续返回旧脚本。这里先等待新 Worker 安装/激活，
+   * 再带查询参数重新进入，绕开 HTML 的 HTTP 缓存。
+   */
+  async applyUpdate() {
     if (typeof location === 'undefined') return;
-    location.reload();
+
+    const hardReload = () => {
+      try {
+        const url = new URL(location.href);
+        url.searchParams.set('_r', Date.now().toString(36));
+        location.replace(url.toString());
+      } catch {
+        location.reload();
+      }
+    };
+
+    if (!this.supported) {
+      hardReload();
+      return;
+    }
+
+    let reg = this.registration;
+    if (!reg) {
+      try {
+        reg = await navigator.serviceWorker.getRegistration();
+      } catch {
+        reg = null;
+      }
+    }
+    if (!reg) {
+      hardReload();
+      return;
+    }
+
+    const waitForController = (ms) => new Promise((resolve) => {
+      if (!navigator.serviceWorker.controller) {
+        resolve(false);
+        return;
+      }
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+        resolve(value);
+      };
+      const onChange = () => finish(true);
+      const timer = setTimeout(() => finish(false), ms);
+      navigator.serviceWorker.addEventListener('controllerchange', onChange);
+    });
+
+    const askWaitingToActivate = () => {
+      if (!reg.waiting) return false;
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      return true;
+    };
+
+    let sawUpdate = askWaitingToActivate();
+
+    if (!sawUpdate) {
+      try {
+        await reg.update();
+      } catch {
+        /* 离线或更新检查失败时走下面的兜底 */
+      }
+      sawUpdate = askWaitingToActivate();
+
+      if (!sawUpdate && reg.installing) {
+        sawUpdate = true;
+        await new Promise((resolve) => {
+          const worker = reg.installing;
+          let settled = false;
+          const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            worker.removeEventListener('statechange', onChange);
+            resolve();
+          };
+          const onChange = () => {
+            if (worker.state === 'installed' || worker.state === 'redundant') finish();
+          };
+          const timer = setTimeout(finish, 5000);
+          worker.addEventListener('statechange', onChange);
+          onChange();
+        });
+        askWaitingToActivate();
+      }
+    }
+
+    // 新 Worker 可能已经 skipWaiting 并激活；等 controllerchange 后再刷新
+    if (sawUpdate) await waitForController(2500);
+
+    hardReload();
   }
 
   get isOnline() {

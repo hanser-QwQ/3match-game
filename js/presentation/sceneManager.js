@@ -18,12 +18,14 @@ import { achievementIcon } from './achievementIcons.js';
 const STAR = '★';
 
 export class SceneManager {
-  constructor({ bus, controller, renderer, audio, a11y }) {
+  constructor({ bus, controller, renderer, audio, a11y, offline = null }) {
     this.bus = bus;
     this.controller = controller;
     this.renderer = renderer;
     this.audio = audio;
     this.a11y = a11y;
+    this.offline = offline;
+    this._updating = false;
     this.current = null;
     this.lastResult = null;
     this.lastScore = -1;
@@ -527,8 +529,7 @@ export class SceneManager {
 
     // 线上重新发布后的版本提示
     document.getElementById('btn-update')?.addEventListener('click', () => {
-      this.updateDismissed = true;
-      location.reload();
+      this.applyUpdate();
     });
     document.getElementById('btn-update-later')?.addEventListener('click', () => {
       this.updateDismissed = true;
@@ -539,12 +540,42 @@ export class SceneManager {
       this.goto(SCENE.NOTICE);
     });
     document.getElementById('btn-notice-refresh')?.addEventListener('click', () => {
-      location.reload();
+      this.applyUpdate();
     });
     this.el.versionLine?.addEventListener('click', () => {
       this.audio.play('button');
       this.goto(SCENE.NOTICE);
     });
+  }
+
+  /**
+   * 统一的“立即刷新”入口。
+   * 先让新 Service Worker 安装/激活，再重新进入页面；
+   * 不能只 location.reload()，否则旧缓存仍可能继续生效。
+   */
+  async applyUpdate() {
+    if (this._updating) return;
+    this._updating = true;
+    this.updateDismissed = true;
+
+    const updateBtn = document.getElementById('btn-update');
+    const noticeBtn = document.getElementById('btn-notice-refresh');
+    if (updateBtn) {
+      updateBtn.disabled = true;
+      updateBtn.textContent = '更新中…';
+    }
+    if (noticeBtn) {
+      noticeBtn.disabled = true;
+      noticeBtn.textContent = '更新中…';
+    }
+    if (this.el.updateText) this.el.updateText.textContent = '正在更新…';
+
+    try {
+      if (this.offline?.applyUpdate) await this.offline.applyUpdate();
+      else location.reload();
+    } catch {
+      location.reload();
+    }
   }
 
   bindBus() {

@@ -6,7 +6,7 @@
  * 首次访问即断网时，导航请求回退到缓存的首页，不出现空白页。
  */
 
-const CACHE_NAME = 'match3-path-v27';
+const CACHE_NAME = 'match3-path-v28';
 const CORE = [
   './',
   './index.html',
@@ -50,9 +50,14 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
+      // 安装时强制回源，避免把浏览器 HTTP 缓存里的旧文件装进新缓存
+      const freshRequest = (url) => new Request(
+        new URL(url, self.registration.scope),
+        { cache: 'reload' }
+      );
       // 逐个缓存：个别资源缺失不应导致整个安装失败
       await Promise.all(
-        CORE.map((url) => cache.add(url).catch(() => undefined))
+        CORE.map((url) => cache.add(freshRequest(url)).catch(() => undefined))
       );
       // 关卡数据按索引清单预缓存，避免探测不存在的关卡号
       try {
@@ -62,7 +67,7 @@ self.addEventListener('install', (event) => {
           await Promise.all(
             (index.levels || []).map((id) => {
               const url = `./levels/level-${String(id).padStart(2, '0')}.json`;
-              return cache.add(url).catch(() => undefined);
+              return cache.add(freshRequest(url)).catch(() => undefined);
             })
           );
         }
@@ -72,6 +77,11 @@ self.addEventListener('install', (event) => {
       self.skipWaiting();
     })()
   );
+});
+
+// 兼容手动触发等待中的新 Worker 激活
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -92,7 +102,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       (async () => {
         try {
-          const fresh = await fetch(request);
+          // 导航必须回源校验，避免 HTML 被浏览器 HTTP 缓存或 CDN 缓存住
+          const fresh = await fetch(request, { cache: 'no-cache' });
           const cache = await caches.open(CACHE_NAME);
           cache.put(request, fresh.clone());
           return fresh;
@@ -111,8 +122,8 @@ self.addEventListener('fetch', (event) => {
       const cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(request);
       if (cached) {
-        // 后台更新，不阻塞当前请求
-        fetch(request)
+        // 后台更新，不阻塞当前请求；no-cache 避免把 HTTP 缓存里的旧文件写回来
+        fetch(request, { cache: 'no-cache' })
           .then((res) => {
             if (res && res.ok) cache.put(request, res.clone());
           })
